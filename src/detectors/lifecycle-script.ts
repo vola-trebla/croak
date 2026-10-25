@@ -199,12 +199,22 @@ function assessor(
       return { ...empty, reasons: ["scripts are nested too deeply to follow"] };
     const facts = analyzeShell(command);
     if (facts.unparsable) {
-      return {
-        ...empty,
-        reasons: [
-          "the command could not be parsed, so croak cannot tell what it runs",
-        ],
-      };
+      // Fail closed: unparsable text that names a download tool could be
+      // hiding curl … | sh behind a trick the parser does not understand.
+      return facts.mentionsDownloader
+        ? {
+            ...empty,
+            block: true,
+            reasons: [
+              "could not be parsed and mentions a download tool (failing closed)",
+            ],
+          }
+        : {
+            ...empty,
+            reasons: [
+              "the command could not be parsed, so croak cannot tell what it runs",
+            ],
+          };
     }
 
     const reasons: string[] = [];

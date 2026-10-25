@@ -1,6 +1,6 @@
 import type { ScanOutcome } from "./scan.ts";
 import { INCOMPLETE_ICON, SEVERITY_ICON, VERDICT_ICON } from "./ui.ts";
-import type { Finding, Severity } from "./verdict.ts";
+import type { Finding, Severity, Verdict } from "./verdict.ts";
 
 /** Bump when the JSON shape changes; agents and hooks depend on it. */
 export const REPORT_SCHEMA = 1;
@@ -8,6 +8,18 @@ export const REPORT_SCHEMA = 1;
 export interface RenderOptions {
   readonly emoji: boolean;
 }
+
+/**
+ * What each verdict means, said out loud: neither green nor yellow is a
+ * promise that the repo is safe to run.
+ */
+const MEANING: Readonly<Record<Verdict, string>> = {
+  allow:
+    "Nothing suspicious found. Not a guarantee: croak only knows what it checks.",
+  warn: "Needs your attention: croak found behavior worth reviewing before you install or run anything. This is not a safe verdict.",
+  block:
+    "Do not install or run this until you have reviewed the findings above.",
+};
 
 const ORDER: Readonly<Record<Severity, number>> = {
   block: 0,
@@ -70,6 +82,7 @@ export function renderScan(
     "",
     ...body,
     "",
+    `  ${MEANING[outcome.verdict]}`,
     `  ${outcome.filesScanned} files scanned · ${Math.round(outcome.durationMs)} ms`,
     "",
   ].join("\n");

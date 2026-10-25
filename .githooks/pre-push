@@ -1,3 +1,3 @@
 #!/bin/sh
-# Full gate before anything leaves the machine: lint + typecheck + invariants + tests.
-exec pnpm check
+# Full gate before anything leaves the machine: lint + typecheck + invariants + tests, then the ReDoS guard.
+pnpm check && exec pnpm redos

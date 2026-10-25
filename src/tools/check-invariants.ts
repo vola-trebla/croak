@@ -80,7 +80,12 @@ const SOURCE_RULES: ReadonlyArray<{
 
 /** Marks a file whose strings are detector patterns or test data (see D16). */
 export const PATTERN_DATA_MARKER = "// croak-invariants: pattern-data";
-const PATTERN_DATA_DIRS = ["src/signals/", "src/detectors/"];
+// Prefixes: two directories, plus the ReDoS guard, whose fragments are data too.
+const PATTERN_DATA_DIRS = [
+  "src/signals/",
+  "src/detectors/",
+  "src/tools/redos-check.",
+];
 
 const FORBIDDEN_MODULES =
   "child_process|vm|worker_threads|module|inspector|repl";

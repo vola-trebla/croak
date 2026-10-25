@@ -31,6 +31,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm invariants
       - run: pnpm test
+      # Its own step with a hard timeout: a catastrophic regex hangs the process.
+      - run: pnpm redos
+        timeout-minutes: 2
       # Full report in the log; regressions already fail the test step above.
       - run: pnpm eval --plain
       - run: pnpm build

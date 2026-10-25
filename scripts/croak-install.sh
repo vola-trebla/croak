@@ -40,6 +40,13 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
   npm_config_cache="$work/cache" npm_config_registry="https://registry.npmjs.org/" \
   npm_config_git=/usr/bin/false npm_config_ignore_scripts=true \
   npm install --package-lock-only --ignore-scripts --no-audit --no-fund -- "$@" >"$work/npm.log" 2>&1); then
+  if grep -q "E404" "$work/npm.log"; then
+    # Most often a mistyped or AI-invented name; an attacker may register it later.
+    echo "croak-install: a requested package does not exist on npm. Check the name:" >&2
+    echo "AI agents often invent plausible package names, and attackers register them." >&2
+    grep -E "404|is not in this registry" "$work/npm.log" | head -n 3 >&2
+    exit 2
+  fi
   echo "croak-install: npm could not plan this install, so it was not checked:" >&2
   tail -n 15 "$work/npm.log" >&2
   exit 3

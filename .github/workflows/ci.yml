@@ -39,3 +39,7 @@ jobs:
       - run: pnpm build
       # Smoke: the built CLI must answer. Silent output with exit 0 is a fail-open.
       - run: node dist/cli.js --version | grep -q .
+      # croak must keep working sandboxed (D23): no spawning, writing, workers, or eval.
+      - run: >-
+          node --permission --allow-fs-read="$PWD" --disallow-code-generation-from-strings
+          dist/cli.js repo eval/cases/d-known-tool-chained/fixture --json | grep -q '"verdict": "block"'

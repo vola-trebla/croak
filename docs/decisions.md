@@ -38,7 +38,7 @@ SHA pins with a version comment; `permissions: contents: read`;
 `persist-credentials: false` on checkout.
 **Trade-off:** updates are manual (or via Dependabot later).
 
-## D6 — Private repo until M8 (2026-10-24)
+## D6 — Private repo until M8 (2026-10-24, superseded by D21)
 
 Iterate freely, open the repo with a working MVP, eval results, and the article.
 **Trade-off:** no early community feedback.
@@ -190,3 +190,36 @@ memoized per script, so a layered script graph cannot stall the scan.
 **Trade-off:** croak trusts an inert tool's name; whether that tool's package
 is itself honest is the install check's job (M3). Some 🟡 returned on the
 corpus — that is the honest number.
+
+## D20 — Agents: block on 🔴, ask on 🟡 (2026-10-25)
+
+In agent integrations (M4), 🔴 and "scan incomplete" block the install. 🟡 does
+not block: the agent shows the findings and asks the user to confirm. A nested
+install found by a scan (`cd client && npm install`) is checked again as its
+own install rather than trusted.
+**Trade-off:** a 🟡 attack that the user waves through gets installed; blocking
+every 🟡 would turn ordinary work into an obstacle course and teach users to
+disable the hook.
+
+## D21 — Open the repo after M2, not M8 (2026-10-25)
+
+`croak repo` works end to end, tests and the eval are reproducible, and the
+limits are documented. Waiting for M8 delays feedback for no safety gain. The
+repo opens marked early-stage; the README says what croak does not catch.
+**Trade-off:** rough edges are public; the README must stay honest about them.
+
+## D22 — Package name `@vola-trebla/croak` (2026-10-25)
+
+`croak` is likely taken on npm. A scoped name avoids a conflict now; the name
+is checked for availability and confusion with existing projects before the
+first publish (M8), because renaming after users arrive is painful.
+**Trade-off:** a scoped name is longer to type.
+
+## D23 — croak runs under Node's permission model (2026-10-25)
+
+Checked in practice: with `--permission`, read access limited to croak and the
+target, and `--disallow-code-generation-from-strings`, croak gives the same
+verdicts while spawning, writing, workers, and eval are denied. CI runs a
+sandboxed scan on every PR; the M4 hook will invoke croak this way. Network
+is not covered by Node 24 and stays a documented gap.
+**Trade-off:** callers must pass the target as an allowed read path.

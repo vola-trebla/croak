@@ -85,12 +85,27 @@ untrusted project. Before shipping M3:
   as signals instead;
 - prove with tests that no lifecycle script runs on this path.
 
-### 6. Least privilege (M2 spike)
+### 6. Least privilege: run croak sandboxed (checked 2026-10-25, D23)
 
-Investigate running analysis under Node's permission model
-(`node --permission --allow-fs-read=<target>`): read-only access to the target,
-no child processes, no workers. Defense in depth — even a bug in croak could
-not execute analyzed code. Network is likely not covered and needs checking.
+Node 24's permission model runs croak with read-only access to its own code
+and the scan target:
+
+```bash
+node --permission --allow-fs-read=<croak dir> --allow-fs-read=<target> \
+     --disallow-code-generation-from-strings <croak dir>/dist/cli.js repo <target>
+```
+
+Measured: croak produces the same verdicts, while child processes, file
+writes, worker threads, `eval`, and `new Function` all fail
+(`ERR_ACCESS_DENIED` / `EvalError`). So even a croak bug that ended up
+"running" analyzed code would get almost no capabilities. **Network is not
+covered**: Node 24 has no network permission, so `fetch` still works inside
+the sandbox. CI runs croak sandboxed on every PR, so a change that needs any
+of the denied capabilities fails the build.
+
+Known gap: a target outside the read allowlist crashes croak with a raw
+`ERR_ACCESS_DENIED` stack instead of a clean error. To fix with the M4 hook,
+which will run croak sandboxed by default.
 
 ### 7. Verdict semantics
 

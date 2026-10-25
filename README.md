@@ -101,17 +101,31 @@ pnpm eval
 ```
 
 ```
-🐸 croak eval — 3 cases (2 malicious, 1 benign)
+🐸 croak eval — 12 cases (5 malicious, 7 benign)
 
-  ✅ benign-vite-app   expected 🟢 allow  got 🟢 allow
-  ❌ d-postinstall     expected 🔴 block  got 🟢 allow  MISSED  missing: repo/lifecycle-script
-  ❌ d-vscode-autorun  expected 🔴 block  got 🟢 allow  MISSED  missing: repo/ide-autorun
+  ✅ benign-large-lockfile        expected 🟢 allow  got 🟢 allow
+  ✅ benign-long-line-config      expected 🟢 allow  got 🟢 allow
+  ✅ benign-minified-vendor       expected 🟢 allow  got 🟢 allow
+  🔸 benign-postinstall-copy-env  expected 🟡 warn   got 🟢 allow  UNDER  missing: repo/lifecycle-script
+  🔸 benign-prisma-postinstall    expected 🟡 warn   got 🟢 allow  UNDER  missing: repo/lifecycle-script
+  ✅ benign-vite-app              expected 🟢 allow  got 🟢 allow
+  ✅ benign-vscode-build-task     expected 🟢 allow  got 🟢 allow
+  ❌ d-config-obfuscated          expected 🔴 block  got 🟢 allow  MISSED  missing: repo/obfuscation
+  ✅ d-oversized-config           expected 🟡 warn   got 🟡 warn
+  ❌ d-postinstall                expected 🔴 block  got 🟢 allow  MISSED  missing: repo/lifecycle-script
+  ❌ d-tailwind-hidden-code       expected 🔴 block  got 🟢 allow  MISSED  missing: repo/hidden-code
+  ❌ d-vscode-autorun             expected 🔴 block  got 🟢 allow  MISSED  missing: repo/ide-autorun
 
-  block recall    0/2    0%  ░░░░░░░░░░░░░░░░░░░░
+  block recall    0/5    0%  ░░░░░░░░░░░░░░░░░░░░
+  flag recall     1/5   20%  ████░░░░░░░░░░░░░░░░
+  false alarms    0/7    0%  ░░░░░░░░░░░░░░░░░░░░
+  rule recall     1/7   14%  ███░░░░░░░░░░░░░░░░░
+  time          2 ms
 ```
 
-Yes, 0%. That's the baseline before the first detector exists — every ❌ that
-turns into ✅ is progress you can see. Format and metrics:
+One detector exists so far: the safety floor `repo/unscanned` (a file too big to
+read is never a clean scan). Every ❌ that turns into ✅ is progress you can see,
+and a case that ever passed is not allowed to fail again. Format and metrics:
 [eval/README.md](eval/README.md).
 
 ## 🗺️ Roadmap
@@ -119,7 +133,7 @@ turns into ✅ is progress you can see. Format and metrics:
 |     | Milestone                                                                   |
 | --- | --------------------------------------------------------------------------- |
 | ✅  | **M0** — foundation: TypeScript, tests, CI, supply-chain-hardened workflows |
-| 🔨  | **M1** — eval first: case format, runner, metrics                           |
+| ✅  | **M1** — eval first: case format, runner, metrics, regression guard         |
 | ⏳  | **M2** — `croak repo`: autorun configs, hidden code, obfuscation            |
 | ⏳  | **M3** — npm install plans + registry signals                               |
 | ⏳  | **M4** — Claude Code hook, agent-friendly verdicts                          |
@@ -138,7 +152,7 @@ Details in [ROADMAP.md](ROADMAP.md); the reasoning behind every choice is in
 nvm use                               # Node 24.2+
 pnpm install
 git config core.hooksPath .githooks   # pre-commit + pre-push checks
-pnpm check                            # lint + typecheck + tests
+pnpm check                            # lint + typecheck + invariants + tests
 pnpm eval                             # run the eval
 ```
 

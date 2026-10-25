@@ -1,4 +1,4 @@
-// SYNTHETIC croak eval fixture. Inert: the hidden payload decodes to a console.log.
+// SYNTHETIC croak eval fixture. Inert: the hidden payload decodes to console.log("croak-eval-synthetic").
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./src/**/*.{js,jsx}"],

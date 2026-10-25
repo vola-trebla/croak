@@ -1,3 +1,4 @@
+// SYNTHETIC croak eval fixture (croak-eval-synthetic). Benign by design.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")

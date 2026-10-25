@@ -4,15 +4,23 @@ import { computeMetrics, outcomeOf, scoreCase } from "./score.ts";
 
 describe("outcomeOf", () => {
   it.each([
-    ["block", "block", "pass"],
-    ["block", "allow", "missed"],
-    ["warn", "allow", "missed"],
-    ["block", "warn", "under"],
-    ["allow", "warn", "false-alarm"],
-    ["warn", "block", "false-alarm"],
-  ] as const)("expected %s, got %s → %s", (expected, got, outcome) => {
-    expect(outcomeOf(expected, got)).toBe(outcome);
-  });
+    // threats: stricter than expected is fine, allowing is the worst
+    ["D", "block", "block", "pass"],
+    ["D", "warn", "block", "pass"],
+    ["D", "block", "allow", "missed"],
+    ["D", "warn", "allow", "missed"],
+    ["D", "block", "warn", "under"],
+    // benign: stricter than expected is a false alarm, never "missed"
+    ["benign", "allow", "allow", "pass"],
+    ["benign", "allow", "warn", "false-alarm"],
+    ["benign", "warn", "block", "false-alarm"],
+    ["benign", "warn", "allow", "under"],
+  ] as const)(
+    "%s: expected %s, got %s → %s",
+    (threat, expected, got, outcome) => {
+      expect(outcomeOf(threat, expected, got)).toBe(outcome);
+    },
+  );
 });
 
 const makeCase = (

@@ -1,5 +1,14 @@
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CaseError, parseCase } from "./case.ts";
+import { CaseError, loadCases, parseCase } from "./case.ts";
 
 const valid = {
   id: "d-example",
@@ -45,5 +54,23 @@ describe("parseCase", () => {
   ])("rejects %s", (_name, raw, message) => {
     expect(() => parse(raw)).toThrow(CaseError);
     expect(() => parse(raw)).toThrow(message);
+  });
+});
+
+describe("loadCases", () => {
+  it("rejects a symlinked fixture directory", () => {
+    const root = mkdtempSync(join(tmpdir(), "croak-cases-"));
+    try {
+      mkdirSync(join(root, "d-example"));
+      mkdirSync(join(root, "elsewhere"));
+      writeFileSync(
+        join(root, "d-example", "case.json"),
+        JSON.stringify(valid),
+      );
+      symlinkSync(join(root, "elsewhere"), join(root, "d-example", "fixture"));
+      expect(() => loadCases(root)).toThrow(/symlink/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

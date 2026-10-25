@@ -1,0 +1,7 @@
+{
+  "id": "benign-large-lockfile",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Ordinary project with a package-lock.json over 1 MB. Large lockfiles are normal and must not trigger repo/unscanned. Benign twin of d-oversized-config.",
+  "expect": { "verdict": "allow", "rules": [] }
+}

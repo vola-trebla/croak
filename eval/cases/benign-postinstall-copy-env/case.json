@@ -1,0 +1,10 @@
+{
+  "id": "benign-postinstall-copy-env",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "postinstall runs a local script that only copies .env.example to .env when missing. Code runs on install, so warn, but nothing suspicious: no network, no eval, no secrets. Benign twin of d-postinstall.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

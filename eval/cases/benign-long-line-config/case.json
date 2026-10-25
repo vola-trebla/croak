@@ -1,0 +1,10 @@
+{
+  "id": "benign-long-line-config",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "tailwind.config.js with a legitimately long safelist line (generated class names). Long lines alone are not hidden code. Benign twin of d-tailwind-hidden-code.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

@@ -13,35 +13,85 @@ export interface Violation {
   readonly text: string;
 }
 
+type Scope = "all" | "source";
+
+/**
+ * "all" rules also apply to test files: a test must not execute fixture code
+ * either. "source" rules apply to non-test code only (tests may write fixtures
+ * and assert on the eval marker).
+ */
 const SOURCE_RULES: ReadonlyArray<{
   readonly rule: string;
+  readonly scope: Scope;
   readonly pattern: RegExp;
 }> = [
-  { rule: "no-process-spawn", pattern: /["'](?:node:)?child_process["']/ },
-  { rule: "no-vm", pattern: /["'](?:node:)?vm["']/ },
-  { rule: "no-workers", pattern: /["'](?:node:)?worker_threads["']/ },
-  { rule: "no-module-loader", pattern: /["'](?:node:)?module["']/ },
-  { rule: "no-eval", pattern: /\beval\s*\(|\bnew\s+Function\s*\(/ },
-  { rule: "no-require", pattern: /\brequire\s*\(/ },
-  { rule: "no-dynamic-import", pattern: /\bimport\s*\(/ },
+  {
+    rule: "no-process-spawn",
+    scope: "all",
+    pattern: /["'](?:node:)?child_process["']/,
+  },
+  { rule: "no-vm", scope: "all", pattern: /["'](?:node:)?vm["']/ },
+  {
+    rule: "no-workers",
+    scope: "all",
+    pattern: /["'](?:node:)?worker_threads["']/,
+  },
+  {
+    rule: "no-module-loader",
+    scope: "all",
+    pattern: /\b(?:from|import)\s*\(?\s*["'](?:node:)?module["']/,
+  },
+  {
+    rule: "no-inspector",
+    scope: "all",
+    pattern: /["'](?:node:)?(?:inspector|repl)(?:\/promises)?["']/,
+  },
+  {
+    rule: "no-eval",
+    scope: "all",
+    pattern:
+      /\beval\s*\)?\s*\(|\bFunction\s*\(|\bprocess\s*\.\s*(?:binding|_linkedBinding|dlopen)\b/,
+  },
+  { rule: "no-require", scope: "all", pattern: /\brequire\s*\(/ },
+  { rule: "no-dynamic-import", scope: "all", pattern: /\bimport\s*\(/ },
   {
     rule: "no-fs-write",
-    pattern:
-      /\b(?:writeFile|appendFile|mkdir|mkdtemp|rm|rmdir|unlink|rename|copyFile|cp|symlink|link|chmod|chown|truncate|utimes)(?:Sync)?\s*\(|\bcreateWriteStream\s*\(/,
+    scope: "source",
+    pattern: new RegExp(
+      [
+        /\b(?:writeFile|appendFile|mkdir|mkdtemp|rm|rmdir|unlink|rename|copyFile|cp|symlink|link|chmod|chown|lchown|utimes|lutimes)(?:Sync)?\s*\(/
+          .source,
+        /\b(?:writeSync|writev(?:Sync)?|truncateSync|ftruncate(?:Sync)?|createWriteStream)\s*\(/
+          .source,
+        /\bfs\.truncate\s*\(/.source,
+        /\bopen(?:Sync)?\s*\([^)]*,\s*["'][wa+]/.source,
+        /\bO_(?:WRONLY|RDWR|CREAT|APPEND|TRUNC)\b/.source,
+      ].join("|"),
+    ),
+  },
+  {
+    rule: "no-eval-marker",
+    scope: "source",
+    pattern: /croak-eval-synthetic|synthetic croak eval/i,
   },
 ];
 
-/** Checks one source file of croak's own (non-test) code. */
-export function checkSource(file: string, text: string): Violation[] {
+/** Checks one file of croak's own code; test files get the "all" rules only. */
+export function checkSource(
+  file: string,
+  text: string,
+  isTest: boolean,
+): Violation[] {
+  const rules = SOURCE_RULES.filter(({ scope }) => scope === "all" || !isTest);
   return text.split("\n").flatMap((lineText, index) =>
-    SOURCE_RULES.filter(({ pattern }) => pattern.test(lineText)).map(
-      ({ rule }) => ({
+    rules
+      .filter(({ pattern }) => pattern.test(lineText))
+      .map(({ rule }) => ({
         file,
         line: index + 1,
         rule,
         text: lineText.trim(),
-      }),
-    ),
+      })),
   );
 }
 
@@ -50,8 +100,18 @@ const DEPENDENCY_FIELDS = [
   "optionalDependencies",
   "peerDependencies",
   "bundleDependencies",
+  "bundledDependencies",
 ];
-const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall", "prepare"];
+// Every script npm runs during `npm install` of the package itself.
+const INSTALL_SCRIPTS = [
+  "preinstall",
+  "install",
+  "postinstall",
+  "prepublish",
+  "preprepare",
+  "prepare",
+  "postprepare",
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -94,19 +154,23 @@ export function checkPackageJson(manifest: unknown): Violation[] {
 }
 
 function main(root: string): number {
+  // This file and its test spell out the forbidden patterns: the only exemptions.
   const self = relative(root, import.meta.filename);
-  const sources = readdirSync(join(root, "src"), {
+  const exempt = new Set([self, self.replace(/\.ts$/, ".test.ts")]);
+  const files = readdirSync(join(root, "src"), {
     recursive: true,
     encoding: "utf8",
   })
     .map((path) => join("src", path))
-    .filter((path) => path.endsWith(".ts") && !path.endsWith(".test.ts"))
-    // This file spells out the forbidden patterns, so it is the one exemption.
-    .filter((path) => path !== self);
+    .filter((path) => path.endsWith(".ts") && !exempt.has(path));
 
   const violations = [
-    ...sources.flatMap((path) =>
-      checkSource(path, readFileSync(join(root, path), "utf8")),
+    ...files.flatMap((path) =>
+      checkSource(
+        path,
+        readFileSync(join(root, path), "utf8"),
+        path.endsWith(".test.ts"),
+      ),
     ),
     ...checkPackageJson(
       JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
@@ -117,7 +181,7 @@ function main(root: string): number {
     process.stderr.write(`${v.file}:${v.line}  ${v.rule}  ${v.text}\n`);
   process.stdout.write(
     violations.length === 0
-      ? `invariants: ${sources.length} source files + package.json clean\n`
+      ? `invariants: ${files.length} files + package.json clean\n`
       : `invariants: ${violations.length} violation(s)\n`,
   );
   return violations.length === 0 ? 0 : 1;

@@ -100,8 +100,11 @@ describe("checkSource", () => {
     ).toContain("no-process-spawn");
   });
 
-  it("lets test files write fixtures and mention the eval marker", () => {
+  it("lets test files write fixtures, mention the eval marker, and hold eval-like data", () => {
     expect(rules(`writeFileSync(p, "x"); mkdirSync(d);`, true)).toEqual([]);
+    expect(
+      rules(`expect(scan('eval(atob("eA=="))')).toBe(true);`, true),
+    ).toEqual([]);
     expect(
       rules(`expect(text).toContain("croak-eval-synthetic");`, true),
     ).toEqual([]);

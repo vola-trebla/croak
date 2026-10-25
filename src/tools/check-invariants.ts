@@ -16,9 +16,11 @@ export interface Violation {
 type Scope = "all" | "source";
 
 /**
- * "all" rules also apply to test files: a test must not execute fixture code
- * either. "source" rules apply to non-test code only (tests may write fixtures
- * and assert on the eval marker).
+ * "all" rules also apply to test files: loading APIs (import(), require,
+ * child_process, vm, workers, module, inspector) are how a test would run
+ * fixture code. "source" rules apply to non-test code only: tests write
+ * fixtures, assert on the eval marker, and hold malicious-looking strings
+ * such as `eval(atob(…))` as test data for detectors.
  */
 const SOURCE_RULES: ReadonlyArray<{
   readonly rule: string;
@@ -48,7 +50,7 @@ const SOURCE_RULES: ReadonlyArray<{
   },
   {
     rule: "no-eval",
-    scope: "all",
+    scope: "source",
     pattern:
       /\beval\s*\)?\s*\(|\bFunction\s*\(|\bprocess\s*\.\s*(?:binding|_linkedBinding|dlopen)\b/,
   },

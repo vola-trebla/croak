@@ -21,8 +21,16 @@ export interface ShellFacts {
   readonly commands: readonly string[];
   /** package.json scripts run via `npm run X`, `pnpm X`, `yarn X`, `npm test`, … */
   readonly runScripts: readonly string[];
+  /**
+   * Things that change what a command does beyond its name: environment
+   * assignments (NODE_OPTIONS=…, PATH=…), redirects, command wrappers (sudo,
+   * env, npx with flags), workspace-wide package-manager flags (-r, --filter).
+   */
+  readonly modifiers: readonly string[];
   /** Quotes or nesting could not be parsed; nothing else is reliable. */
   readonly unparsable: boolean;
+  /** A download tool's name appears anywhere in the raw text (fail-closed input). */
+  readonly mentionsDownloader: boolean;
 }
 
 export const MAX_SCRIPT_LENGTH = 10_000;
@@ -90,6 +98,30 @@ const WRAPPERS = new Set([
   "npx",
   "pnpx",
   "bunx",
+  "timeout",
+  "xargs",
+  "stdbuf",
+  "setsid",
+  "ionice",
+]);
+/** Shell keywords that start or end a compound command, not a command name. */
+const RESERVED = new Set([
+  "{",
+  "}",
+  "!",
+  "if",
+  "then",
+  "elif",
+  "else",
+  "fi",
+  "do",
+  "done",
+  "while",
+  "until",
+  "for",
+  "case",
+  "esac",
+  "in",
 ]);
 const PACKAGE_RUNNERS = new Set(["npm", "pnpm", "yarn"]);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
@@ -301,6 +333,20 @@ function parse(input: string, depth: number): Script {
       const close = findBacktickEnd(input, i + 1);
       substitution(input.slice(i + 1, close));
       i = close;
+    } else if (ch === "#" && !inWord) {
+      // A comment runs to the end of the line, quotes and all.
+      const newline = input.indexOf("\n", i);
+      i = (newline === -1 ? input.length : newline) - 1;
+    } else if (
+      ch === "{" &&
+      !inWord &&
+      words.length === 0 &&
+      (next === " " || next === "\t" || next === "\n")
+    ) {
+      // { …; } groups commands like a subshell does.
+      const close = findClose(input, i + 1, "{", "}");
+      subshell = parse(input.slice(i + 1, close - 1), depth + 1);
+      i = close - 1;
     } else if (ch === "(" && !inWord && words.length === 0) {
       const close = findClose(input, i + 1, "(", ")");
       subshell = parse(input.slice(i + 1, close - 1), depth + 1);
@@ -354,43 +400,82 @@ const urlFileName = (url: string): string =>
   basename(url.split(/[?#]/)[0] ?? "");
 
 /** The real command after env assignments and wrappers, with its arguments. */
-function resolveCommand(command: Command):
-  | {
-      readonly name: string;
-      readonly raw: string;
-      readonly args: readonly Word[];
-    }
-  | undefined {
+const NPX_LIKE = new Set(["npx", "pnpx", "bunx"]);
+const WORKSPACE_FLAGS = new Set([
+  "-r",
+  "--recursive",
+  "--filter",
+  "-F",
+  "-w",
+  "--workspace",
+  "--workspaces",
+  "-ws",
+  "--if-present",
+]);
+
+interface Resolved {
+  readonly name: string;
+  readonly raw: string;
+  readonly args: readonly Word[];
+  readonly modifiers: readonly string[];
+}
+
+/** The real command after env assignments and wrappers, with its arguments. */
+function resolveCommand(command: Command): Resolved | undefined {
   const words = [...command.words];
+  const modifiers: string[] = [];
   while (words.length > 0) {
     const first = words[0];
     if (first === undefined) break;
+    if (RESERVED.has(first.text)) {
+      words.shift();
+      continue;
+    }
     if (ASSIGNMENT.test(first.text)) {
+      modifiers.push(`sets ${first.text.slice(0, first.text.indexOf("="))}`);
       words.shift();
       continue;
     }
     const name = normalizeName(first.text);
     if (WRAPPERS.has(name)) {
       words.shift();
+      const flags: string[] = [];
       // Skip wrapper flags (sudo -u user, nice -n 5, npx --yes).
       while (words[0]?.text.startsWith("-")) {
-        const flag = words.shift()?.text;
+        const flag = words.shift()?.text ?? "";
+        flags.push(flag);
         if (
-          (flag === "-u" || flag === "-n" || flag === "-g") &&
+          ["-u", "-n", "-g", "-p", "-I", "-s", "--package"].includes(flag) &&
           words.length > 1
-        )
+        ) {
           words.shift();
+        }
       }
+      // timeout's first operand is the duration, not the command.
+      if (name === "timeout" && /^\d/.test(words[0]?.text ?? "")) words.shift();
+      // A bare npx runs a local bin; npx with flags or any other wrapper changes what runs.
+      if (!NPX_LIKE.has(name) || flags.length > 0)
+        modifiers.push(
+          `runs through ${name}${flags.length > 0 ? ` ${flags.join(" ")}` : ""}`,
+        );
       continue;
     }
     if (
       PACKAGE_RUNNERS.has(name) &&
       (words[1]?.text === "exec" || words[1]?.text === "dlx")
     ) {
+      modifiers.push(`runs through ${name} ${words[1]?.text}`);
       words.splice(0, 2);
       continue;
     }
-    return { name, raw: first.text, args: words.slice(1) };
+    const args = words.slice(1);
+    if (
+      (PACKAGE_RUNNERS.has(name) || name === "bun") &&
+      args.some((a) => WORKSPACE_FLAGS.has(a.text.split("=")[0] ?? ""))
+    ) {
+      modifiers.push("runs scripts across workspaces");
+    }
+    return { name, raw: first.text, args, modifiers };
   }
   return undefined;
 }
@@ -402,6 +487,7 @@ interface Acc {
   inlineCode: string[];
   commands: string[];
   runScripts: string[];
+  modifiers: string[];
   downloaded: Set<string>;
 }
 
@@ -419,6 +505,7 @@ function newAcc(): Acc {
     inlineCode: [],
     commands: [],
     runScripts: [],
+    modifiers: [],
     downloaded: new Set(),
   };
 }
@@ -443,37 +530,37 @@ function downloadTargets(
 ): string[] {
   const targets: string[] = [];
   const url = args.find((a) => /^[a-z]+:\/\//i.test(a.text))?.text ?? "";
+  let wgetOutput = false;
   for (let i = 0; i < args.length; i++) {
-    const flag = args[i]?.text;
+    const flag = args[i]?.text ?? "";
     const value = args[i + 1]?.text;
-    if (
-      name === "curl" &&
-      (flag === "-o" || flag === "--output") &&
-      value !== undefined
-    )
-      targets.push(value);
-    if (name === "curl" && (flag === "-O" || flag === "--remote-name"))
-      targets.push(urlFileName(url));
-    if (
-      name === "wget" &&
-      (flag === "-O" || flag === "--output-document") &&
-      value !== undefined &&
-      value !== "-"
-    ) {
-      targets.push(value);
+    if (name === "curl") {
+      // -o FILE, also inside a cluster such as -sSLo FILE
+      if (
+        (flag === "--output" || /^-[a-zA-Z]*o$/.test(flag)) &&
+        value !== undefined
+      )
+        targets.push(value);
+      if (flag === "--remote-name" || /^-[a-zA-Z]*O[a-zA-Z]*$/.test(flag))
+        targets.push(urlFileName(url));
+    }
+    if (name === "wget") {
+      // -O FILE, -qO FILE, -qO- (stdout), --output-document=FILE
+      const cluster = /^-[a-zA-Z]*O(.*)$/.exec(flag);
+      const long = flag.startsWith("--output-document")
+        ? (flag.split("=")[1] ?? value)
+        : undefined;
+      if (cluster !== null || long !== undefined) {
+        wgetOutput = true;
+        const attached = cluster?.[1];
+        const target =
+          long ??
+          (attached !== undefined && attached !== "" ? attached : value);
+        if (target !== undefined && target !== "-") targets.push(target);
+      }
     }
   }
-  if (
-    name === "wget" &&
-    !args.some(
-      (a) =>
-        a.text === "-O" ||
-        a.text.startsWith("-qO") ||
-        a.text === "--output-document",
-    )
-  ) {
-    targets.push(urlFileName(url));
-  }
+  if (name === "wget" && !wgetOutput) targets.push(urlFileName(url));
   for (const { op, target } of redirects)
     if (op === ">" || op === ">>") targets.push(target.text);
   return targets.filter((t) => t !== "").map(stripDot);
@@ -499,6 +586,9 @@ function walkCommand(
   if (resolved === undefined) return { downloader: false, interpreter: false };
   const { name, raw, args } = resolved;
   acc.commands.push(name);
+  acc.modifiers.push(...resolved.modifiers);
+  if (command.redirects.length > 0)
+    acc.modifiers.push("redirects input or output");
   const script = scriptName(name, args);
   if (script !== undefined) acc.runScripts.push(script);
 
@@ -531,7 +621,8 @@ function walkCommand(
   if (raw.includes("/") && !interpreter && !downloader) addLocal(acc, raw);
 
   if (SHELLS.has(name)) {
-    const c = args.findIndex((a) => a.text === "-c");
+    // -c, also inside a cluster such as -ec or -xc
+    const c = args.findIndex((a) => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(a.text));
     const body = c === -1 ? undefined : args[c + 1];
     if (body !== undefined) {
       walkScript(parse(body.text, depth + 1), acc, depth + 1);
@@ -579,13 +670,25 @@ function walkCommand(
   return { downloader, interpreter };
 }
 
+/** A command with a process substitution whose first command is an interpreter, as in `tee >(sh)`. */
+function feedsInterpreter(command: Command): boolean {
+  return command.words.some((word) =>
+    word.subs.some((sub) => {
+      const first = sub[0]?.[0];
+      const resolved = first === undefined ? undefined : resolveCommand(first);
+      return resolved !== undefined && INTERPRETERS.has(resolved.name);
+    }),
+  );
+}
+
 function walkScript(script: Script, acc: Acc, depth: number): void {
   for (const pipeline of script) {
     let downloaded = false;
     for (const command of pipeline) {
       const { downloader, interpreter } = walkCommand(command, acc, depth);
-      // curl … | sh, curl … | tee f | sh
-      if (interpreter && downloaded) acc.downloadExecute = true;
+      // curl … | sh, curl … | tee f | sh, curl … | tee >(sh)
+      if ((interpreter || feedsInterpreter(command)) && downloaded)
+        acc.downloadExecute = true;
       if (downloader) downloaded = true;
     }
   }
@@ -599,7 +702,14 @@ function merge(into: Acc, from: Acc): void {
   into.inlineCode.push(...from.inlineCode);
   into.commands.push(...from.commands);
   into.runScripts.push(...from.runScripts);
+  into.modifiers.push(...from.modifiers);
   for (const d of from.downloaded) into.downloaded.add(d);
+}
+
+function mentionsDownloader(command: string): boolean {
+  return command
+    .split(/[^A-Za-z0-9._/-]+/)
+    .some((token) => DOWNLOADERS.has(normalizeName(token)));
 }
 
 export function analyzeShell(command: string): ShellFacts {
@@ -610,7 +720,9 @@ export function analyzeShell(command: string): ShellFacts {
     inlineCode: [],
     commands: [],
     runScripts: [],
+    modifiers: [],
     unparsable: true,
+    mentionsDownloader: mentionsDownloader(command),
   };
   if (command.length > MAX_SCRIPT_LENGTH) return unparsable;
   let script: Script;
@@ -634,6 +746,8 @@ export function analyzeShell(command: string): ShellFacts {
     inlineCode: acc.inlineCode,
     commands: acc.commands,
     runScripts: acc.runScripts,
+    modifiers: [...new Set(acc.modifiers)],
+    mentionsDownloader: mentionsDownloader(command),
     unparsable: false,
   };
 }

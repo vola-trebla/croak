@@ -15,8 +15,10 @@ export type ObfuscationKind =
 
 export interface ObfuscationHit {
   readonly kind: ObfuscationKind;
-  /** 1-based; for file-level signals, the first line seen. */
+  /** 1-based; the first line where the signal met its threshold. */
   readonly line: number;
+  /** Every line where it did (a decoy on line 1 must not hide line 51). */
+  readonly lines: readonly number[];
   readonly count: number;
 }
 
@@ -83,18 +85,20 @@ const count = (pattern: RegExp, text: string): number =>
   [...text.matchAll(new RegExp(pattern.source, "g"))].length;
 
 export function obfuscationSignals(text: string): ObfuscationHit[] {
-  const hits: ObfuscationHit[] = [];
   const lines = text.split("\n");
-  const seen = new Set<ObfuscationKind>();
+  const byKind = new Map<ObfuscationKind, { lines: number[]; count: number }>();
+  const note = (kind: ObfuscationKind, line: number, n: number): void => {
+    const entry = byKind.get(kind) ?? { lines: [], count: 0 };
+    if (!entry.lines.includes(line)) entry.lines.push(line);
+    entry.count += n;
+    byKind.set(kind, entry);
+  };
 
   lines.forEach((line, index) => {
     for (const { kind, pattern, threshold, scope } of OBFUSCATION_PATTERNS) {
-      if (scope !== "line" || seen.has(kind) || !pattern.test(line)) continue;
+      if (scope !== "line" || !pattern.test(line)) continue;
       const n = count(pattern, line);
-      if (n >= threshold) {
-        hits.push({ kind, line: index + 1, count: n });
-        seen.add(kind);
-      }
+      if (n >= threshold) note(kind, index + 1, n);
     }
   });
 
@@ -102,8 +106,19 @@ export function obfuscationSignals(text: string): ObfuscationHit[] {
     if (scope !== "file") continue;
     const n = count(pattern, text);
     if (n < threshold) continue;
-    const first = lines.findIndex((line) => pattern.test(line));
-    hits.push({ kind, line: first + 1, count: n });
+    lines.forEach((line, index) => {
+      if (pattern.test(line)) note(kind, index + 1, 0);
+    });
+    const entry = byKind.get(kind);
+    if (entry !== undefined) entry.count = n;
   }
-  return hits.sort((a, b) => a.line - b.line);
+
+  return [...byKind]
+    .map(([kind, { lines: at, count: n }]) => ({
+      kind,
+      line: Math.min(...at),
+      lines: at.sort((a, b) => a - b),
+      count: n,
+    }))
+    .sort((a, b) => a.line - b.line);
 }

@@ -18,10 +18,6 @@ const SCANNED = /\.[cm]?[jt]sx?$/;
 /** Legitimate code has these too: icon-font escape maps, embedded fonts or wasm. */
 const WEAK: ReadonlySet<ObfuscationKind> = new Set(["escapes", "encoded-blob"]);
 
-/**
- * Weak signals alone are context. One strong signal warns. A strong signal
- * with any second signal, or any signal next to eval or decoding, blocks.
- */
 /** Lines within which a weak signal and eval/decoding count as one construct. */
 const NEARBY_LINES = 3;
 
@@ -53,7 +49,9 @@ function fileFinding(path: string, text: string): Finding | undefined {
   const decodeNearWeak = hits.some(
     (hit) =>
       WEAK.has(hit.kind) &&
-      decodeLines.some((line) => Math.abs(line - hit.line) <= NEARBY_LINES),
+      hit.lines.some((at) =>
+        decodeLines.some((line) => Math.abs(line - at) <= NEARBY_LINES),
+      ),
   );
   const raw = severityOf(kinds, decodeLines.length > 0, decodeNearWeak);
   // As with other content detectors: installed and committed dependencies look

@@ -1,9 +1,10 @@
 import { posix } from "node:path";
 import type { RepoSnapshot } from "../repo-snapshot.ts";
 import { JsoncError, parseJsonc } from "../signals/jsonc.ts";
-import { analyzeShell } from "../signals/shell.ts";
+import { stripBom } from "../signals/text.ts";
 import type { Finding } from "../verdict.ts";
 import type { RepoDetector } from "./index.ts";
+import { assessor } from "./lifecycle-script.ts";
 import { isInNodeModules } from "./node-modules-present.ts";
 
 const RULE = "repo/ide-autorun";
@@ -27,24 +28,27 @@ function folderOpenLines(text: string): number[] {
 }
 
 /** The npm script a task runs, read from the package.json next to the .vscode folder. */
-function npmScript(
+/** The package.json next to the .vscode folder: its directory and scripts. */
+function manifestFor(
   repo: RepoSnapshot,
   tasksPath: string,
-  script: string,
-): string | undefined {
+): { dir: string; scripts: Record<string, unknown> } {
   const folder = posix.dirname(posix.dirname(tasksPath));
-  const manifestPath =
-    folder === "." ? "package.json" : `${folder}/package.json`;
-  const text = repo.read(manifestPath);
-  if (text === undefined) return undefined;
+  const dir = folder === "." ? "" : folder;
+  const text = repo.read(dir === "" ? "package.json" : `${dir}/package.json`);
+  if (text === undefined) return { dir, scripts: {} };
   try {
-    const manifest: unknown = JSON.parse(text);
-    const scripts =
-      isRecord(manifest) && isRecord(manifest.scripts) ? manifest.scripts : {};
-    return asString(scripts[script]);
+    const manifest: unknown = JSON.parse(stripBom(text));
+    return {
+      dir,
+      scripts:
+        isRecord(manifest) && isRecord(manifest.scripts)
+          ? manifest.scripts
+          : {},
+    };
   } catch {
     // An unreadable package.json is reported by repo/lifecycle-script.
-    return undefined;
+    return { dir, scripts: {} };
   }
 }
 
@@ -53,6 +57,7 @@ function taskFinding(
   path: string,
   task: Record<string, unknown>,
   line: number | undefined,
+  trigger: string,
 ): Finding {
   const label = asString(task.label) ?? "(unnamed task)";
   const presentation = isRecord(task.presentation) ? task.presentation : {};
@@ -61,19 +66,26 @@ function taskFinding(
   const at = line === undefined ? { file: path } : { file: path, line };
 
   if (task.type === "npm") {
+    // Same analysis as install scripts: the script, the files it runs, and
+    // the scripts it calls through npm run.
     const script = asString(task.script) ?? "";
-    const command = npmScript(repo, path, script);
-    const dangerous =
-      command !== undefined && analyzeShell(command).downloadExecute;
+    const { dir, scripts } = manifestFor(repo, path);
+    const command = asString(scripts[script]);
+    const assessment =
+      command === undefined ? undefined : assessor(repo, dir, scripts)(command);
     const shown =
       command === undefined
         ? "not found in package.json"
         : `\`${truncate(command)}\``;
+    const reasons =
+      assessment !== undefined && assessment.reasons.length > 0
+        ? `: ${assessment.reasons.join("; ")}`
+        : "";
     return {
       ruleId: RULE,
-      severity: dangerous ? "block" : "warn",
+      severity: assessment?.block === true ? "block" : "warn",
       ...at,
-      message: `task "${label}" runs npm script "${script}" (${shown}) when the folder is opened${hidden}${dangerous ? "; the script downloads and executes code" : ""}`,
+      message: `task "${label}" runs npm script "${script}" (${shown}) ${trigger}${hidden}${reasons}`,
     };
   }
 
@@ -86,16 +98,24 @@ function taskFinding(
     ruleId: RULE,
     severity: "block",
     ...at,
-    message: `task "${label}" runs \`${truncate(command)}\` automatically when the folder is opened${hidden}`,
+    message: `task "${label}" runs \`${truncate(command)}\` automatically ${trigger}${hidden}`,
   };
 }
+
+const dependsOnLabels = (task: Record<string, unknown>): string[] => {
+  const deps = task.dependsOn;
+  if (typeof deps === "string") return [deps];
+  return Array.isArray(deps)
+    ? deps.filter((d): d is string => typeof d === "string")
+    : [];
+};
 
 function tasksFindings(repo: RepoSnapshot, path: string): Finding[] {
   const text = repo.read(path);
   if (text === undefined) return [];
   let config: unknown;
   try {
-    config = parseJsonc(text);
+    config = parseJsonc(stripBom(text));
   } catch (error) {
     if (!(error instanceof JsoncError)) throw error;
     return [
@@ -111,14 +131,47 @@ function tasksFindings(repo: RepoSnapshot, path: string): Finding[] {
     isRecord(config) && Array.isArray(config.tasks)
       ? config.tasks.filter(isRecord)
       : [];
+  const byLabel = new Map(
+    tasks.flatMap((task) =>
+      typeof task.label === "string" ? [[task.label, task] as const] : [],
+    ),
+  );
   const autorun = tasks.filter(
     (task) =>
       isRecord(task.runOptions) && task.runOptions.runOn === "folderOpen",
   );
   const lines = folderOpenLines(text);
-  return autorun.map((task, index) =>
-    taskFinding(repo, path, task, lines[index]),
+  const findings = autorun.map((task, index) =>
+    taskFinding(repo, path, task, lines[index], "when the folder is opened"),
   );
+
+  // Tasks an autorun task depends on run first, just as automatically.
+  const seen = new Set<Record<string, unknown>>(autorun);
+  const queue = autorun.flatMap((task) =>
+    dependsOnLabels(task).map((dep) => ({
+      dep,
+      parent: asString(task.label) ?? "",
+    })),
+  );
+  while (queue.length > 0) {
+    const next = queue.shift();
+    const task = next === undefined ? undefined : byLabel.get(next.dep);
+    if (next === undefined || task === undefined || seen.has(task)) continue;
+    seen.add(task);
+    findings.push(
+      taskFinding(
+        repo,
+        path,
+        task,
+        undefined,
+        `when the folder is opened (folder-open task "${next.parent}" depends on it)`,
+      ),
+    );
+    queue.push(
+      ...dependsOnLabels(task).map((dep) => ({ dep, parent: next.dep })),
+    );
+  }
+  return findings;
 }
 
 /** VS Code tasks that run by themselves when the folder is opened. */

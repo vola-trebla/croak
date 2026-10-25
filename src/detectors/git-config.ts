@@ -8,6 +8,8 @@ import type { RepoDetector } from "./index.ts";
 import { isInNodeModules } from "./node-modules-present.ts";
 
 const RULE = "repo/git-config";
+const LFS_FILTER = /^git-lfs (?:clean|smudge|filter-process)(?: -- %f)?$/;
+const NAMED_HELPER = /^[A-Za-z0-9-]+$/;
 const BOOLEAN = new Set([
   "true",
   "false",
@@ -55,14 +57,16 @@ function classify({ section, key, value }: GitConfigEntry): Rule | undefined {
     section.startsWith("filter.") &&
     ["clean", "smudge", "process"].includes(key)
   ) {
-    return value.startsWith("git-lfs ")
+    // Git runs filter values through the shell: only the exact LFS command is benign.
+    return LFS_FILTER.test(value)
       ? { when: "is a Git LFS filter", severity: "info" }
       : { when: "runs on checkout and add", severity: "block" };
   }
   if (name === "credential.helper") {
-    return value.startsWith("!") || value.includes("/")
-      ? { when: "runs when git asks for credentials", severity: "block" }
-      : { when: "is a named credential helper", severity: "info" };
+    // Only a bare helper name (osxkeychain, store, manager) is benign.
+    return NAMED_HELPER.test(value)
+      ? { when: "is a named credential helper", severity: "info" }
+      : { when: "runs when git asks for credentials", severity: "block" };
   }
   if (
     section.startsWith("submodule.") &&
@@ -70,6 +74,36 @@ function classify({ section, key, value }: GitConfigEntry): Rule | undefined {
     value.startsWith("!")
   ) {
     return { when: "runs on git submodule update", severity: "block" };
+  }
+  if (
+    section.startsWith("diff.") &&
+    (key === "textconv" || key === "command")
+  ) {
+    return {
+      when: "runs on git diff and git log -p for files mapped in .gitattributes",
+      severity: "block",
+    };
+  }
+  if (section.startsWith("merge.") && key === "driver")
+    return { when: "runs on merges", severity: "block" };
+  if (section === "pager")
+    return { when: `runs as the pager for git ${key}`, severity: "block" };
+  if (section === "core" && key === "gitproxy")
+    return { when: "runs on git:// fetches", severity: "block" };
+  if (
+    section.startsWith("remote.") &&
+    (key === "uploadpack" || key === "receivepack")
+  ) {
+    return { when: "runs on fetch or push", severity: "block" };
+  }
+  if (
+    (section.startsWith("difftool.") || section.startsWith("mergetool.")) &&
+    key === "cmd"
+  ) {
+    return {
+      when: "runs when the diff or merge tool is used",
+      severity: "block",
+    };
   }
   if (section === "core" && key === "hookspath")
     return { when: "moves git hooks to another directory", severity: "warn" };

@@ -27,7 +27,7 @@ describe("obfuscationSignals", () => {
   it("flags javascript-obfuscator names across the file, at the first line seen", () => {
     expect(
       obfuscationSignals(`const _0x3f1a = [];\nfoo();\nbar(_0x3f1a, _0x9c2e);`),
-    ).toEqual([{ kind: "obfuscator-names", line: 1, count: 3 }]);
+    ).toEqual([{ kind: "obfuscator-names", line: 1, lines: [1, 3], count: 3 }]);
     expect(kinds(`const _0x3f1a = 1; use(_0x3f1a);`)).toEqual([]);
   });
 
@@ -82,7 +82,7 @@ describe("obfuscationSignals", () => {
   it("reports line numbers and counts for line-level signals", () => {
     const line = `x("\\x61\\x62\\x63\\x64\\x65\\x66\\x67\\x68\\x69")`;
     expect(obfuscationSignals(`ok\n${line}`)).toEqual([
-      { kind: "escapes", line: 2, count: 9 },
+      { kind: "escapes", line: 2, lines: [2], count: 9 },
     ]);
   });
 });

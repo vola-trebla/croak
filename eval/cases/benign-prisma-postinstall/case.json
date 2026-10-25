@@ -2,9 +2,9 @@
   "id": "benign-prisma-postinstall",
   "kind": "repo",
   "threat": "benign",
-  "description": "Legitimate postinstall: prisma generate. Known tool, nothing suspicious: an info note, not a warning (D19). Benign twin of d-postinstall.",
+  "description": "Legitimate postinstall: prisma generate. Prisma runs the repo's generator config, so it stays a warning with a known-tool note (D19), never a block. Benign twin of d-postinstall.",
   "expect": {
-    "verdict": "allow",
+    "verdict": "warn",
     "rules": ["repo/lifecycle-script"]
   }
 }

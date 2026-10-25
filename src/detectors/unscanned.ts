@@ -2,7 +2,7 @@ import type { RepoDetector } from "./index.ts";
 import { isInNodeModules } from "./node-modules-present.ts";
 
 /** Code that a JS toolchain, an IDE, or git may execute or load. */
-const CODE = /\.(?:[cm]?[jt]sx?|json)$/;
+const CODE = /\.(?:[cm]?[jt]sx?|json|sh|bash|zsh|py|rb|pl|ps1|gyp)$/;
 const LOCKFILES = new Set(["package-lock.json", "npm-shrinkwrap.json"]);
 /** Type declarations are never executed, and lib.dom.d.ts alone is over 1 MB. */
 const DECLARATIONS = /\.d\.[cm]?ts$/;
@@ -18,6 +18,7 @@ export const unscanned: RepoDetector = (repo) =>
       const name = entry.path.slice(entry.path.lastIndexOf("/") + 1);
       return (
         entry.path.startsWith(".git/") ||
+        /(?:^|\/)\.husky\//.test(entry.path) ||
         (CODE.test(name) && !LOCKFILES.has(name) && !DECLARATIONS.test(name))
       );
     })

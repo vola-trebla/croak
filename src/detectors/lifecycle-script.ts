@@ -7,6 +7,7 @@ import {
   isSuspicious,
 } from "../signals/code.ts";
 import { analyzeShell } from "../signals/shell.ts";
+import { stripBom } from "../signals/text.ts";
 import type { Finding } from "../verdict.ts";
 import type { RepoDetector } from "./index.ts";
 import { isInNodeModules } from "./node-modules-present.ts";
@@ -22,48 +23,56 @@ export const INSTALL_SCRIPTS = [
   "preprepare",
   "prepare",
   "postprepare",
+  // runs after node_modules changes (npm docs)
+  "dependencies",
 ] as const;
 
 /**
- * Tools that legitimately run on install. Recognizing one adds context (an
- * info note); it never lowers the verdict of anything else in the script.
+ * Tools that run no project code: their install-time use can be an info note
+ * (D19). Everything they do is decided by the tool, not by files in the repo.
  */
-const KNOWN_TOOLS = new Set([
-  // install-time tools
-  "prisma",
+const INERT_TOOLS = new Set([
   "husky",
-  "patch-package",
   "simple-git-hooks",
   "lefthook",
-  "ngcc",
-  "nuxt",
-  "nuxi",
-  "svelte-kit",
-  "astro",
-  "playwright",
   "only-allow",
   "opencollective-postinstall",
-  // build tools commonly run from prepare
+  "playwright",
   "tsc",
-  "tsup",
-  "vite",
-  "rollup",
   "esbuild",
-  "webpack",
-  "turbo",
-  "nx",
-  "lerna",
-  "unbuild",
   "swc",
-  "babel",
-  "rimraf",
-  // harmless shell builtins
   "echo",
   "true",
   "exit",
   "printf",
 ]);
 
+/**
+ * Recognized install-time tools that execute code from the repo — a JS/TS
+ * config, workspace tasks, a generator, or patches. Recognizing one adds a
+ * note; the script stays a warning.
+ */
+const EXECUTING_TOOLS = new Set([
+  "prisma",
+  "vite",
+  "webpack",
+  "rollup",
+  "tsup",
+  "unbuild",
+  "babel",
+  "nuxt",
+  "nuxi",
+  "svelte-kit",
+  "astro",
+  "ngcc",
+  "turbo",
+  "nx",
+  "lerna",
+  "patch-package",
+  "rimraf",
+]);
+
+const KNOWN_TOOLS = new Set([...INERT_TOOLS, ...EXECUTING_TOOLS]);
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const MAX_SCRIPT_DEPTH = 5;
 
@@ -78,11 +87,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const truncate = (text: string): string =>
   text.length > MAX_SHOWN ? `${text.slice(0, MAX_SHOWN)}…` : text;
 
-/** 1-based line of the "name": key in a manifest, if found. */
+/** 1-based line of `"name":` inside the manifest's "scripts" object, if found. */
 function scriptLine(manifest: string, name: string): number | undefined {
-  const index = manifest
-    .split("\n")
-    .findIndex((line) => line.includes(`"${name}"`));
+  const lines = manifest.split("\n");
+  const scripts = lines.findIndex((line) => /"scripts"\s*:/.test(line));
+  const key = `"${name}"`;
+  const index = lines.findIndex(
+    (line, i) =>
+      i >= Math.max(scripts, 0) &&
+      line.includes(key) &&
+      /"\s*:/.test(line.slice(line.indexOf(key))),
+  );
   return index === -1 ? undefined : index + 1;
 }
 
@@ -90,105 +105,189 @@ interface Assessment {
   readonly block: boolean;
   readonly reasons: readonly string[];
   readonly knownTools: readonly string[];
+  readonly signals: ReadonlySet<CodeSignal>;
 }
 
 /**
- * True when every command is a known tool or a package-manager call to a
- * script that is itself routine, and nothing else at all is going on: no
- * network, no local files, no inline code, no code signals. Anything unknown
- * or unresolved is not routine (D19).
+ * Decides whether install-time commands are routine (D19): every command is an
+ * inert tool or a package-manager call that runs a script which is itself
+ * routine — including npm's pre/post hooks for that script — and nothing else
+ * is present: no network, local files, inline code, code signals, environment
+ * assignments, redirects, wrappers, or workspace-wide runs. Results are
+ * memoized per script name, so a layered script graph costs linear time.
  */
-function isRoutine(
-  command: string,
+function routineChecker(
   scripts: Record<string, unknown>,
-  depth = 0,
-  visited: ReadonlySet<string> = new Set(),
-): boolean {
-  if (depth > MAX_SCRIPT_DEPTH) return false;
-  const facts = analyzeShell(command);
-  if (
-    facts.unparsable ||
-    facts.downloadExecute ||
-    facts.network ||
-    facts.localFiles.length > 0 ||
-    facts.inlineCode.length > 0 ||
-    codeSignals(command).length > 0 ||
-    facts.commands.length === 0
-  ) {
-    return false;
-  }
-  const runs = new Set(facts.runScripts);
-  const everyCommandKnown = facts.commands.every(
-    (name) =>
-      KNOWN_TOOLS.has(name) || (PACKAGE_MANAGERS.has(name) && runs.size > 0),
-  );
-  if (!everyCommandKnown) return false;
-  return [...runs].every((name) => {
-    const target = scripts[name];
-    return (
-      typeof target === "string" &&
-      !visited.has(name) &&
-      isRoutine(target, scripts, depth + 1, new Set([...visited, name]))
-    );
-  });
+): (command: string) => boolean {
+  const memo = new Map<string, boolean>();
+
+  const scriptIsRoutine = (name: string, depth: number): boolean => {
+    const known = memo.get(name);
+    if (known !== undefined) return known;
+    memo.set(name, false); // a cycle back here is not routine
+    const body = scripts[name];
+    const result =
+      typeof body === "string" &&
+      commandIsRoutine(body, depth + 1) &&
+      [`pre${name}`, `post${name}`].every(
+        (hook) => !(hook in scripts) || scriptIsRoutine(hook, depth + 1),
+      );
+    memo.set(name, result);
+    return result;
+  };
+
+  const commandIsRoutine = (command: string, depth: number): boolean => {
+    if (depth > MAX_SCRIPT_DEPTH) return false;
+    const facts = analyzeShell(command);
+    if (
+      facts.unparsable ||
+      facts.downloadExecute ||
+      facts.network ||
+      facts.localFiles.length > 0 ||
+      facts.inlineCode.length > 0 ||
+      facts.modifiers.length > 0 ||
+      codeSignals(command).length > 0 ||
+      facts.commands.length === 0
+    ) {
+      return false;
+    }
+    // Every package-manager call must run a script: `npm install x` does not.
+    const pmCalls = facts.commands.filter((name) =>
+      PACKAGE_MANAGERS.has(name),
+    ).length;
+    if (pmCalls !== facts.runScripts.length) return false;
+    if (
+      !facts.commands.every(
+        (name) => INERT_TOOLS.has(name) || PACKAGE_MANAGERS.has(name),
+      )
+    )
+      return false;
+    return facts.runScripts.every((name) => scriptIsRoutine(name, depth));
+  };
+
+  return (command) => commandIsRoutine(command, 0);
 }
 
-/** What the script's command does, including the files and inline code it runs. */
-function assess(repo: RepoSnapshot, dir: string, command: string): Assessment {
-  const facts = analyzeShell(command);
-  if (facts.unparsable) {
-    return {
-      block: false,
-      reasons: [
-        "the command could not be parsed, so croak cannot tell what it runs",
-      ],
-      knownTools: [],
-    };
-  }
-
-  const reasons: string[] = [];
-  const signals = new Set<CodeSignal>();
-  const absorb = (
-    hits: ReturnType<typeof codeSignals>,
-    where: string,
-  ): void => {
-    if (hits.length === 0) return;
-    for (const hit of hits) signals.add(hit.signal);
-    reasons.push(describeSignals(hits, where));
+/**
+ * What a script's command does, including the files and inline code it runs
+ * and the package.json scripts it calls through `npm run` (with npm's pre/post
+ * hooks), recursively. Signals are combined across the whole call graph, so
+ * an attack split across two scripts still blocks. Memoized per script name.
+ */
+export function assessor(
+  repo: RepoSnapshot,
+  dir: string,
+  scripts: Record<string, unknown>,
+): (command: string) => Assessment {
+  const memo = new Map<string, Assessment>();
+  const empty: Assessment = {
+    block: false,
+    reasons: [],
+    knownTools: [],
+    signals: new Set(),
   };
 
-  if (facts.downloadExecute) reasons.push("downloads and executes code");
-  if (facts.network) {
-    signals.add("network");
-    reasons.push("uses the network");
-  }
-  if (SHELL_DECODE.test(command)) signals.add("decode");
-  absorb(codeSignals(command), "the command");
-  for (const code of facts.inlineCode) absorb(codeSignals(code), "inline code");
+  const assessScript = (name: string, depth: number): Assessment => {
+    const known = memo.get(name);
+    if (known !== undefined) return known;
+    memo.set(name, empty); // break cycles
+    const body = scripts[name];
+    const result =
+      typeof body !== "string"
+        ? {
+            ...empty,
+            reasons: [`calls script "${name}", which is not in package.json`],
+          }
+        : assessCommand(body, depth + 1);
+    memo.set(name, result);
+    return result;
+  };
 
-  for (const file of facts.localFiles) {
-    const path = posix.normalize(posix.join(dir, file));
-    if (path === ".." || path.startsWith("../")) {
-      reasons.push(`runs ${file}, a path outside the repo`);
-      continue;
+  const assessCommand = (command: string, depth: number): Assessment => {
+    if (depth > MAX_SCRIPT_DEPTH)
+      return { ...empty, reasons: ["scripts are nested too deeply to follow"] };
+    const facts = analyzeShell(command);
+    if (facts.unparsable) {
+      // Fail closed: unparsable text that names a download tool could be
+      // hiding curl … | sh behind a trick the parser does not understand.
+      return facts.mentionsDownloader
+        ? {
+            ...empty,
+            block: true,
+            reasons: [
+              "could not be parsed and mentions a download tool (failing closed)",
+            ],
+          }
+        : {
+            ...empty,
+            reasons: [
+              "the command could not be parsed, so croak cannot tell what it runs",
+            ],
+          };
     }
-    const entry = repo.entries.find((e) => e.path === path);
-    if (entry === undefined)
-      reasons.push(`runs ${path}, which is not in the repo`);
-    else if (entry.kind === "oversized")
-      reasons.push(`runs ${path}, too large to scan`);
-    else if (entry.kind === "symlink")
-      reasons.push(`runs ${path}, a symlink croak does not follow`);
-    else absorb(codeSignals(repo.read(path) ?? ""), path);
-  }
 
-  return {
-    block: facts.downloadExecute || isSuspicious(signals),
-    reasons,
-    knownTools: [
-      ...new Set(facts.commands.filter((name) => KNOWN_TOOLS.has(name))),
-    ],
+    const reasons: string[] = [];
+    const signals = new Set<CodeSignal>();
+    const knownTools = new Set(
+      facts.commands.filter((name) => KNOWN_TOOLS.has(name)),
+    );
+    let nestedBlock = false;
+    const absorb = (
+      hits: ReturnType<typeof codeSignals>,
+      where: string,
+    ): void => {
+      if (hits.length === 0) return;
+      for (const hit of hits) signals.add(hit.signal);
+      reasons.push(describeSignals(hits, where));
+    };
+
+    if (facts.downloadExecute) reasons.push("downloads and executes code");
+    if (facts.network) {
+      signals.add("network");
+      reasons.push("uses the network");
+    }
+    if (SHELL_DECODE.test(command)) signals.add("decode");
+    absorb(codeSignals(command), "the command");
+    for (const code of facts.inlineCode)
+      absorb(codeSignals(code), "inline code");
+
+    for (const file of facts.localFiles) {
+      const path = posix.normalize(posix.join(dir, file));
+      if (path === ".." || path.startsWith("../")) {
+        reasons.push(`runs ${file}, a path outside the repo`);
+        continue;
+      }
+      const entry = repo.entries.find((e) => e.path === path);
+      if (entry === undefined)
+        reasons.push(`runs ${path}, which is not in the repo`);
+      else if (entry.kind === "oversized")
+        reasons.push(`runs ${path}, too large to scan`);
+      else if (entry.kind === "symlink")
+        reasons.push(`runs ${path}, a symlink croak does not follow`);
+      else absorb(codeSignals(repo.read(path) ?? ""), path);
+    }
+
+    for (const name of facts.runScripts) {
+      for (const script of [`pre${name}`, name, `post${name}`]) {
+        if (script !== name && !(script in scripts)) continue;
+        const sub = assessScript(script, depth);
+        nestedBlock ||= sub.block;
+        for (const signal of sub.signals) signals.add(signal);
+        for (const tool of sub.knownTools) knownTools.add(tool);
+        if (sub.reasons.length > 0)
+          reasons.push(`via script "${script}": ${sub.reasons.join("; ")}`);
+      }
+    }
+
+    return {
+      block: facts.downloadExecute || nestedBlock || isSuspicious(signals),
+      reasons,
+      knownTools: [...knownTools],
+      signals,
+    };
   };
+
+  return (command) => assessCommand(command, 0);
 }
 
 function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
@@ -197,7 +296,7 @@ function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
   if (text === undefined) return [];
   let manifest: unknown;
   try {
-    manifest = JSON.parse(text);
+    manifest = JSON.parse(stripBom(text));
   } catch {
     // Not swallowed: an unreadable manifest is reported, the scan continues.
     return [
@@ -213,14 +312,16 @@ function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
   const scripts =
     isRecord(manifest) && isRecord(manifest.scripts) ? manifest.scripts : {};
   const findings: Finding[] = [];
+  const isRoutine = routineChecker(scripts);
+  const assess = assessor(repo, dir, scripts);
 
   for (const name of INSTALL_SCRIPTS) {
     const command = scripts[name];
     if (typeof command !== "string") continue;
-    const { block, reasons, knownTools } = assess(repo, dir, command);
+    const { block, reasons, knownTools } = assess(command);
     const line = scriptLine(text, name);
     const at = line === undefined ? { file: path } : { file: path, line };
-    if (!block && isRoutine(command, scripts)) {
+    if (!block && isRoutine(command)) {
       findings.push({
         ruleId: RULE,
         severity: "info",

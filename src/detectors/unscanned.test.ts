@@ -22,6 +22,10 @@ describe("repo/unscanned", () => {
     "package.json",
     ".git/config",
     ".git/hooks/post-checkout",
+    "scripts/setup.sh",
+    "tools/gen.py",
+    "binding.gyp",
+    ".husky/pre-commit",
   ])("warns about an oversized %s that croak could not read", (path) => {
     expect(unscanned(repo([big(path)]))).toEqual([
       {

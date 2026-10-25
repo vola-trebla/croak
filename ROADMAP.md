@@ -73,9 +73,12 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [x] `croak repo <path>`: human and JSON reports, exit codes, `info` severity
 - [x] `repo/node-modules-present`: installed dependencies in a repo are one warning, not a wall of alarms
 - [x] Lifecycle scripts in every `package.json` outside `node_modules` (incl. implicit `binding.gyp`), via a shell analyzer and code signals
-- [ ] IDE autorun (`.vscode/tasks.json` `runOn: folderOpen`, etc.)
-- [ ] Obfuscation and whitespace-hidden code
-- [ ] Suspicious code in build configs (`*.config.js`)
+- [x] IDE autorun (`.vscode/tasks.json` `runOn: folderOpen`, npm tasks, `dependsOn`)
+- [x] Obfuscation (vs. minification) and hidden code (offscreen, below the fold, Trojan Source)
+- [x] Suspicious code in build configs (`*.config.js`) — covered by the hidden-code and obfuscation detectors
+- [x] Dangerous git config and hooks (`repo/git-config`)
+- [x] Real-world corpus for false-alarm checks (`pnpm corpus`)
+- [x] Fixes from the M2 review (D19 hardening, shell-parser evasions, decoys, report escaping, …)
 - [x] Facts → signals → verdict model; `info` level that does not affect the verdict
 - [x] ReDoS guard: detectors under pathological input with a time budget, own process + CI timeout
 - [x] Spike: run analysis under `node --permission` (read-only, no child processes) — works; sandboxed scan in CI (D23)

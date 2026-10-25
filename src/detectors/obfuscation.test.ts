@@ -56,6 +56,11 @@ describe("repo/obfuscation", () => {
     });
   });
 
+  it("is not fooled by a decoy weak line at the top of the file", () => {
+    const decoy = `const icons = "${"\\x61".repeat(10)}";\n${"x();\n".repeat(49)}eval(atob("${"\\x61".repeat(10)}"));`;
+    expect(scan({ "a.js": decoy })[0]?.severity).toBe("block");
+  });
+
   it("still blocks a strong signal with decoding anywhere in the file", () => {
     expect(
       scan({ "a.js": `${names}\n${"x();\n".repeat(100)}atob(p);` })[0]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderScan, scanToJson } from "./repo-report.ts";
+import { renderScan, safe, scanToJson } from "./repo-report.ts";
 import type { ScanOutcome } from "./scan.ts";
 
 const complete: ScanOutcome = {
@@ -73,6 +73,36 @@ describe("renderScan", () => {
     expect(text).toContain("more than 2 entries");
     expect(text).toContain("not a clean scan");
     expect(renderScan(incomplete, { emoji: true })).toContain("🟠 incomplete");
+  });
+});
+
+describe("hostile text in the report", () => {
+  it("escapes terminal control and bidi characters from the scanned repo", () => {
+    const evil: ScanOutcome = {
+      ...complete,
+      root: "./t\u001b]0;pwned\u0007",
+      findings: [
+        {
+          ruleId: "repo/x",
+          severity: "block",
+          file: "a\u202e.js",
+          message: "runs `x`\u001b[2K\u001b[1A erased",
+        },
+      ],
+    };
+    const text = renderScan(evil, { emoji: false });
+    const raw = [...text].filter(
+      (ch) => (ch.charCodeAt(0) < 0x20 && ch !== "\n") || ch === "\u202e",
+    );
+    expect(raw).toEqual([]);
+    expect(text).toContain("\\u001b[2K");
+    expect(text).toContain("a\\u202e.js");
+  });
+
+  it("leaves ordinary text alone", () => {
+    expect(safe("plain — text, кириллица 🐸")).toBe(
+      "plain — text, кириллица 🐸",
+    );
   });
 });
 

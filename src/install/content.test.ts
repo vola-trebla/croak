@@ -79,7 +79,7 @@ describe("contentFindings", () => {
     ).toBe("block");
   });
 
-  it("warns about prebuilt native binaries it cannot inspect", () => {
+  it("notes prebuilt native binaries it cannot inspect", () => {
     const findings = scan({
       "package.json": manifest({}),
       "build/Release/addon.node": "\u007fELF",
@@ -87,8 +87,30 @@ describe("contentFindings", () => {
     expect(findings).toEqual([
       expect.objectContaining({
         ruleId: "install/native-binary",
-        severity: "warn",
+        severity: "info",
       }),
     ]);
+  });
+
+  it("notes a large JSON data file but warns when package.json is too large to read", () => {
+    const big = `{"a":"${"x".repeat(9 * 1024 * 1024)}"}`;
+    const severities = (file: string) =>
+      scan({ "package.json": manifest({}), [file]: big }).map(
+        (f) => `${f.severity}:${f.file}`,
+      );
+    expect(severities("protocol.json")).toEqual(["info:x@1.0.0/protocol.json"]);
+    expect(
+      contentFindings("x@1.0.0", pkg({ "package.json": big })).map(
+        (f) => f.severity,
+      ),
+    ).toEqual(["warn"]);
+  });
+
+  it("reads files up to 8 MB in a package", () => {
+    const findings = scan({
+      "package.json": manifest({}),
+      "bundle.js": `${"x;".repeat(2 * 1024 * 1024)}\n`,
+    });
+    expect(findings).toEqual([]);
   });
 });

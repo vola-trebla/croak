@@ -20,7 +20,8 @@ export interface TarLimits {
 export const DEFAULT_TAR_LIMITS: TarLimits = {
   maxUnpackedBytes: 256 * 1024 * 1024,
   maxEntries: 20_000,
-  maxFileBytes: 1024 * 1024,
+  // Bundles of a few MB are common in packages; reading them is cheap in memory.
+  maxFileBytes: 8 * 1024 * 1024,
 };
 
 export class TarballError extends Error {

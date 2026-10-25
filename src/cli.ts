@@ -133,10 +133,10 @@ function runPlan(
 }
 
 /** Pure entry point: all I/O goes through deps. */
-export function run(
+export async function run(
   argv: readonly string[],
   deps: CliDeps = DEFAULT_DEPS,
-): CliResult {
+): Promise<CliResult> {
   let parsed: ReturnType<typeof parse>;
   try {
     parsed = parse(argv);
@@ -175,7 +175,7 @@ export function run(
 
 // Only touch the process when executed directly, not when imported by tests.
 if (import.meta.main) {
-  const result = run(process.argv.slice(2), {
+  const result = await run(process.argv.slice(2), {
     scan: (root) => scanRepoAt(root),
     emoji: process.stdout.isTTY === true,
   });

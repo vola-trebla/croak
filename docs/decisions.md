@@ -39,3 +39,16 @@ SHA pins with a version comment; `permissions: contents: read`;
 
 Iterate freely, open the repo with a working MVP, eval results, and the article.
 **Trade-off:** no early community feedback.
+
+## D7 — AI agent setup lives in the repo (2026-10-25)
+
+`CLAUDE.md`, `.claude/skills/` (`/ship`, `/sync`), `.claude/agents/toad-reviewer.md`,
+and a read-only command allowlist in `.claude/settings.json` are committed.
+They document the engineering workflow for any AI agent and contributor.
+Personal preferences (language, tone) stay in user-level config;
+`.claude/settings.local.json` and `CLAUDE.local.md` are gitignored.
+The allowlist only covers commands that read or verify; anything that changes
+state (push, PR, publish) still asks. The agent did not grant itself these
+permissions — the maintainer added the file.
+**Trade-off:** the repo is opinionated about tooling; contributors without
+Claude Code simply ignore these files.

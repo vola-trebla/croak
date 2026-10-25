@@ -47,7 +47,8 @@ data and never lets anything inside run (how: [security model](docs/security-mod
 | 🔏  | **Is the seal intact?**                   | missing or dropped [provenance](https://docs.npmjs.com/generating-provenance-statements) signatures |
 | 🤖  | **Ask an expert (optional)**              | an LLM reviews the _diff_ between versions — and can only raise the alarm, never lower it           |
 
-Then it gives a verdict: 🟢 **allow**, 🟡 **warn**, or 🔴 **block** — with
+Then it gives a verdict — 🟢 **allow** (nothing suspicious found, not a
+guarantee), 🟡 **warn** (needs your attention, never "safe"), or 🔴 **block** — with
 reasons a human _and_ an agent can act on (planned output):
 
 ```
@@ -89,6 +90,8 @@ block. `--json` gives a versioned report for tools.
 
 Being honest about limits matters more than marketing:
 - Code that's clean at install and turns malicious later, at runtime
+- Install scripts that pull the payload in through `require` from the file they
+  run: croak reads the script and the files it runs directly, not deeper (yet)
 - Long-game maintainer takeovers (think xz-utils)
 - A compromised registry or signing infrastructure
 - Malware that's already on your machine

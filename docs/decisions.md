@@ -132,3 +132,28 @@ dependencies), and oversized files inside it are `info`.
 **Trade-off:** scanning your own installed project shows one warning per
 `node_modules` directory; a malicious committed `node_modules` is a warn, not
 a block, until content detectors inspect it.
+
+## D16 — Pattern-data files: statement-level invariant checks (2026-10-25)
+
+Detectors and their tests must hold strings such as `require("child_process")`
+or `eval(atob(…))` as data; a regex tripwire cannot tell data from code. A file
+whose first lines contain `// croak-invariants: pattern-data` gets
+statement-level rules instead: a real `import`/`require`/dynamic import/`eval`
+that starts a statement is still a violation, and non-test files keep the
+fs-write rule. The marker is allowed only under `src/signals/`,
+`src/detectors/`, and the ReDoS guard; anywhere else it is itself a violation.
+Separately, test files are exempt from `no-eval` (strings are test data) but
+not from the loading rules (`import()`, `require`, `child_process`, `vm`, …).
+**Trade-off:** an expression-level loading call inside a marked file
+(`foo(require(x))`) is not caught; review covers the two allowed directories.
+
+## D17 — Install-script verdicts and analysis depth (2026-10-25)
+
+Any install script warns. Network alone warns; network plus secrets, process,
+eval, or decode blocks, as does download-and-execute (detected by parsing the
+shell command, not by one regex). Known tools add info and never lower a
+verdict. croak reads the script, its inline code, and the files it runs
+directly — not their `require` graph. The limit is stated in the security
+model and README so the warning is not mistaken for a full audit.
+**Trade-off:** a payload one `require` away from the executed file is not seen
+by this detector.

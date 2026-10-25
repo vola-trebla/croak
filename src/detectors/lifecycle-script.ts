@@ -29,6 +29,7 @@ export const INSTALL_SCRIPTS = [
  * info note); it never lowers the verdict of anything else in the script.
  */
 const KNOWN_TOOLS = new Set([
+  // install-time tools
   "prisma",
   "husky",
   "patch-package",
@@ -40,10 +41,31 @@ const KNOWN_TOOLS = new Set([
   "svelte-kit",
   "astro",
   "playwright",
-  "electron-builder",
-  "node-gyp",
+  "only-allow",
   "opencollective-postinstall",
+  // build tools commonly run from prepare
+  "tsc",
+  "tsup",
+  "vite",
+  "rollup",
+  "esbuild",
+  "webpack",
+  "turbo",
+  "nx",
+  "lerna",
+  "unbuild",
+  "swc",
+  "babel",
+  "rimraf",
+  // harmless shell builtins
+  "echo",
+  "true",
+  "exit",
+  "printf",
 ]);
+
+const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
+const MAX_SCRIPT_DEPTH = 5;
 
 const SHELL_DECODE =
   /\bbase64\s+(?:-d|-D|--decode)\b|\bopenssl\s+(?:enc|base64)\b[^|;&]*\s-d\b/;
@@ -68,6 +90,47 @@ interface Assessment {
   readonly block: boolean;
   readonly reasons: readonly string[];
   readonly knownTools: readonly string[];
+}
+
+/**
+ * True when every command is a known tool or a package-manager call to a
+ * script that is itself routine, and nothing else at all is going on: no
+ * network, no local files, no inline code, no code signals. Anything unknown
+ * or unresolved is not routine (D19).
+ */
+function isRoutine(
+  command: string,
+  scripts: Record<string, unknown>,
+  depth = 0,
+  visited: ReadonlySet<string> = new Set(),
+): boolean {
+  if (depth > MAX_SCRIPT_DEPTH) return false;
+  const facts = analyzeShell(command);
+  if (
+    facts.unparsable ||
+    facts.downloadExecute ||
+    facts.network ||
+    facts.localFiles.length > 0 ||
+    facts.inlineCode.length > 0 ||
+    codeSignals(command).length > 0 ||
+    facts.commands.length === 0
+  ) {
+    return false;
+  }
+  const runs = new Set(facts.runScripts);
+  const everyCommandKnown = facts.commands.every(
+    (name) =>
+      KNOWN_TOOLS.has(name) || (PACKAGE_MANAGERS.has(name) && runs.size > 0),
+  );
+  if (!everyCommandKnown) return false;
+  return [...runs].every((name) => {
+    const target = scripts[name];
+    return (
+      typeof target === "string" &&
+      !visited.has(name) &&
+      isRoutine(target, scripts, depth + 1, new Set([...visited, name]))
+    );
+  });
 }
 
 /** What the script's command does, including the files and inline code it runs. */
@@ -157,6 +220,15 @@ function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
     const { block, reasons, knownTools } = assess(repo, dir, command);
     const line = scriptLine(text, name);
     const at = line === undefined ? { file: path } : { file: path, line };
+    if (!block && isRoutine(command, scripts)) {
+      findings.push({
+        ruleId: RULE,
+        severity: "info",
+        ...at,
+        message: `${name} runs \`${truncate(command)}\` on install: known tools only, nothing suspicious`,
+      });
+      continue;
+    }
     findings.push({
       ruleId: RULE,
       severity: block ? "block" : "warn",

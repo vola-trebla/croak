@@ -167,3 +167,17 @@ one PR does one thing (module, detector, case set, or docs), stays around
 starts with a short plan, and stops at a checkpoint if it runs long. `/ship`
 checks the size before opening a PR.
 **Trade-off:** more PRs and merges per feature; each is reviewable in minutes.
+
+## D19 — Known-tool install scripts are info, not warnings (2026-10-25)
+
+The real-world corpus put 7 of 13 popular repositories at 🟡 for routine
+scripts like `prepare: husky` or `prepare: npm run build` → `tsc`. Warnings
+that everyone learns to ignore defeat the tool. A script is now info when
+every command is a known tool or a package-manager call to a script that is
+itself routine (resolved through `scripts`, depth ≤ 5, cycles rejected), and
+nothing else is present: no network, local files, inline code, or code
+signals. Unknown commands, nested installs (`cd client && npm install`), and
+native builds (`node-gyp`) stay warnings; suspicious combinations still block.
+Corpus: 🟡 repos 7 → 5, warnings 35 → 26, all remaining explainable.
+**Trade-off:** croak trusts a known tool's name; whether that tool's package
+is itself honest is the install check's job (M3).

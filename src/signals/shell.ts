@@ -19,6 +19,8 @@ export interface ShellFacts {
   readonly inlineCode: readonly string[];
   /** Command names in order, with wrappers (sudo, env, npx, …) stripped. */
   readonly commands: readonly string[];
+  /** package.json scripts run via `npm run X`, `pnpm X`, `yarn X`, `npm test`, … */
+  readonly runScripts: readonly string[];
   /** Quotes or nesting could not be parsed; nothing else is reliable. */
   readonly unparsable: boolean;
 }
@@ -91,6 +93,52 @@ const WRAPPERS = new Set([
 ]);
 const PACKAGE_RUNNERS = new Set(["npm", "pnpm", "yarn"]);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** Package-manager subcommands that are not package.json script names. */
+const PM_BUILTINS = new Set([
+  "install",
+  "i",
+  "ci",
+  "add",
+  "remove",
+  "rm",
+  "uninstall",
+  "update",
+  "up",
+  "upgrade",
+  "exec",
+  "dlx",
+  "x",
+  "create",
+  "init",
+  "link",
+  "unlink",
+  "publish",
+  "pack",
+  "audit",
+  "outdated",
+  "list",
+  "ls",
+  "why",
+  "rebuild",
+  "prune",
+  "dedupe",
+  "config",
+  "set",
+  "help",
+]);
+/** npm runs these scripts without `run`. */
+const NPM_SCRIPT_ALIASES = new Set(["test", "start", "stop", "restart"]);
+
+/** The package.json script a package-manager command runs, if any. */
+function scriptName(name: string, args: readonly Word[]): string | undefined {
+  if (!PACKAGE_RUNNERS.has(name) && name !== "bun") return undefined;
+  const positional = args.map((a) => a.text).filter((t) => !t.startsWith("-"));
+  const [first, second] = positional;
+  if (first === "run" || first === "run-script") return second;
+  if (first === undefined) return undefined;
+  if (name === "npm") return NPM_SCRIPT_ALIASES.has(first) ? first : undefined;
+  return PM_BUILTINS.has(first) ? undefined : first;
+}
 
 // ---------------------------------------------------------------- parsing
 
@@ -353,6 +401,7 @@ interface Acc {
   localFiles: string[];
   inlineCode: string[];
   commands: string[];
+  runScripts: string[];
   downloaded: Set<string>;
 }
 
@@ -369,6 +418,7 @@ function newAcc(): Acc {
     localFiles: [],
     inlineCode: [],
     commands: [],
+    runScripts: [],
     downloaded: new Set(),
   };
 }
@@ -449,6 +499,8 @@ function walkCommand(
   if (resolved === undefined) return { downloader: false, interpreter: false };
   const { name, raw, args } = resolved;
   acc.commands.push(name);
+  const script = scriptName(name, args);
+  if (script !== undefined) acc.runScripts.push(script);
 
   // Running a file the script downloaded earlier.
   if (
@@ -546,6 +598,7 @@ function merge(into: Acc, from: Acc): void {
     if (!into.localFiles.includes(f)) into.localFiles.push(f);
   into.inlineCode.push(...from.inlineCode);
   into.commands.push(...from.commands);
+  into.runScripts.push(...from.runScripts);
   for (const d of from.downloaded) into.downloaded.add(d);
 }
 
@@ -556,6 +609,7 @@ export function analyzeShell(command: string): ShellFacts {
     localFiles: [],
     inlineCode: [],
     commands: [],
+    runScripts: [],
     unparsable: true,
   };
   if (command.length > MAX_SCRIPT_LENGTH) return unparsable;
@@ -579,6 +633,7 @@ export function analyzeShell(command: string): ShellFacts {
     localFiles: acc.localFiles,
     inlineCode: acc.inlineCode,
     commands: acc.commands,
+    runScripts: acc.runScripts,
     unparsable: false,
   };
 }

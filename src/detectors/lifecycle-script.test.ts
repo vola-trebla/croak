@@ -68,13 +68,60 @@ describe("repo/lifecycle-script", () => {
     "postprepare",
   ])("covers the %s lifecycle", (name) => {
     expect(
-      verdicts(scan(repo({ "package.json": pkg({ [name]: "echo hi" }) }))),
+      verdicts(scan(repo({ "package.json": pkg({ [name]: "make setup" }) }))),
     ).toEqual(["warn:package.json"]);
   });
 
-  it("adds an info note for a known tool, and still warns", () => {
+  it("only notes a script made of known tools with nothing suspicious (D19)", () => {
+    for (const command of [
+      "prisma generate",
+      "husky",
+      "tsc -p . && echo done",
+      "only-allow pnpm",
+    ]) {
+      const findings = scan(
+        repo({ "package.json": pkg({ prepare: command }) }),
+      );
+      expect(verdicts(findings)).toEqual(["info:package.json"]);
+      expect(findings[0]?.message).toContain("known tools only");
+    }
+  });
+
+  it("resolves npm run / pnpm X through the scripts, with cycles and unknowns staying warn", () => {
+    const routine = pkg({
+      prepare: "npm run build",
+      build: "pnpm compile",
+      compile: "tsc",
+    });
+    expect(verdicts(scan(repo({ "package.json": routine })))).toEqual([
+      "info:package.json",
+    ]);
+    const unknown = pkg({
+      prepare: "npm run build",
+      build: "node scripts/build.js",
+    });
+    expect(
+      verdicts(
+        scan(repo({ "package.json": unknown, "scripts/build.js": "x" })),
+      ),
+    ).toEqual(["warn:package.json"]);
+    const cycle = pkg({ prepare: "npm run a", a: "npm run b", b: "npm run a" });
+    expect(verdicts(scan(repo({ "package.json": cycle })))).toEqual([
+      "warn:package.json",
+    ]);
+    const missing = pkg({ prepare: "npm run nope" });
+    expect(verdicts(scan(repo({ "package.json": missing })))).toEqual([
+      "warn:package.json",
+    ]);
+  });
+
+  it("keeps unknown commands and nested installs at warn, with a known-tool note", () => {
     const findings = scan(
-      repo({ "package.json": pkg({ postinstall: "prisma generate" }) }),
+      repo({
+        "package.json": pkg({
+          postinstall: "prisma generate && cd client && npm install",
+        }),
+      }),
     );
     expect(verdicts(findings)).toEqual([
       "warn:package.json",

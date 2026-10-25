@@ -1,0 +1,10 @@
+{
+  "id": "d-known-tool-chained",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: postinstall starts with a legitimate prisma generate, then pipes a remote script into a shell. A known tool must not launder the rest of the command.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "d-postinstall-curl-pipe",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: postinstall pipes a remote script into a shell.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

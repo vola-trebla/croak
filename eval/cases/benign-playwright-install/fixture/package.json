@@ -1,0 +1,12 @@
+{
+  "name": "e2e-suite",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "playwright install --with-deps chromium",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}

@@ -141,7 +141,7 @@ whose first lines contain `// croak-invariants: pattern-data` gets
 statement-level rules instead: a real `import`/`require`/dynamic import/`eval`
 that starts a statement is still a violation, and non-test files keep the
 fs-write rule. The marker is allowed only under `src/signals/`,
-`src/detectors/`, and the ReDoS guard; anywhere else it is itself a violation.
+`src/detectors/`, `src/install/` (install detectors, added in M3), and the ReDoS guard; anywhere else it is itself a violation.
 Separately, test files are exempt from `no-eval` (strings are test data) but
 not from the loading rules (`import()`, `require`, `child_process`, `vm`, …).
 **Trade-off:** an expression-level loading call inside a marked file

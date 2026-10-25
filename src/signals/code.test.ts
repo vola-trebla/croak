@@ -6,6 +6,7 @@ import {
   codeSignals,
   describeSignals,
   isSuspicious,
+  isSuspiciousInDependency,
 } from "./code.ts";
 
 const signals = (text: string): CodeSignal[] =>
@@ -85,5 +86,18 @@ describe("describeSignals", () => {
     expect(describeSignals(codeSignals(text), "x.js")).toBe(
       "network (x.js:1), secrets (x.js:3)",
     );
+  });
+});
+
+describe("isSuspiciousInDependency", () => {
+  it.each([
+    [["network", "process"], false],
+    [["network"], false],
+    [["network", "secrets"], true],
+    [["network", "decode"], true],
+    [["network", "eval"], true],
+    [["eval", "decode"], true],
+  ] as const)("%j → %s", (set, expected) => {
+    expect(isSuspiciousInDependency(new Set(set))).toBe(expected);
   });
 });

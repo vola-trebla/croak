@@ -127,6 +127,23 @@ export function isSuspicious(signals: ReadonlySet<CodeSignal>): boolean {
   );
 }
 
+/**
+ * For dependency contents: native-binary installers (esbuild, swc, sharp)
+ * legitimately download a binary and spawn it at install time, so network plus
+ * process alone is not suspicious there. Network plus secrets, decoding, or
+ * eval still is, as is eval of decoded data.
+ */
+export function isSuspiciousInDependency(
+  signals: ReadonlySet<CodeSignal>,
+): boolean {
+  const reach =
+    signals.has("secrets") || signals.has("eval") || signals.has("decode");
+  return (
+    (signals.has("network") && reach) ||
+    (signals.has("eval") && signals.has("decode"))
+  );
+}
+
 /** "network (x.js:1), secrets (x.js:3)" — each signal once, at its first hit. */
 export function describeSignals(
   hits: readonly SignalHit[],

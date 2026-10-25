@@ -4,7 +4,6 @@
 first. It statically checks what an install (or an unfamiliar repo) would do
 **before any of its code runs**, and explains its verdict so an agent can
 self-correct.
-
 - Plan and milestones: [ROADMAP.md](ROADMAP.md)
 - Why things are the way they are: [docs/decisions.md](docs/decisions.md)
 
@@ -50,7 +49,6 @@ Note: pnpm 12 does not accept `-s`.
 ## Workflow
 
 Small, reviewable steps. Never work for long stretches without checking in.
-
 1. One task = one branch: `<type>/<milestone>-<topic>`
    (`feat/m1-eval-schema`, `fix/cli-unknown-flag`, `chore/claude-setup`).
 2. Test first, then a small code change, then `pnpm check`.

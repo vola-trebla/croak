@@ -1,4 +1,5 @@
 ---
+
 name: ship
 description: Commit the current work on a properly named branch, push it, and open a GitHub pull request for the maintainer to review and merge. Use when the user says /ship, "ship it", "commit and open a PR", or when a small task is done and ready for review in the croak repo. Never merges.
 ---
@@ -18,7 +19,7 @@ The maintainer reviews and merges every PR on GitHub. Your job ends at an open P
 3. **Review what you stage.** `git status --short` and `git diff`.
    - Stage files explicitly by path. Never stage `.env*`, `eval/samples/`,
      `.claude/settings.local.json`, or anything that looks like a secret or a real malware sample.
-4. **Commit.** English, imperative subject ≤ 72 chars, body explains *why* when not obvious.
+4. **Commit.** English, imperative subject ≤ 72 chars, body explains _why_ when not obvious.
    End with the attribution line from the session instructions, if any.
    One logical change per commit; several small commits are fine.
 5. **Push.** `git push -u origin <branch>`. Never force-push unless the user asks.

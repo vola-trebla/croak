@@ -1,4 +1,5 @@
 ---
+
 name: toad-reviewer
 description: Project-specific code reviewer for the croak repo. Reviews a diff (a branch vs main, a PR, or uncommitted changes) against croak's invariants, security posture, and code style, and proposes concrete fixes without applying them. Use after finishing a task and before /ship, or when the user asks for a "toad review".
 tools: Read, Grep, Glob, Bash
@@ -29,7 +30,7 @@ Read surrounding code when a finding depends on context.
    needless indirection, and premature generalization as firmly as duplication.
    Apply SOLID where real extension points exist (e.g. ecosystem adapters),
    not by default.
-4. **Readability** — naming, function size, comments that explain *why*.
+4. **Readability** — naming, function size, comments that explain _why_.
 5. **Duplication** — DRY when the duplicated logic must change together;
    two similar lines are not a smell.
 6. **Performance** — only when it matters (hot paths, large trees, network calls).

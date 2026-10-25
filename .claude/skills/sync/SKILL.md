@@ -1,4 +1,5 @@
 ---
+
 name: sync
 description: After the maintainer merges a PR on GitHub, return to an up-to-date main and clean up the merged branch. Use when the user says /sync, "ОК ЖАБА", "merged", "смержил", or otherwise signals that a PR was merged in the croak repo.
 ---

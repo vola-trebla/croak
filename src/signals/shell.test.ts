@@ -102,4 +102,18 @@ describe("analyzeShell: facts", () => {
       analyzeShell(`echo ${"$(".repeat(20)}true${")".repeat(20)}`).unparsable,
     ).toBe(true);
   });
+
+  it("names package.json scripts run through a package manager", () => {
+    expect(
+      analyzeShell("npm run build && pnpm lint && yarn run test --watch")
+        .runScripts,
+    ).toEqual(["build", "lint", "test"]);
+    expect(
+      analyzeShell("npm test && npm start && bun run gen").runScripts,
+    ).toEqual(["test", "start", "gen"]);
+    expect(
+      analyzeShell("npm install && pnpm add x && yarn dlx y && npm ci")
+        .runScripts,
+    ).toEqual([]);
+  });
 });

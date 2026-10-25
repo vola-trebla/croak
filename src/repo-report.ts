@@ -90,23 +90,44 @@ export function renderScan(
     ].join("\n");
   }
 
+  return renderVerdict(
+    {
+      title,
+      verdict: outcome.verdict,
+      findings: outcome.findings,
+      footer: `${outcome.filesScanned} files scanned · ${Math.round(outcome.durationMs)} ms`,
+    },
+    options,
+  );
+}
+
+/** The shared verdict layout for `croak repo` and `croak plan`. */
+export function renderVerdict(
+  report: {
+    readonly title: string;
+    readonly verdict: Verdict;
+    readonly findings: readonly Finding[];
+    readonly footer: string;
+  },
+  options: RenderOptions,
+): string {
+  const { emoji } = options;
   const status = emoji
-    ? `— ${VERDICT_ICON[outcome.verdict]} ${outcome.verdict}`
-    : `- ${outcome.verdict.toUpperCase()}`;
+    ? `— ${VERDICT_ICON[report.verdict]} ${report.verdict}`
+    : `- ${report.verdict.toUpperCase()}`;
   const body =
-    outcome.findings.length === 0
+    report.findings.length === 0
       ? ["  nothing suspicious found"]
-      : sortFindings(outcome.findings).flatMap((finding) =>
+      : sortFindings(report.findings).flatMap((finding) =>
           findingLines(finding, options),
         );
-
   return [
-    emoji ? `🐸 ${title} ${status}` : `${title} ${status}`,
+    emoji ? `🐸 ${report.title} ${status}` : `${report.title} ${status}`,
     "",
     ...body,
     "",
-    `  ${MEANING[outcome.verdict]}`,
-    `  ${outcome.filesScanned} files scanned · ${Math.round(outcome.durationMs)} ms`,
+    `  ${MEANING[report.verdict]}`,
+    `  ${report.footer}`,
     "",
   ].join("\n");
 }

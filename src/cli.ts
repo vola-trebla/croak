@@ -1,5 +1,8 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { planToJson, renderPlan } from "./install/report.ts";
+import { type PlanOutcome, planInstall } from "./install/scan.ts";
 import { renderScan, scanToJson } from "./repo-report.ts";
 import { type ScanOutcome, ScanTargetError, scanRepoAt } from "./scan.ts";
 
@@ -26,6 +29,8 @@ export interface CliDeps {
   readonly scan: (root: string) => ScanOutcome;
   /** Emoji output for a human in a terminal; plain text for pipes and CI. */
   readonly emoji: boolean;
+  /** Reads a lockfile for `croak plan`; defaults to the filesystem. */
+  readonly readFile?: (path: string) => string;
 }
 
 const DEFAULT_DEPS: CliDeps = {
@@ -36,6 +41,8 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
+  croak plan --after <lock> [--before <lock|none>]
+                         judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
   croak --version
   croak --help
@@ -66,6 +73,8 @@ function parse(argv: readonly string[]) {
       help: { type: "boolean", short: "h" },
       json: { type: "boolean" },
       plain: { type: "boolean" },
+      before: { type: "string" },
+      after: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -78,9 +87,49 @@ const usageError = (message: string): CliResult => ({
   stderr: `croak: ${message}\n\n${HELP}`,
 });
 
-function exitCode(outcome: ScanOutcome): number {
+function exitCode(outcome: ScanOutcome | PlanOutcome): number {
   if (outcome.status === "incomplete") return EXIT.incomplete;
   return outcome.verdict === "block" ? EXIT.block : EXIT.ok;
+}
+
+function runPlan(
+  values: {
+    readonly before?: string | undefined;
+    readonly after?: string | undefined;
+    readonly json?: boolean | undefined;
+    readonly plain?: boolean | undefined;
+  },
+  rest: readonly string[],
+  deps: CliDeps,
+): CliResult {
+  if (rest.length > 0)
+    return usageError(`plan takes no positional arguments, got ${rest.length}`);
+  if (values.after === undefined)
+    return usageError("plan needs --after <lockfile>");
+  const read = deps.readFile ?? ((path: string) => readFileSync(path, "utf8"));
+  const load = (path: string): string | CliResult => {
+    try {
+      return read(path);
+    } catch (error) {
+      return usageError(
+        `cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+  const after = load(values.after);
+  if (typeof after !== "string") return after;
+  let before: string | undefined;
+  if (values.before !== undefined && values.before !== "none") {
+    const text = load(values.before);
+    if (typeof text !== "string") return text;
+    before = text;
+  }
+  const outcome = planInstall(before, after);
+  const stdout =
+    values.json === true
+      ? planToJson(outcome)
+      : renderPlan(outcome, { emoji: deps.emoji && values.plain !== true });
+  return { code: exitCode(outcome), stdout, stderr: "" };
 }
 
 /** Pure entry point: all I/O goes through deps. */
@@ -104,6 +153,7 @@ export function run(
   if (values.help === true || command === undefined) {
     return { code: EXIT.ok, stdout: HELP, stderr: "" };
   }
+  if (command === "plan") return runPlan(values, rest, deps);
   if (command !== "repo") return usageError(`unknown command "${command}"`);
   if (rest.length > 1)
     return usageError(`repo takes one path, got ${rest.length}`);

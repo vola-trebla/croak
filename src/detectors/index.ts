@@ -1,5 +1,6 @@
 import type { RepoSnapshot } from "../repo-snapshot.ts";
 import type { Finding } from "../verdict.ts";
+import { lifecycleScript } from "./lifecycle-script.ts";
 import { nodeModulesPresent } from "./node-modules-present.ts";
 import { unscanned } from "./unscanned.ts";
 
@@ -9,6 +10,7 @@ export type RepoDetector = (repo: RepoSnapshot) => readonly Finding[];
 export const repoDetectors: readonly RepoDetector[] = [
   unscanned,
   nodeModulesPresent,
+  lifecycleScript,
 ];
 
 export function scanRepo(

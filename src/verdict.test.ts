@@ -19,6 +19,13 @@ describe("aggregate", () => {
     ).toBe("block");
     expect(aggregate([finding("warn")])).toBe("warn");
   });
+
+  it("never lets an info finding change the verdict", () => {
+    expect(aggregate([finding("info")])).toBe("allow");
+    expect(aggregate([finding("info"), finding("warn"), finding("info")])).toBe(
+      "warn",
+    );
+  });
 });
 
 describe("isVerdict", () => {

@@ -64,8 +64,6 @@ describe("snapshotRepo", () => {
     const snap = snapshotRepo(root);
     expect(snap.entries[0]?.kind).toBe("oversized");
     expect(snap.read("big.js")).toBeUndefined();
-    expect(
-      snap.read("../" + outside.split("/").pop() + "/secret"),
-    ).toBeUndefined();
+    expect(snap.read(`../${outside.split("/").pop()}/secret`)).toBeUndefined();
   });
 });

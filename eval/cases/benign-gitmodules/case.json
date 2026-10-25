@@ -1,0 +1,10 @@
+{
+  "id": "benign-gitmodules",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "An ordinary submodule: path, url, and branch only. Its malicious twin (update = !command) cannot be committed: git's fsck, enforced by GitHub, rejects it, so that vector is unit-tested.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

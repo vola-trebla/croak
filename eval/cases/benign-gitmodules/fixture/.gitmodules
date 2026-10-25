@@ -1,0 +1,5 @@
+# SYNTHETIC croak eval fixture (croak-eval-synthetic). Benign by design.
+[submodule "docs-theme"]
+	path = docs/theme
+	url = https://git.example.invalid/theme.git
+	branch = main

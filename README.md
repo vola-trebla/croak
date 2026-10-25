@@ -67,9 +67,9 @@ croak repo .          # 🧪 early: scan an unfamiliar repo before you install o
 Plus a **Claude Code hook** (🚧 planned) that puts croak in front of every
 install command an agent runs.
 
-`croak repo` runs end to end and checks install scripts, committed
-`node_modules`, and files too large to scan; IDE autorun and hidden or
-obfuscated code are next. Exit codes: `0` allow/warn,
+`croak repo` runs end to end with seven detectors: install scripts, VS Code
+autorun tasks, hidden code, obfuscation, dangerous git config, committed
+`node_modules`, and files too large to scan. Exit codes: `0` allow/warn,
 `1` block, `2` usage error, `3` scan incomplete — agents should treat `3` as a
 block. `--json` gives a versioned report for tools.
 
@@ -110,40 +110,51 @@ pnpm eval
 ```
 
 ```
-🐸 croak eval — 22 cases (11 malicious, 11 benign)
+🐸 croak eval — 32 cases (16 malicious, 16 benign)
 
-  ✅ benign-husky-prepare         expected 🟡 warn   got 🟡 warn
+  ✅ benign-gitmodules            expected 🟢 allow  got 🟢 allow
+  ✅ benign-husky-prepare         expected 🟢 allow  got 🟢 allow
+  ✅ benign-icon-font-map         expected 🟢 allow  got 🟢 allow
   ✅ benign-installed-project     expected 🟡 warn   got 🟡 warn
   ✅ benign-large-lockfile        expected 🟢 allow  got 🟢 allow
   ✅ benign-long-line-config      expected 🟢 allow  got 🟢 allow
   ✅ benign-minified-vendor       expected 🟢 allow  got 🟢 allow
   ✅ benign-native-module         expected 🟡 warn   got 🟡 warn
-  ✅ benign-playwright-install    expected 🟡 warn   got 🟡 warn
+  ✅ benign-playwright-install    expected 🟢 allow  got 🟢 allow
   ✅ benign-postinstall-copy-env  expected 🟡 warn   got 🟡 warn
   ✅ benign-prisma-postinstall    expected 🟡 warn   got 🟡 warn
+  ✅ benign-rtl-locale            expected 🟢 allow  got 🟢 allow
   ✅ benign-vite-app              expected 🟢 allow  got 🟢 allow
   ✅ benign-vscode-build-task     expected 🟢 allow  got 🟢 allow
+  ✅ benign-vscode-jsonc          expected 🟢 allow  got 🟢 allow
+  ✅ benign-vscode-npm-watch      expected 🟡 warn   got 🟡 warn
   ✅ d-binding-gyp-implicit       expected 🟡 warn   got 🟡 warn
   ✅ d-committed-node-modules     expected 🟡 warn   got 🟡 warn
-  ❌ d-config-obfuscated          expected 🔴 block  got 🟢 allow  MISSED  missing: repo/obfuscation
+  ✅ d-config-obfuscated          expected 🔴 block  got 🔴 block
   ✅ d-known-tool-chained         expected 🔴 block  got 🔴 block
+  ✅ d-obfuscated-string-array    expected 🔴 block  got 🔴 block
   ✅ d-oversized-config           expected 🟡 warn   got 🟡 warn
   ✅ d-postinstall                expected 🟡 warn   got 🟡 warn
   ✅ d-postinstall-curl-pipe      expected 🔴 block  got 🔴 block
   ✅ d-postinstall-exfil          expected 🔴 block  got 🔴 block
   ✅ d-postinstall-inline-decode  expected 🔴 block  got 🔴 block
-  ❌ d-tailwind-hidden-code       expected 🔴 block  got 🟢 allow  MISSED  missing: repo/hidden-code
-  ❌ d-vscode-autorun             expected 🔴 block  got 🟢 allow  MISSED  missing: repo/ide-autorun
+  ✅ d-tailwind-hidden-code       expected 🔴 block  got 🔴 block
+  ✅ d-trojan-source              expected 🟡 warn   got 🟡 warn
+  ✅ d-vertical-hidden            expected 🔴 block  got 🔴 block
+  ✅ d-vscode-autorun             expected 🔴 block  got 🔴 block
+  ✅ d-vscode-hidden-nested       expected 🔴 block  got 🔴 block
+  ✅ d-vscode-npm-autorun         expected 🔴 block  got 🔴 block
 
-  block recall   4/11   36%  ███████░░░░░░░░░░░░░
-  flag recall    8/11   73%  ███████████████░░░░░
-  false alarms   0/11    0%  ░░░░░░░░░░░░░░░░░░░░
-  rule recall   14/17   82%  ████████████████░░░░
-  time          7 ms
+  block recall  11/16   69%  ██████████████░░░░░░
+  flag recall   16/16  100%  ████████████████████
+  false alarms   0/16    0%  ░░░░░░░░░░░░░░░░░░░░
+  rule recall   23/23  100%  ████████████████████
+  time          30 ms
 ```
 
-Three detectors exist so far: install scripts, committed `node_modules`, and
-the safety floor `repo/unscanned` (a file too big to read is never a clean scan). Every ❌ that turns into ✅ is progress you can see,
+Every malicious case is flagged with no false alarms on the benign ones, and a
+separate run on 13 pinned real-world repositories (`pnpm corpus`) checks the
+noise level on code we did not write. Every ❌ that turns into ✅ is progress you can see,
 and a case that ever passed is not allowed to fail again. Format and metrics:
 [eval/README.md](eval/README.md).
 

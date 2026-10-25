@@ -177,6 +177,22 @@ describe("repo/lifecycle-script", () => {
     expect(scan(repo({ "package.json": text }))[0]?.severity).toBe("block");
   });
 
+  it("points at the script, not an earlier mention of its name", () => {
+    const text = JSON.stringify(
+      {
+        description: "run prepare first",
+        dependencies: { prepare: "1.0.0" },
+        scripts: { prepare: "make" },
+      },
+      null,
+      2,
+    );
+    const [finding] = scan(repo({ "package.json": text }));
+    expect(finding?.line).toBe(
+      text.split("\n").findIndex((l) => l.includes('"prepare": "make"')) + 1,
+    );
+  });
+
   it("does not loop on script cycles", () => {
     expect(
       scan(

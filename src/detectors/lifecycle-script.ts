@@ -87,11 +87,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const truncate = (text: string): string =>
   text.length > MAX_SHOWN ? `${text.slice(0, MAX_SHOWN)}…` : text;
 
-/** 1-based line of the "name": key in a manifest, if found. */
+/** 1-based line of `"name":` inside the manifest's "scripts" object, if found. */
 function scriptLine(manifest: string, name: string): number | undefined {
-  const index = manifest
-    .split("\n")
-    .findIndex((line) => line.includes(`"${name}"`));
+  const lines = manifest.split("\n");
+  const scripts = lines.findIndex((line) => /"scripts"\s*:/.test(line));
+  const key = `"${name}"`;
+  const index = lines.findIndex(
+    (line, i) =>
+      i >= Math.max(scripts, 0) &&
+      line.includes(key) &&
+      /"\s*:/.test(line.slice(line.indexOf(key))),
+  );
   return index === -1 ? undefined : index + 1;
 }
 

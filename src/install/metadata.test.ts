@@ -105,10 +105,21 @@ describe("metadataFindings", () => {
     expect(rules(metadataFindings(change("lib"), facts()))).toEqual([]);
   });
 
-  it("warns on a new publisher", () => {
+  it("only notes a new publisher on its own", () => {
     expect(
       rules(metadataFindings(change("lib"), facts({ publisher: "mallory" }))),
-    ).toEqual(["warn:install/publisher"]);
+    ).toEqual(["info:install/publisher"]);
+  });
+
+  it("ignores a new publisher name on a version with provenance (a CI identity)", () => {
+    expect(
+      rules(
+        metadataFindings(
+          change("lib", { hasInstallScript: true }),
+          facts({ publisher: "GitHub Actions", hasProvenance: true }),
+        ),
+      ),
+    ).toEqual([]);
   });
 
   it("blocks the hijacked-account pattern: install script plus dropped provenance or a new publisher", () => {

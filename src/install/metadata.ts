@@ -51,7 +51,8 @@ export function nearPopularName(name: string): string | undefined {
 
 /**
  * Registry signals for one new or changed version. Each signal alone is a
- * warning (D25); two patterns block (D26): an install script with dropped
+ * warning (D25), except a new publisher, which alone is context (D27); two
+ * patterns block (D26): an install script with dropped
  * provenance or a new publisher (a hijacked maintainer account), and a
  * typo-squat name on a brand-new package.
  */
@@ -92,7 +93,10 @@ export function metadataFindings(
   const recent = facts.earlier.slice(0, 5);
   const provenanceDropped =
     !facts.hasProvenance && recent.some((v) => v.hasProvenance);
+  // With provenance, the publisher is a CI identity tied to the source repo;
+  // a different account name there is a pipeline change, not a new person.
   const newPublisher =
+    !facts.hasProvenance &&
     facts.publisher !== undefined &&
     facts.earlier.length > 0 &&
     !facts.earlier.some((v) => v.publisher === facts.publisher);
@@ -125,7 +129,9 @@ export function metadataFindings(
     findings.push(
       finding(
         "install/publisher",
-        hijack ? "block" : "warn",
+        // Alone it is context: maintainers rotate and orgs publish from
+        // service accounts (microsoft1es, GitHub Actions).
+        hijack ? "block" : "info",
         `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}`,
       ),
     );

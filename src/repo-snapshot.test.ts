@@ -8,7 +8,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MAX_FILE_BYTES, snapshotRepo } from "./repo-snapshot.ts";
+import {
+  MAX_FILE_BYTES,
+  SnapshotLimitError,
+  snapshotRepo,
+} from "./repo-snapshot.ts";
 
 let root: string;
 let outside: string;
@@ -65,5 +69,24 @@ describe("snapshotRepo", () => {
     expect(snap.entries[0]?.kind).toBe("oversized");
     expect(snap.read("big.js")).toBeUndefined();
     expect(snap.read(`../${outside.split("/").pop()}/secret`)).toBeUndefined();
+  });
+
+  it("refuses repos with more entries than the limit", () => {
+    for (const name of ["a", "b", "c"]) writeFileSync(join(root, name), "");
+    expect(() => snapshotRepo(root, { maxEntries: 2 })).toThrow(
+      SnapshotLimitError,
+    );
+    expect(() => snapshotRepo(root, { maxEntries: 2 })).toThrow(/entries/);
+  });
+
+  it("refuses directory trees deeper than the limit instead of overflowing the stack", () => {
+    let dir = root;
+    for (let i = 0; i < 5; i++) {
+      dir = join(dir, `d${i}`);
+      mkdirSync(dir);
+    }
+    writeFileSync(join(dir, "deep.js"), "");
+    expect(() => snapshotRepo(root, { maxDepth: 3 })).toThrow(/depth/);
+    expect(snapshotRepo(root, { maxDepth: 10 }).entries).toHaveLength(1);
   });
 });

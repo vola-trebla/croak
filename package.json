@@ -19,7 +19,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
-    "check": "pnpm lint && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "eval": "node src/eval/main.ts"
   },
   "license": "MIT",
   "devDependencies": {

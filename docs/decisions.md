@@ -75,3 +75,13 @@ reviews the whole codebase at each milestone's end. First run (M0) found an
 allowlist file-write hole, a Node 24.0/24.1 fail-open, and Vitest executing
 fixture tests.
 **Trade-off:** non-mechanical issues can live up to one milestone.
+
+## D10 — Run TypeScript directly with Node, `.ts` import specifiers (2026-10-25)
+
+Node 24 strips types natively, so dev tools like `pnpm eval` run `src/` with no
+build step. Relative imports use `.ts`; `rewriteRelativeImportExtensions`
+makes tsc emit `.js` for the published build. `erasableSyntaxOnly` keeps the
+code within what Node can strip (no enums, no parameter properties).
+Eval code lives in `src/eval/` but is excluded from the published build.
+**Trade-off:** no enums/namespaces/parameter properties; imports look unusual
+to people used to `.js` specifiers.

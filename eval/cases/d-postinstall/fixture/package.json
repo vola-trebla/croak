@@ -1,0 +1,9 @@
+{
+  "name": "frontend-test-task",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "node scripts/setup.js",
+    "dev": "vite"
+  }
+}

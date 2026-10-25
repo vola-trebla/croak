@@ -63,7 +63,9 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [ ] Benign set: top-N npm packages (false-positive baseline)
 - [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git)
 - [ ] Synthetic "test assignment" repos with harmless payloads (exfil to `localhost`)
-- [ ] Eval runner + metrics: precision / recall per threat class, FP rate, latency, cost per verdict
+- [x] Eval runner + metrics: block/flag recall, false alarms, rule recall, latency (emoji + plain + JSON output)
+- [x] Case format + first synthetic cases (null baseline: 0% recall)
+- [ ] Cost per verdict (with the LLM layer, M5)
 
 ### M2 — `croak repo` (static, offline)
 

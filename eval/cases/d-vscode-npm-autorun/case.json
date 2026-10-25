@@ -1,0 +1,10 @@
+{
+  "id": "d-vscode-npm-autorun",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: a VS Code npm task runs on folder open, and the npm script it calls pipes a remote script into a shell. Nothing to install: opening the folder is enough.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/ide-autorun"]
+  }
+}

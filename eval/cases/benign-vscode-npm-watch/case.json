@@ -1,0 +1,10 @@
+{
+  "id": "benign-vscode-npm-watch",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "An npm task starts the Vite dev server when the folder opens. Code runs on open, so warn (needs attention), but nothing suspicious. Benign twin of d-vscode-npm-autorun.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/ide-autorun"]
+  }
+}

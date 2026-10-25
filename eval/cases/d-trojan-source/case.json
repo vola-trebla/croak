@@ -1,0 +1,10 @@
+{
+  "id": "d-trojan-source",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: an access check uses a Unicode right-to-left override so the code reads differently from how it runs (Trojan Source, CVE-2021-42574). Bidi controls in code warn; croak does not judge what the reordered code does.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/hidden-code"]
+  }
+}

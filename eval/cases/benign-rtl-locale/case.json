@@ -1,0 +1,10 @@
+{
+  "id": "benign-rtl-locale",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Arabic and Hebrew locale files legitimately contain bidi isolate characters around interpolated values. JSON locales get an info note, not an alarm. Benign twin of d-trojan-source.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

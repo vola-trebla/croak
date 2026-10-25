@@ -1,0 +1,10 @@
+{
+  "id": "d-vertical-hidden",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: next.config.js looks complete, but after 200 blank lines it phones home with the environment when the dev server starts.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/hidden-code"]
+  }
+}

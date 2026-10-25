@@ -1,0 +1,8 @@
+{
+  "name": "auth-test-task",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/auth.js"
+  }
+}

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { checkPackageJson, checkSource } from "./check-invariants.ts";
+import {
+  checkPackageJson,
+  checkSource,
+  PATTERN_DATA_MARKER,
+} from "./check-invariants.ts";
 
 const rules = (text: string, isTest = false) =>
   checkSource("src/x.ts", text, isTest).map((v) => v.rule);
@@ -113,6 +117,69 @@ describe("checkSource", () => {
   it("reports the line number", () => {
     expect(checkSource("src/x.ts", "ok\nok\neval(x)\n", false)).toEqual([
       { file: "src/x.ts", line: 3, rule: "no-eval", text: "eval(x)" },
+    ]);
+  });
+});
+
+describe("pattern-data files", () => {
+  const data = (body: string, file = "src/signals/x.ts", isTest = false) =>
+    checkSource(file, `${PATTERN_DATA_MARKER}\n${body}`, isTest).map(
+      (v) => v.rule,
+    );
+
+  it("allow forbidden module names and calls as data inside strings", () => {
+    expect(
+      data(
+        `  ["https", \`const h = require("https");\`],\n  "child_process",\n  pattern: load("vm"),`,
+      ),
+    ).toEqual([]);
+    expect(
+      data(`  [\`eval(atob(x))\`, "eval"],`, "src/detectors/x.test.ts", true),
+    ).toEqual([]);
+  });
+
+  it.each([
+    [
+      "an import statement",
+      `import { execSync } from "node:child_process";`,
+      "no-forbidden-import",
+    ],
+    [
+      "a re-export",
+      `export { runInThisContext } from "vm";`,
+      "no-forbidden-import",
+    ],
+    [
+      "a require statement",
+      `const cp = require("child_process");`,
+      "no-require",
+    ],
+    [
+      "a dynamic import statement",
+      `const m = await import(path);`,
+      "no-dynamic-import",
+    ],
+    ["an eval statement", `  eval(code);`, "no-eval"],
+    ["an indirect eval statement", `const r = (0, eval)(code);`, "no-eval"],
+    [
+      "a Function constructor statement",
+      `const f = new Function(code);`,
+      "no-eval",
+    ],
+  ])("still flag %s", (_name, body, rule) => {
+    expect(data(body)).toContain(rule);
+  });
+
+  it("keep the fs-write rule for non-test pattern-data files", () => {
+    expect(data(`writeFileSync(p, d);`)).toContain("no-fs-write");
+    expect(data(`writeFileSync(p, d);`, "src/signals/x.test.ts", true)).toEqual(
+      [],
+    );
+  });
+
+  it("refuse the marker outside src/signals and src/detectors", () => {
+    expect(data("ok", "src/eval/x.ts")).toEqual([
+      "pattern-data-outside-allowed-dirs",
     ]);
   });
 });

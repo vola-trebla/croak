@@ -78,14 +78,48 @@ const SOURCE_RULES: ReadonlyArray<{
   },
 ];
 
-/** Checks one file of croak's own code; test files get the "all" rules only. */
-export function checkSource(
+/** Marks a file whose strings are detector patterns or test data (see D16). */
+export const PATTERN_DATA_MARKER = "// croak-invariants: pattern-data";
+const PATTERN_DATA_DIRS = ["src/signals/", "src/detectors/"];
+
+const FORBIDDEN_MODULES =
+  "child_process|vm|worker_threads|module|inspector|repl";
+const ASSIGNED = String.raw`^\s*(?:export\s+)?(?:(?:const|let|var)\s+[^=]+=\s*)?(?:await\s+)?`;
+
+/**
+ * Pattern-data files legitimately hold strings such as require("child_process")
+ * as data, so they get statement-level rules: an import, require, dynamic
+ * import, or eval that starts a statement is still a violation.
+ */
+const STATEMENT_RULES: ReadonlyArray<{
+  readonly rule: string;
+  readonly pattern: RegExp;
+}> = [
+  {
+    rule: "no-forbidden-import",
+    pattern: new RegExp(
+      String.raw`^\s*(?:import|export)\b[^"'\x60]*["'](?:node:)?(?:${FORBIDDEN_MODULES})["']`,
+    ),
+  },
+  { rule: "no-require", pattern: new RegExp(`${ASSIGNED}require\\s*\\(`) },
+  {
+    rule: "no-dynamic-import",
+    pattern: new RegExp(`${ASSIGNED}import\\s*\\(`),
+  },
+  {
+    rule: "no-eval",
+    pattern: new RegExp(
+      String.raw`${ASSIGNED}(?:\(0,\s*)?(?:eval\s*\)?|new\s+Function)\s*\(`,
+    ),
+  },
+];
+
+const violationsFor = (
   file: string,
   text: string,
-  isTest: boolean,
-): Violation[] {
-  const rules = SOURCE_RULES.filter(({ scope }) => scope === "all" || !isTest);
-  return text.split("\n").flatMap((lineText, index) =>
+  rules: ReadonlyArray<{ readonly rule: string; readonly pattern: RegExp }>,
+): Violation[] =>
+  text.split("\n").flatMap((lineText, index) =>
     rules
       .filter(({ pattern }) => pattern.test(lineText))
       .map(({ rule }) => ({
@@ -95,6 +129,41 @@ export function checkSource(
         text: lineText.trim(),
       })),
   );
+
+/**
+ * Checks one file of croak's own code. Test files get the "all" rules only;
+ * pattern-data files (marker in the first lines, allowed directories only)
+ * get statement-level rules, plus "source" rules when they are not tests.
+ */
+export function checkSource(
+  file: string,
+  text: string,
+  isTest: boolean,
+): Violation[] {
+  const marked = text
+    .split("\n", 5)
+    .some((line) => line.trim() === PATTERN_DATA_MARKER);
+  if (!marked) {
+    return violationsFor(
+      file,
+      text,
+      SOURCE_RULES.filter(({ scope }) => scope === "all" || !isTest),
+    );
+  }
+  if (!PATTERN_DATA_DIRS.some((dir) => file.startsWith(dir))) {
+    return [
+      {
+        file,
+        line: 1,
+        rule: "pattern-data-outside-allowed-dirs",
+        text: PATTERN_DATA_MARKER,
+      },
+    ];
+  }
+  const sourceOnly = isTest
+    ? []
+    : SOURCE_RULES.filter(({ rule }) => rule === "no-fs-write");
+  return violationsFor(file, text, [...STATEMENT_RULES, ...sourceOnly]);
 }
 
 const DEPENDENCY_FIELDS = [

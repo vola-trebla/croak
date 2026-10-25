@@ -50,8 +50,28 @@ and a read-only command allowlist in `.claude/settings.json` are committed.
 They document the engineering workflow for any AI agent and contributor.
 Personal preferences (language, tone) stay in user-level config;
 `.claude/settings.local.json` and `CLAUDE.local.md` are gitignored.
-The allowlist only covers commands that read or verify; anything that changes
-state (push, PR, publish) still asks. The agent did not grant itself these
+The allowlist only covers exact read-only commands — no `:*` prefix rules for
+git, because prefix rules accept any flag (`git log --output=<path>` writes an
+arbitrary file; found in the M0 review). Anything that changes state
+(push, PR, publish, format) still asks. The agent did not grant itself these
 permissions — the maintainer added the file.
 **Trade-off:** the repo is opinionated about tooling; contributors without
 Claude Code simply ignore these files.
+
+## D8 — Git hooks without husky (2026-10-25)
+
+`.githooks/pre-commit` runs `biome check --staged` (instant); `.githooks/pre-push`
+runs `pnpm check`. Enabled with `git config core.hooksPath .githooks`.
+husky installs hooks through a `prepare` lifecycle script — the install-time
+execution mechanism croak exists to gate — and adds a dependency.
+**Trade-off:** one manual setup command per clone.
+
+## D9 — Review cadence: machines per PR, toad per milestone (2026-10-25)
+
+Per-line LLM review is noisy and misses architecture. Invariants that can be
+checked mechanically (no code execution APIs in analysis code, no runtime
+dependencies, no `any`) run in CI on every PR (from M1). `toad-reviewer`
+reviews the whole codebase at each milestone's end. First run (M0) found an
+allowlist file-write hole, a Node 24.0/24.1 fail-open, and Vitest executing
+fixture tests.
+**Trade-off:** non-mechanical issues can live up to one milestone.

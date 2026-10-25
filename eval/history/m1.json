@@ -1,6 +1,28 @@
 {
   "results": [
     {
+      "id": "benign-large-lockfile",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.49704200000000043
+    },
+    {
+      "id": "benign-long-line-config",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.0922079999999994
+    },
+    {
       "id": "benign-minified-vendor",
       "threat": "benign",
       "expected": "allow",
@@ -9,18 +31,29 @@
       "expectedRules": [],
       "firedRules": [],
       "missingRules": [],
-      "durationMs": 0.3649169999999984
+      "durationMs": 0.2133749999999992
+    },
+    {
+      "id": "benign-postinstall-copy-env",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "allow",
+      "outcome": "under",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": [],
+      "missingRules": ["repo/lifecycle-script"],
+      "durationMs": 0.22833299999999923
     },
     {
       "id": "benign-prisma-postinstall",
       "threat": "benign",
       "expected": "warn",
       "got": "allow",
-      "outcome": "missed",
+      "outcome": "under",
       "expectedRules": ["repo/lifecycle-script"],
       "firedRules": [],
       "missingRules": ["repo/lifecycle-script"],
-      "durationMs": 0.22454199999999958
+      "durationMs": 0.19729099999999988
     },
     {
       "id": "benign-vite-app",
@@ -31,7 +64,18 @@
       "expectedRules": [],
       "firedRules": [],
       "missingRules": [],
-      "durationMs": 0.14187499999999886
+      "durationMs": 0.15149999999999864
+    },
+    {
+      "id": "benign-vscode-build-task",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.49466699999999975
     },
     {
       "id": "d-config-obfuscated",
@@ -42,7 +86,18 @@
       "expectedRules": ["repo/obfuscation"],
       "firedRules": [],
       "missingRules": ["repo/obfuscation"],
-      "durationMs": 0.13308299999999917
+      "durationMs": 0.11820800000000276
+    },
+    {
+      "id": "d-oversized-config",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/unscanned"],
+      "firedRules": ["repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.17600000000000193
     },
     {
       "id": "d-postinstall",
@@ -53,7 +108,7 @@
       "expectedRules": ["repo/lifecycle-script"],
       "firedRules": [],
       "missingRules": ["repo/lifecycle-script"],
-      "durationMs": 0.10466699999999918
+      "durationMs": 0.12049999999999983
     },
     {
       "id": "d-tailwind-hidden-code",
@@ -64,7 +119,7 @@
       "expectedRules": ["repo/hidden-code"],
       "firedRules": [],
       "missingRules": ["repo/hidden-code"],
-      "durationMs": 0.09708399999999529
+      "durationMs": 0.1336250000000021
     },
     {
       "id": "d-vscode-autorun",
@@ -75,29 +130,29 @@
       "expectedRules": ["repo/ide-autorun"],
       "firedRules": [],
       "missingRules": ["repo/ide-autorun"],
-      "durationMs": 0.10358300000000042
+      "durationMs": 0.11170900000000472
     }
   ],
   "metrics": {
-    "cases": 7,
-    "malicious": 4,
-    "benign": 3,
+    "cases": 12,
+    "malicious": 5,
+    "benign": 7,
     "blockRecall": {
       "hit": 0,
-      "total": 4
+      "total": 5
     },
     "flagRecall": {
-      "hit": 0,
-      "total": 4
+      "hit": 1,
+      "total": 5
     },
     "falseAlarms": {
       "hit": 0,
-      "total": 3
+      "total": 7
     },
     "ruleRecall": {
-      "hit": 0,
-      "total": 5
+      "hit": 1,
+      "total": 7
     }
   },
-  "durationMs": 1.3469580000000008
+  "durationMs": 2.693165999999998
 }

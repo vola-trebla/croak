@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { RepoDetector } from "../detectors.ts";
+import { snapshotRepo } from "../repo-snapshot.ts";
 import { loadCases } from "./case.ts";
 import { runEval } from "./run.ts";
 
@@ -26,4 +27,19 @@ describe("runEval on the real case set", () => {
     const { metrics } = runEval(cases, [paranoid]);
     expect(metrics.blockRecall.hit).toBe(metrics.blockRecall.total);
   });
+});
+
+describe("fixture hygiene", () => {
+  // Both malicious and benign fixtures carry the marker, so a detector that keys
+  // off it produces false alarms instead of a perfect score.
+  const MARKERS = ["SYNTHETIC croak eval fixture", "croak-eval-synthetic"];
+
+  it.each(loadCases(CASES_DIR).map((c) => [c.id, c.fixtureDir]))(
+    "%s carries both markers",
+    (_id, dir) => {
+      const repo = snapshotRepo(dir);
+      const text = repo.entries.map((e) => repo.read(e.path) ?? "").join("\n");
+      for (const marker of MARKERS) expect(text).toContain(marker);
+    },
+  );
 });

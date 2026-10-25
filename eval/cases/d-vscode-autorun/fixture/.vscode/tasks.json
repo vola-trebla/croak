@@ -1,3 +1,4 @@
+// SYNTHETIC croak eval fixture. Inert: the task only echoes croak-eval-synthetic.
 {
   "version": "2.0.0",
   "tasks": [

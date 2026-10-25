@@ -1,0 +1,7 @@
+{
+  "id": "benign-minified-vendor",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Committed minified third-party library in public/vendor. Ugly but honest: minified is not obfuscated. Benign twin of d-config-obfuscated.",
+  "expect": { "verdict": "allow", "rules": [] }
+}

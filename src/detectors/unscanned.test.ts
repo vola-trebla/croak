@@ -39,6 +39,8 @@ describe("repo/unscanned", () => {
     "sub/package-lock.json",
     "assets/video.mp4",
     "pnpm-lock.yaml",
+    "node_modules/typescript/lib/lib.dom.d.ts",
+    "types/index.d.mts",
   ])("ignores an oversized %s (lockfile or non-code)", (path) => {
     expect(unscanned(repo([big(path)]))).toEqual([]);
   });

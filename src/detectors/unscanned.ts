@@ -3,6 +3,8 @@ import type { RepoDetector } from "./index.ts";
 /** Code that a JS toolchain, an IDE, or git may execute or load. */
 const CODE = /\.(?:[cm]?[jt]sx?|json)$/;
 const LOCKFILES = new Set(["package-lock.json", "npm-shrinkwrap.json"]);
+/** Type declarations are never executed, and lib.dom.d.ts alone is over 1 MB. */
+const DECLARATIONS = /\.d\.[cm]?ts$/;
 
 /**
  * Safety floor: a code file too large to read was not scanned, so the repo is
@@ -15,7 +17,7 @@ export const unscanned: RepoDetector = (repo) =>
       const name = entry.path.slice(entry.path.lastIndexOf("/") + 1);
       return (
         entry.path.startsWith(".git/") ||
-        (CODE.test(name) && !LOCKFILES.has(name))
+        (CODE.test(name) && !LOCKFILES.has(name) && !DECLARATIONS.test(name))
       );
     })
     .map((entry) => ({

@@ -205,3 +205,12 @@ repo opens marked early-stage; the README says what croak does not catch.
 is checked for availability and confusion with existing projects before the
 first publish (M8), because renaming after users arrive is painful.
 **Trade-off:** a scoped name is longer to type.
+
+## D23 — croak runs under Node's permission model (2026-10-25)
+
+Checked in practice: with `--permission`, read access limited to croak and the
+target, and `--disallow-code-generation-from-strings`, croak gives the same
+verdicts while spawning, writing, workers, and eval are denied. CI runs a
+sandboxed scan on every PR; the M4 hook will invoke croak this way. Network
+is not covered by Node 24 and stays a documented gap.
+**Trade-off:** callers must pass the target as an allowed read path.

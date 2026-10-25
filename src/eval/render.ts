@@ -58,7 +58,7 @@ function caseLine(
     .filter(Boolean)
     .join("  ");
   const line = `  ${head} ${result.id.padEnd(idWidth)}  expected ${verdict(result.expected, options)}  got ${verdict(result.got, options)}`;
-  return tail ? `${line}  ${tail}` : line;
+  return tail ? `${line}  ${tail}` : line.trimEnd();
 }
 
 function metricLine(

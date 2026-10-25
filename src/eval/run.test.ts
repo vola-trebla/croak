@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { RepoDetector } from "../detectors.ts";
+import type { RepoDetector } from "../detectors/index.ts";
 import { snapshotRepo } from "../repo-snapshot.ts";
 import { loadCases } from "./case.ts";
 import { runEval } from "./run.ts";

@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { type RepoDetector, scanRepo } from "../detectors.ts";
+import { type RepoDetector, scanRepo } from "../detectors/index.ts";
 import { snapshotRepo } from "../repo-snapshot.ts";
 import { aggregate } from "../verdict.ts";
 import type { EvalCase } from "./case.ts";

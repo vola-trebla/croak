@@ -1,0 +1,7 @@
+{
+  "id": "d-oversized-config",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: tailwind.config.js padded past croak's 1 MB read limit with a payload at the very end, so content detectors never see it. croak cannot clear what it could not read.",
+  "expect": { "verdict": "warn", "rules": ["repo/unscanned"] }
+}

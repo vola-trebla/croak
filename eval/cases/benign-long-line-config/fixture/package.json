@@ -1,0 +1,12 @@
+{
+  "name": "marketing-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0",
+    "vite": "^7.0.0"
+  }
+}

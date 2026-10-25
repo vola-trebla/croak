@@ -1,0 +1,10 @@
+{
+  "id": "benign-vscode-build-task",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Ordinary .vscode/tasks.json with a build task the user runs manually; no runOn: folderOpen. Benign twin of d-vscode-autorun.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!.claude/**/*.md"]
+    "includes": ["**", "!.claude/**/*.md", "!eval/cases/*/fixture"]
   },
   "formatter": {
     "enabled": true,

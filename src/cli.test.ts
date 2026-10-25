@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EXIT_USAGE, run, VERSION } from "./cli.js";
+import { EXIT_USAGE, run, VERSION } from "./cli.ts";
 
 describe("cli", () => {
   it.each([["--version"], ["-v"]])("prints the version with %s", (flag) => {

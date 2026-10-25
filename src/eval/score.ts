@@ -2,10 +2,11 @@ import { type Verdict, verdictRank } from "../verdict.ts";
 import type { EvalCase, Threat } from "./case.ts";
 
 /**
- * pass        — verdict as expected
- * missed      — threat expected to be flagged, croak allowed it (the worst outcome)
- * under       — flagged, but weaker than expected (warn instead of block)
- * false-alarm — stricter than expected (e.g. blocked a benign repo)
+ * pass        — verdict as expected; for a threat, anything at least that strict
+ * missed      — a threat that croak allowed (the worst outcome)
+ * under       — weaker than expected, but not a missed threat
+ *               (a threat warned instead of blocked, or a benign repo that deserved a warning)
+ * false-alarm — a benign repo treated more strictly than expected
  */
 export type Outcome = "pass" | "missed" | "under" | "false-alarm";
 
@@ -41,11 +42,16 @@ export interface Metrics {
   readonly ruleRecall: Ratio;
 }
 
-export function outcomeOf(expected: Verdict, got: Verdict): Outcome {
+export function outcomeOf(
+  threat: Threat,
+  expected: Verdict,
+  got: Verdict,
+): Outcome {
   const diff = verdictRank(got) - verdictRank(expected);
-  if (diff === 0) return "pass";
+  const isThreat = threat !== "benign";
+  if (diff === 0 || (diff > 0 && isThreat)) return "pass";
   if (diff > 0) return "false-alarm";
-  return got === "allow" ? "missed" : "under";
+  return isThreat && got === "allow" ? "missed" : "under";
 }
 
 export function scoreCase(
@@ -60,7 +66,7 @@ export function scoreCase(
     threat: evalCase.threat,
     expected: evalCase.expect.verdict,
     got,
-    outcome: outcomeOf(evalCase.expect.verdict, got),
+    outcome: outcomeOf(evalCase.threat, evalCase.expect.verdict, got),
     expectedRules: evalCase.expect.rules,
     firedRules: fired,
     missingRules: evalCase.expect.rules.filter((rule) => !fired.includes(rule)),

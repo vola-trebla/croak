@@ -33,12 +33,12 @@ Malicious cases cannot expect `allow`; benign cases cannot expect `block`.
 
 ## Outcomes
 
-|     | Outcome     | Meaning                                                   |
-| --- | ----------- | --------------------------------------------------------- |
-| ✅  | PASS        | verdict as expected                                       |
-| ❌  | MISSED      | a threat was allowed — the worst outcome                  |
-| 🔸  | UNDER       | flagged, but weaker than expected (warn instead of block) |
-| 📢  | FALSE ALARM | stricter than expected, e.g. a benign repo blocked        |
+|     | Outcome     | Meaning                                                                                                         |
+| --- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| ✅  | PASS        | verdict as expected (for a threat: at least that strict)                                                        |
+| ❌  | MISSED      | a threat was allowed — the worst outcome                                                                        |
+| 🔸  | UNDER       | weaker than expected, but not a missed threat (warn instead of block, or a benign repo that deserved a warning) |
+| 📢  | FALSE ALARM | a benign repo treated more strictly than expected                                                               |
 
 ## Metrics
 

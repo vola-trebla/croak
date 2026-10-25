@@ -4,6 +4,7 @@ import { hiddenCodeDetector } from "./hidden-code.ts";
 import { ideAutorun } from "./ide-autorun.ts";
 import { lifecycleScript } from "./lifecycle-script.ts";
 import { nodeModulesPresent } from "./node-modules-present.ts";
+import { obfuscation } from "./obfuscation.ts";
 import { unscanned } from "./unscanned.ts";
 
 export type RepoDetector = (repo: RepoSnapshot) => readonly Finding[];
@@ -15,6 +16,7 @@ export const repoDetectors: readonly RepoDetector[] = [
   lifecycleScript,
   ideAutorun,
   hiddenCodeDetector,
+  obfuscation,
 ];
 
 export function scanRepo(

@@ -85,7 +85,7 @@ untrusted project. Before shipping M3:
   as signals instead;
 - prove with tests that no lifecycle script runs on this path.
 
-### 6. Least privilege: run croak sandboxed (checked 2026-10-26, D23)
+### 6. Least privilege: run croak sandboxed (checked 2026-10-25, D23)
 
 Node 24's permission model runs croak with read-only access to its own code
 and the scan target:

@@ -1,0 +1,9 @@
+{
+  "name": "lib",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "biome check .",
+    "test": "vitest"
+  }
+}

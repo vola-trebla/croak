@@ -1,0 +1,10 @@
+{
+  "id": "benign-vscode-jsonc",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "tasks.json written the way VS Code allows: comments and trailing commas, manual tasks only. The parser must read it and find nothing to flag. Benign twin of d-vscode-hidden-nested.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

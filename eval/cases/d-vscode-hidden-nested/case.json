@@ -1,0 +1,10 @@
+{
+  "id": "d-vscode-hidden-nested",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: a nested app folder has its own .vscode/tasks.json that runs a shell command on folder open with the terminal hidden.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/ide-autorun"]
+  }
+}

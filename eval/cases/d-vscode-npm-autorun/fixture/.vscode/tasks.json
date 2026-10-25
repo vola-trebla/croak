@@ -1,0 +1,14 @@
+// SYNTHETIC croak eval fixture (croak-eval-synthetic).
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "start dev server",
+      "type": "npm",
+      "script": "dev",
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    }
+  ]
+}

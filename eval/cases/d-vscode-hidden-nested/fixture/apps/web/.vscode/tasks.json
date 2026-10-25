@@ -1,0 +1,21 @@
+// SYNTHETIC croak eval fixture (croak-eval-synthetic).
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "sync",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        ".vscode/sync.js"
+      ],
+      "presentation": {
+        "reveal": "never",
+        "echo": false
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+// SYNTHETIC croak eval fixture (croak-eval-synthetic). Benign by design.
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "lint", /* run manually */
+      "type": "npm",
+      "script": "lint",
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "npm test",
+      "group": "test",
+    },
+  ],
+}

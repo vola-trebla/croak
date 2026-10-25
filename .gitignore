@@ -10,6 +10,8 @@ coverage/
 *.log
 # Never commit real malware samples
 eval/samples/
+# Real-world corpus checkouts (pnpm corpus:fetch)
+eval/corpus/repos/
 # Personal Claude Code settings (shared ones live in .claude/settings.json)
 .claude/settings.local.json
 CLAUDE.local.md

@@ -1,0 +1,83 @@
+{
+  "description": "Real-world repositories for false-alarm checks. Pinned by commit; fetched by scripts/corpus-fetch.sh into the gitignored eval/corpus/repos/.",
+  "repos": [
+    {
+      "name": "axios",
+      "repo": "axios/axios",
+      "commit": "aa54a5e1e0e50cd1a2561b854ae5490ff589d065",
+      "why": "HTTP client, many contributors"
+    },
+    {
+      "name": "express",
+      "repo": "expressjs/express",
+      "commit": "1c6f1b0fe4000977b9a7b4f34097e4d527dd9824",
+      "why": "classic Node framework"
+    },
+    {
+      "name": "zod",
+      "repo": "colinhacks/zod",
+      "commit": "afdac65e0f80c0ccf9e8909da97c411567908b57",
+      "why": "TypeScript library, monorepo"
+    },
+    {
+      "name": "hono",
+      "repo": "honojs/hono",
+      "commit": "5ca49b0720755c585c9a9835f0a479ceea36fb52",
+      "why": "TypeScript framework"
+    },
+    {
+      "name": "ky",
+      "repo": "sindresorhus/ky",
+      "commit": "3541888878c4d303a8bc2ad61815f4e048f55a5d",
+      "why": "small library"
+    },
+    {
+      "name": "husky",
+      "repo": "typicode/husky",
+      "commit": "3f0023dc10d7003d70f2e31aa56300eab80e76d6",
+      "why": "git hooks tool (prepare script)"
+    },
+    {
+      "name": "chalk",
+      "repo": "chalk/chalk",
+      "commit": "72110019e147683f60e13fa0ff5c14a0c27cd9fe",
+      "why": "tiny library, unicode escapes"
+    },
+    {
+      "name": "create-t3-app",
+      "repo": "t3-oss/create-t3-app",
+      "commit": "4709861f7e67a15564c0460c13e7b4b6cfcae40d",
+      "why": "app scaffolder with templates"
+    },
+    {
+      "name": "trpc",
+      "repo": "trpc/trpc",
+      "commit": "8d09833c76791b2ea7270af174fdab9f1408aeb8",
+      "why": "large TS monorepo"
+    },
+    {
+      "name": "esbuild",
+      "repo": "evanw/esbuild",
+      "commit": "f6058f8364fe7ab91ca57a83e02577ed74c9cae4",
+      "why": "honest postinstall that installs a binary"
+    },
+    {
+      "name": "sharp",
+      "repo": "lovell/sharp",
+      "commit": "1ea0375ef20c94e0dc94f790bf1375bb8872642f",
+      "why": "native addon: install script and binding.gyp"
+    },
+    {
+      "name": "vscode-extension-samples",
+      "repo": "microsoft/vscode-extension-samples",
+      "commit": "65c1c44800eeac6fb065a54823ee5ae62c79540a",
+      "why": "many .vscode/tasks.json files"
+    },
+    {
+      "name": "core",
+      "repo": "vuejs/core",
+      "commit": "0ff253bfba3ee8d3d65448bd44ad890fd01b0ecd",
+      "why": "large monorepo with build tooling"
+    }
+  ]
+}

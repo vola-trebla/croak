@@ -15,6 +15,9 @@ The maintainer reviews and merges every PR on GitHub. Your job ends at an open P
      Milestone from ROADMAP.md (`m1`, `m2`, …) when it applies, e.g. `feat/m2-repo-autorun`, `fix/cli-unknown-flag`.
    - On a feature branch: confirm it matches the task; if not, ask.
 2. **Check.** Run `pnpm check`. If it fails, stop and report — do not ship red.
+   **Size (D18):** `git diff --stat main...HEAD`. If the change is over ~300
+   lines excluding generated fixtures, or does more than one thing, stop and
+   propose a split instead of shipping.
 3. **Review what you stage.** `git status --short` and `git diff`.
    - Stage files explicitly by path. Never stage `.env*`, `eval/samples/`,
      `.claude/settings.local.json`, or anything that looks like a secret or a real malware sample.

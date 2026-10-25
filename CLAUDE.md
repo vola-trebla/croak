@@ -58,6 +58,13 @@ Note: pnpm 12 does not accept `-s`.
 ## Workflow
 
 Small, reviewable steps. Never work for long stretches without checking in.
+
+**Size budget (D18):** one PR = one thing — a module, or a detector, or a set
+of eval cases, or docs. Aim for ≤ ~300 changed lines (generated fixtures
+excluded) and ≤ ~15 minutes of work. Post a 3–5 line plan before starting;
+if work runs past ~15 minutes, stop and report where you are. A feature is a
+chain of PRs: module → detector → cases → docs. Review fixes: 1–2 findings
+per PR.
 1. One task = one branch: `<type>/<milestone>-<topic>`
    (`feat/m1-eval-schema`, `fix/cli-unknown-flag`, `chore/claude-setup`).
 2. Test first, then a small code change, then `pnpm check`.

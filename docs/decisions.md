@@ -157,3 +157,13 @@ directly — not their `require` graph. The limit is stated in the security
 model and README so the warning is not mistaken for a full audit.
 **Trade-off:** a payload one `require` away from the executed file is not seen
 by this detector.
+
+## D18 — PR size budget (2026-10-25)
+
+PRs #4–#8 grew to 600–2000 changed lines (one to 44k with generated
+fixtures) and took 10+ minutes to build, against the small-steps rule. Now:
+one PR does one thing (module, detector, case set, or docs), stays around
+300 changed lines excluding generated fixtures and about 15 minutes of work,
+starts with a short plan, and stops at a checkpoint if it runs long. `/ship`
+checks the size before opening a PR.
+**Trade-off:** more PRs and merges per feature; each is reviewable in minutes.

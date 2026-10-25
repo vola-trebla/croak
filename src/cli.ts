@@ -2,7 +2,11 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { planToJson, renderPlan } from "./install/report.ts";
-import { type PlanOutcome, planInstall } from "./install/scan.ts";
+import {
+  type PlanOutcome,
+  planInstall,
+  planInstallOnline,
+} from "./install/scan.ts";
 import { renderScan, scanToJson } from "./repo-report.ts";
 import { type ScanOutcome, ScanTargetError, scanRepoAt } from "./scan.ts";
 
@@ -31,6 +35,8 @@ export interface CliDeps {
   readonly emoji: boolean;
   /** Reads a lockfile for `croak plan`; defaults to the filesystem. */
   readonly readFile?: (path: string) => string;
+  /** Registry access for `croak plan`; defaults to the global fetch. */
+  readonly fetch?: typeof globalThis.fetch;
 }
 
 const DEFAULT_DEPS: CliDeps = {
@@ -41,7 +47,7 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none>]
+  croak plan --after <lock> [--before <lock|none>] [--offline]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
   croak --version
@@ -75,6 +81,7 @@ function parse(argv: readonly string[]) {
       plain: { type: "boolean" },
       before: { type: "string" },
       after: { type: "string" },
+      offline: { type: "boolean" },
     },
     allowPositionals: true,
     strict: true,
@@ -92,16 +99,17 @@ function exitCode(outcome: ScanOutcome | PlanOutcome): number {
   return outcome.verdict === "block" ? EXIT.block : EXIT.ok;
 }
 
-function runPlan(
+async function runPlan(
   values: {
     readonly before?: string | undefined;
     readonly after?: string | undefined;
     readonly json?: boolean | undefined;
     readonly plain?: boolean | undefined;
+    readonly offline?: boolean | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
-): CliResult {
+): Promise<CliResult> {
   if (rest.length > 0)
     return usageError(`plan takes no positional arguments, got ${rest.length}`);
   if (values.after === undefined)
@@ -124,7 +132,15 @@ function runPlan(
     if (typeof text !== "string") return text;
     before = text;
   }
-  const outcome = planInstall(before, after);
+  // --offline: lockfile signals only, no registry requests (tests, air-gapped CI).
+  const outcome =
+    values.offline === true
+      ? planInstall(before, after)
+      : await planInstallOnline(
+          before,
+          after,
+          deps.fetch === undefined ? {} : { fetch: deps.fetch },
+        );
   const stdout =
     values.json === true
       ? planToJson(outcome)
@@ -153,7 +169,7 @@ export async function run(
   if (values.help === true || command === undefined) {
     return { code: EXIT.ok, stdout: HELP, stderr: "" };
   }
-  if (command === "plan") return runPlan(values, rest, deps);
+  if (command === "plan") return await runPlan(values, rest, deps);
   if (command !== "repo") return usageError(`unknown command "${command}"`);
   if (rest.length > 1)
     return usageError(`repo takes one path, got ${rest.length}`);

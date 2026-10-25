@@ -155,7 +155,7 @@ describe("croak plan", () => {
 
   it("compares two lockfiles and reports a verdict", async () => {
     const result = await run(
-      ["plan", "--before", "before.json", "--after", "after.json"],
+      ["plan", "--before", "before.json", "--after", "after.json", "--offline"],
       planDeps,
     );
     expect(result.code).toBe(EXIT.ok);
@@ -165,7 +165,15 @@ describe("croak plan", () => {
 
   it("treats --before none as a fresh install", async () => {
     const result = await run(
-      ["plan", "--before", "none", "--after", "after.json", "--json"],
+      [
+        "plan",
+        "--before",
+        "none",
+        "--after",
+        "after.json",
+        "--json",
+        "--offline",
+      ],
       planDeps,
     );
     const report: PlanOutcome & { schema: number } = JSON.parse(result.stdout);

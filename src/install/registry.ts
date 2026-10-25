@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 /**
  * A minimal npm registry client: one packument per package, read with a time
  * limit and a size limit. Package names come from untrusted lockfiles, so they
@@ -11,6 +12,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const NAME =
   /^(?:@[a-zA-Z0-9-~][a-zA-Z0-9-._~]*\/)?[a-zA-Z0-9-~][a-zA-Z0-9-._~]*$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_TARBALL_BYTES = 100 * 1024 * 1024;
+const SRI_ALGORITHMS = ["sha512", "sha384", "sha256", "sha1"] as const;
 
 export class RegistryError extends Error {
   constructor(message: string) {
@@ -34,12 +37,12 @@ export function packageUrl(name: string): string {
   return `${REGISTRY}/${name.startsWith("@") ? name.replace("/", "%2F") : name}`;
 }
 
-async function readCapped(
+async function readCappedBytes(
   response: Response,
   maxBytes: number,
-): Promise<string> {
+): Promise<Buffer> {
   const reader = response.body?.getReader();
-  if (reader === undefined) return "";
+  if (reader === undefined) return Buffer.alloc(0);
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (;;) {
@@ -52,7 +55,14 @@ async function readCapped(
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks);
+}
+
+async function readCapped(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
+  return (await readCappedBytes(response, maxBytes)).toString("utf8");
 }
 
 /** The package document, or "not-found" when the registry has no such package. */
@@ -162,4 +172,70 @@ export function versionFacts(
     ...versionInfo(versions[version]),
     earlier,
   };
+}
+
+/** The downloaded tarball does not match the lockfile's integrity hash. */
+export class IntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "IntegrityError";
+  }
+}
+
+/** Checks data against an SRI string ("sha512-…"), using the strongest algorithm it lists. */
+export function verifyIntegrity(data: Buffer, integrity: string): void {
+  const hashes = new Map(
+    integrity
+      .trim()
+      .split(/\s+/)
+      .map(
+        (token) =>
+          [
+            token.slice(0, token.indexOf("-")),
+            token.slice(token.indexOf("-") + 1),
+          ] as const,
+      ),
+  );
+  const algorithm = SRI_ALGORITHMS.find((alg) => hashes.has(alg));
+  if (algorithm === undefined)
+    throw new IntegrityError(
+      `unsupported integrity format: ${integrity.slice(0, 40)}`,
+    );
+  const actual = createHash(algorithm).update(data).digest("base64");
+  if (actual !== hashes.get(algorithm))
+    throw new IntegrityError(`${algorithm} does not match the lockfile`);
+}
+
+/**
+ * Downloads a tarball from the public registry (https only) with a timeout
+ * and a 100 MB cap, and verifies it against the lockfile's integrity hash.
+ */
+export async function fetchTarball(
+  url: string,
+  integrity: string | undefined,
+  options: FetchOptions = {},
+): Promise<Buffer> {
+  if (!url.startsWith(`${REGISTRY}/`))
+    throw new RegistryError(
+      `refusing to download a tarball from outside ${REGISTRY}: ${url}`,
+    );
+  const doFetch = options.fetch ?? fetch;
+  let response: Response;
+  try {
+    response = await doFetch(url, {
+      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS * 4),
+    });
+  } catch (error) {
+    throw new RegistryError(
+      `${url}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (!response.ok)
+    throw new RegistryError(`${url}: registry answered ${response.status}`);
+  const data = await readCappedBytes(
+    response,
+    options.maxBytes ?? MAX_TARBALL_BYTES,
+  );
+  if (integrity !== undefined) verifyIntegrity(data, integrity);
+  return data;
 }

@@ -1,8 +1,12 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   fetchPackument,
+  fetchTarball,
+  IntegrityError,
   packageUrl,
   RegistryError,
+  verifyIntegrity,
   versionFacts,
 } from "./registry.ts";
 
@@ -103,5 +107,34 @@ describe("versionFacts", () => {
 
   it("returns undefined for a version the registry does not know", () => {
     expect(versionFacts(packument, "9.9.9", now)).toBeUndefined();
+  });
+});
+
+describe("tarball download and integrity", () => {
+  const data = Buffer.from("tarball bytes");
+  const sri = `sha512-${createHash("sha512").update(data).digest("base64")}`;
+  const url = "https://registry.npmjs.org/x/-/x-1.0.0.tgz";
+  const serve =
+    (body: Buffer): typeof fetch =>
+    async () =>
+      new Response(body, { status: 200 });
+
+  it("verifies against the strongest listed hash", () => {
+    expect(() => verifyIntegrity(data, `sha1-bogus ${sri}`)).not.toThrow();
+    expect(() => verifyIntegrity(Buffer.from("tampered"), sri)).toThrow(
+      IntegrityError,
+    );
+  });
+
+  it("downloads, checks the hash, and refuses other hosts", async () => {
+    await expect(
+      fetchTarball(url, sri, { fetch: serve(data) }),
+    ).resolves.toEqual(data);
+    await expect(
+      fetchTarball(url, sri, { fetch: serve(Buffer.from("evil")) }),
+    ).rejects.toThrow(IntegrityError);
+    await expect(
+      fetchTarball("https://evil.invalid/x.tgz", sri, { fetch: serve(data) }),
+    ).rejects.toThrow(RegistryError);
   });
 });

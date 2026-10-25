@@ -126,6 +126,13 @@ describe("repo/ide-autorun", () => {
     expect(lines[0]).not.toBe(lines[1]);
   });
 
+  it("reads a tasks.json that starts with a UTF-8 byte-order mark", () => {
+    const text = `\ufeff${tasks({ label: "x", type: "shell", command: "echo hi", ...onOpen })}`;
+    expect(ideAutorun(repo({ ".vscode/tasks.json": text }))[0]?.severity).toBe(
+      "block",
+    );
+  });
+
   it("warns, not crashes, when tasks.json cannot be parsed", () => {
     expect(
       ideAutorun(repo({ ".vscode/tasks.json": "{ oops" }))[0],

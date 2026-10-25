@@ -75,3 +75,18 @@ it("handles CRLF line endings", () => {
     { kind: "offscreen", line: 2, hidden: "c" },
   ]);
 });
+
+describe("hiddenCode: line breaks and whitespace attackers use", () => {
+  it.each([
+    ["lone CR", "\r"],
+    ["U+2028", "\u2028"],
+  ])("treats %s as a line break for the vertical trick", (_name, br) => {
+    const text = `module.exports = {};${br.repeat(MIN_BLANK_LINES + 10)}eval(payload);`;
+    expect(hiddenCode(text).map((h) => h.kind)).toContain("vertical");
+  });
+
+  it("treats non-breaking spaces as whitespace for the offscreen trick", () => {
+    const text = `module.exports = {};${"\u00a0".repeat(MIN_GAP + 10)}eval(payload);`;
+    expect(hiddenCode(text).map((h) => h.kind)).toContain("offscreen");
+  });
+});

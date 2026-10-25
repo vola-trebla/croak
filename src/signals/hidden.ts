@@ -28,8 +28,11 @@ export const MIN_GAP = 100;
 /** Consecutive blank lines that push code below the fold. */
 export const MIN_BLANK_LINES = 150;
 
-const isSpace = (ch: string): boolean => ch === " " || ch === "\t";
-const BLANK = /^[ \t]*$/;
+// Any Unicode whitespace hides code, not only spaces and tabs (NBSP, U+3000, …).
+const isSpace = (ch: string): boolean => /\s/.test(ch);
+const BLANK = /^\s*$/;
+/** JS and editors break lines at \r\n, \n, a lone \r, U+2028, and U+2029. */
+const LINE_BREAK = /\r\n|[\n\r\u2028\u2029]/;
 
 /** U+202A–U+202E (embeddings/overrides) and U+2066–U+2069 (isolates). */
 function isBidiControl(code: number): boolean {
@@ -63,8 +66,7 @@ function bidi(line: string): number | undefined {
 export function hiddenCode(text: string): HiddenHit[] {
   const hits: HiddenHit[] = [];
   let blankRun = 0;
-  text.split("\n").forEach((raw, index) => {
-    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+  text.split(LINE_BREAK).forEach((line, index) => {
     const number = index + 1;
     const blank = BLANK.test(line);
 

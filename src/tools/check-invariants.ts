@@ -187,6 +187,8 @@ const INSTALL_SCRIPTS = [
   "preprepare",
   "prepare",
   "postprepare",
+  // runs after node_modules changes (npm docs)
+  "dependencies",
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {

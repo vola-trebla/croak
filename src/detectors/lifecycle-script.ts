@@ -7,6 +7,7 @@ import {
   isSuspicious,
 } from "../signals/code.ts";
 import { analyzeShell } from "../signals/shell.ts";
+import { stripBom } from "../signals/text.ts";
 import type { Finding } from "../verdict.ts";
 import type { RepoDetector } from "./index.ts";
 import { isInNodeModules } from "./node-modules-present.ts";
@@ -22,6 +23,8 @@ export const INSTALL_SCRIPTS = [
   "preprepare",
   "prepare",
   "postprepare",
+  // runs after node_modules changes (npm docs)
+  "dependencies",
 ] as const;
 
 /**
@@ -287,7 +290,7 @@ function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
   if (text === undefined) return [];
   let manifest: unknown;
   try {
-    manifest = JSON.parse(text);
+    manifest = JSON.parse(stripBom(text));
   } catch {
     // Not swallowed: an unreadable manifest is reported, the scan continues.
     return [

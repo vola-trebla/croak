@@ -2,6 +2,7 @@ import { posix } from "node:path";
 import type { RepoSnapshot } from "../repo-snapshot.ts";
 import { JsoncError, parseJsonc } from "../signals/jsonc.ts";
 import { analyzeShell } from "../signals/shell.ts";
+import { stripBom } from "../signals/text.ts";
 import type { Finding } from "../verdict.ts";
 import type { RepoDetector } from "./index.ts";
 import { isInNodeModules } from "./node-modules-present.ts";
@@ -38,7 +39,7 @@ function npmScript(
   const text = repo.read(manifestPath);
   if (text === undefined) return undefined;
   try {
-    const manifest: unknown = JSON.parse(text);
+    const manifest: unknown = JSON.parse(stripBom(text));
     const scripts =
       isRecord(manifest) && isRecord(manifest.scripts) ? manifest.scripts : {};
     return asString(scripts[script]);
@@ -95,7 +96,7 @@ function tasksFindings(repo: RepoSnapshot, path: string): Finding[] {
   if (text === undefined) return [];
   let config: unknown;
   try {
-    config = parseJsonc(text);
+    config = parseJsonc(stripBom(text));
   } catch (error) {
     if (!(error instanceof JsoncError)) throw error;
     return [

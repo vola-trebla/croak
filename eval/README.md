@@ -74,3 +74,20 @@ pnpm eval --json > eval/history/<milestone>.json
 
 A test fails if any case that passed in **any** snapshot no longer passes with
 the registered detectors. Timings in snapshots are informational.
+
+## Real-world corpus (false-alarm check)
+
+Synthetic cases are written by us, so passing them proves little about noise
+on real projects. `eval/corpus.json` pins 13 popular repositories by commit
+(honest install scripts, `binding.gyp`, many `.vscode` folders, large
+monorepos).
+
+```bash
+pnpm corpus:fetch   # shallow fetch at pinned commits into eval/corpus/repos/ (gitignored)
+pnpm corpus         # scan them; prints every block and warning for review
+```
+
+Fetching is a shell script on purpose: croak itself never spawns processes.
+It fetches one commit, no submodules, with hooks and Git LFS filters
+disabled. On legitimate projects a block is almost certainly a false alarm,
+and every warning should be explainable. Not run in CI (needs the network).

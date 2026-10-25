@@ -27,7 +27,9 @@
     "eval": "node src/eval/main.ts",
     "invariants": "node src/tools/check-invariants.ts",
     "croak": "node src/cli.ts",
-    "redos": "node src/tools/redos-check.ts"
+    "redos": "node src/tools/redos-check.ts",
+    "corpus:fetch": "sh scripts/corpus-fetch.sh",
+    "corpus": "node src/tools/corpus.ts"
   },
   "license": "MIT",
   "devDependencies": {

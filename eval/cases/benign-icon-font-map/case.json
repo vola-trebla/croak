@@ -1,0 +1,10 @@
+{
+  "id": "benign-icon-font-map",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "An icon library maps names to private-use code points with dense \\u escapes and embeds its font as base64. Two weak signals, neither strong: not obfuscation. Benign twin of d-obfuscated-string-array.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

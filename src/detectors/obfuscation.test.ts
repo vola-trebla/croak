@@ -42,10 +42,25 @@ describe("repo/obfuscation", () => {
     expect(scan({ "a.js": `${names}\n${dynamic}` })[0]?.severity).toBe("block");
   });
 
-  it("blocks any obfuscation signal next to eval or decoding", () => {
+  it("blocks a weak signal with eval or decoding within a few lines", () => {
     expect(scan({ "a.js": `${blob}\neval(atob(font));` })[0]?.severity).toBe(
       "block",
     );
+  });
+
+  it("does not block a weak signal when decoding is far away in a large file (zod, esbuild)", () => {
+    const far = `${escapes}\n${"const x = 1;\n".repeat(100)}const ok = atob(input);`;
+    expect(scan({ "types.ts": far })[0]).toMatchObject({
+      severity: "info",
+      message: expect.not.stringContaining("eval"),
+    });
+  });
+
+  it("still blocks a strong signal with decoding anywhere in the file", () => {
+    expect(
+      scan({ "a.js": `${names}\n${"x();\n".repeat(100)}atob(p);` })[0]
+        ?.severity,
+    ).toBe("block");
   });
 
   it("explains which signals it saw, with lines", () => {

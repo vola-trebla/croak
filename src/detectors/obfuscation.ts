@@ -22,12 +22,23 @@ const WEAK: ReadonlySet<ObfuscationKind> = new Set(["escapes", "encoded-blob"]);
  * Weak signals alone are context. One strong signal warns. A strong signal
  * with any second signal, or any signal next to eval or decoding, blocks.
  */
+/** Lines within which a weak signal and eval/decoding count as one construct. */
+const NEARBY_LINES = 3;
+
+/**
+ * Weak signals alone are context. One strong signal warns. A strong signal
+ * with any second signal or with eval/decoding anywhere in the file blocks.
+ * A weak signal blocks only with eval/decoding nearby — a Unicode regex and an
+ * unrelated atob() 2,000 lines apart are not one construct.
+ */
 function severityOf(
   kinds: ReadonlySet<ObfuscationKind>,
-  evalOrDecode: boolean,
+  decodeAnywhere: boolean,
+  decodeNearWeak: boolean,
 ): Severity {
   const strong = [...kinds].filter((kind) => !WEAK.has(kind)).length;
-  if (evalOrDecode || (strong >= 1 && kinds.size >= 2)) return "block";
+  if (strong >= 1 && (kinds.size >= 2 || decodeAnywhere)) return "block";
+  if (decodeNearWeak) return "block";
   return strong >= 1 ? "warn" : "info";
 }
 
@@ -36,21 +47,30 @@ function fileFinding(path: string, text: string): Finding | undefined {
   const first = hits[0];
   if (first === undefined) return undefined;
   const kinds = new Set(hits.map((hit) => hit.kind));
-  const evalOrDecode = codeSignals(text).some(
-    (s) => s.signal === "eval" || s.signal === "decode",
+  const decodeLines = codeSignals(text)
+    .filter((s) => s.signal === "eval" || s.signal === "decode")
+    .map((s) => s.line);
+  const decodeNearWeak = hits.some(
+    (hit) =>
+      WEAK.has(hit.kind) &&
+      decodeLines.some((line) => Math.abs(line - hit.line) <= NEARBY_LINES),
   );
-  const raw = severityOf(kinds, evalOrDecode);
+  const raw = severityOf(kinds, decodeLines.length > 0, decodeNearWeak);
   // As with other content detectors: installed and committed dependencies look
   // the same, and repo/node-modules-present already flags the directory.
   const severity: Severity =
     isInNodeModules(path) && raw === "block" ? "warn" : raw;
   const seen = hits.map((hit) => `${hit.kind} (line ${hit.line})`).join(", ");
+  const why =
+    raw === "block" && decodeLines.length > 0
+      ? ", next to eval or decoding"
+      : "";
   return {
     ruleId: RULE,
     severity,
     file: path,
     line: first.line,
-    message: `${LEAD[severity]}: ${seen}${evalOrDecode ? ", next to eval or decoding" : ""}`,
+    message: `${LEAD[severity]}: ${seen}${why}`,
   };
 }
 

@@ -1,0 +1,7 @@
+{
+  "id": "benign-vite-app",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Ordinary Vite app with dev/build scripts and no install-time hooks.",
+  "expect": { "verdict": "allow", "rules": [] }
+}

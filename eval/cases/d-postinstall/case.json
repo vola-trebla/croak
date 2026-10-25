@@ -1,0 +1,7 @@
+{
+  "id": "d-postinstall",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: root package.json runs a setup script on install that posts data to a remote host.",
+  "expect": { "verdict": "block", "rules": ["repo/lifecycle-script"] }
+}

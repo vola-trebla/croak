@@ -1,0 +1,7 @@
+{
+  "id": "d-vscode-autorun",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: VS Code task runs a shell command automatically when the folder is opened.",
+  "expect": { "verdict": "block", "rules": ["repo/ide-autorun"] }
+}

@@ -75,11 +75,13 @@ export const CODE_PATTERNS: ReadonlyArray<{
     label: "private key",
     pattern: /\bid_(?:rsa|ed25519|ecdsa|dsa)\b/,
   },
-  // The whole environment, not process.env.PORT or process.env[name].
+  // The whole environment, not process.env.PORT, a destructured
+  // `{ PORT } = process.env`, or `{ env: process.env }` handed to a child.
   {
     signal: "secrets",
-    label: "process.env",
-    pattern: /\bprocess\s*\.\s*env\b(?!\s*(?:\.|\[|\?\.))/,
+    label: "whole process.env",
+    // passed whole to a call (JSON.stringify, Object.entries, send) or walked with for…in
+    pattern: /\(\s*process\s*\.\s*env\s*[,)]|\bin\s+process\s*\.\s*env\b/,
   },
   { signal: "secrets", label: "home directory", pattern: /\bhomedir\s*\(/ },
   {
@@ -129,15 +131,15 @@ export function isSuspicious(signals: ReadonlySet<CodeSignal>): boolean {
 
 /**
  * For dependency contents: native-binary installers (esbuild, swc, sharp)
- * legitimately download a binary and spawn it at install time, so network plus
- * process alone is not suspicious there. Network plus secrets, decoding, or
- * eval still is, as is eval of decoded data.
+ * legitimately download a binary, unpack it (String.fromCharCode on a tar
+ * header), and spawn it at install time, so network plus process or decoding
+ * alone only warns there. Network plus secrets or eval still blocks, as does
+ * eval of decoded data.
  */
 export function isSuspiciousInDependency(
   signals: ReadonlySet<CodeSignal>,
 ): boolean {
-  const reach =
-    signals.has("secrets") || signals.has("eval") || signals.has("decode");
+  const reach = signals.has("secrets") || signals.has("eval");
   return (
     (signals.has("network") && reach) ||
     (signals.has("eval") && signals.has("decode"))

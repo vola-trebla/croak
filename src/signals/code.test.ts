@@ -35,6 +35,12 @@ describe("codeSignals", () => {
     ["npmrc", `path.join(os.homedir(), ".npmrc")`, "secrets"],
     ["whole env", `body: JSON.stringify(process.env)`, "secrets"],
     ["env keys", `Object.keys(process.env)`, "secrets"],
+    [
+      "env entries",
+      `for (const e of Object.entries(process.env)) send(e);`,
+      "secrets",
+    ],
+    ["env walk", `for (const k in process.env) out[k] = 1;`, "secrets"],
     ["shell rc", `appendFileSync("~/.zshrc", line)`, "secrets"],
     ["browser credentials", `join(profile, "Login Data")`, "secrets"],
     ["metamask", `const id = "nkbihfbeogaeaoehlefnkodbefgpgknn";`, "secrets"],
@@ -45,6 +51,12 @@ describe("codeSignals", () => {
   it.each([
     ["single env var", `const port = process.env.PORT ?? 3000;`],
     ["env index", `const v = process.env[name];`],
+    [
+      "destructured env var (esbuild)",
+      `const { npm_config_user_agent } = process.env;`,
+    ],
+    ["env for a child", `spawn(bin, args, { env: process.env });`],
+    ["env spread for a child", `const env = { ...process.env, CI: "1" };`],
     ["object fields", `config.ssh = true; user.profile.name = "x";`],
     ["regex exec", `const m = /a/.exec(s);`],
     ["base64 encode", `Buffer.from(s).toString("base64")`],
@@ -92,9 +104,10 @@ describe("describeSignals", () => {
 describe("isSuspiciousInDependency", () => {
   it.each([
     [["network", "process"], false],
+    [["network", "decode"], false],
+    [["network", "process", "decode"], false],
     [["network"], false],
     [["network", "secrets"], true],
-    [["network", "decode"], true],
     [["network", "eval"], true],
     [["eval", "decode"], true],
   ] as const)("%j → %s", (set, expected) => {

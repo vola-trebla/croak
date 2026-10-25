@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { checkPackageJson, checkSource } from "./check-invariants.ts";
 
-const rules = (text: string) =>
-  checkSource("src/x.ts", text).map((v) => v.rule);
+const rules = (text: string, isTest = false) =>
+  checkSource("src/x.ts", text, isTest).map((v) => v.rule);
 
 describe("checkSource", () => {
   it("passes ordinary read-only code", () => {
@@ -35,28 +35,80 @@ describe("checkSource", () => {
       `import { createRequire } from "node:module";`,
       "no-module-loader",
     ],
+    ["inspector", `import inspector from "node:inspector";`, "no-inspector"],
+    ["repl", `import repl from "repl";`, "no-inspector"],
     ["eval", `eval(code);`, "no-eval"],
+    ["indirect eval", `(0, eval)(code);`, "no-eval"],
     ["new Function", `const f = new Function("return 1");`, "no-eval"],
+    ["Function without new", `Function("return 1")();`, "no-eval"],
+    ["process.binding", `process.binding("spawn_sync");`, "no-eval"],
+    ["process.dlopen", `process.dlopen(m, p);`, "no-eval"],
     ["require", `const x = require(name);`, "no-require"],
     ["dynamic import", `const m = await import(path);`, "no-dynamic-import"],
     ["writeFileSync", `writeFileSync(p, data);`, "no-fs-write"],
+    ["writeSync", `writeSync(fd, data);`, "no-fs-write"],
     ["mkdir", `await mkdir(p);`, "no-fs-write"],
     ["rmSync", `rmSync(p, { recursive: true });`, "no-fs-write"],
     ["createWriteStream", `createWriteStream(p);`, "no-fs-write"],
+    ["open for writing", `openSync(p, "w");`, "no-fs-write"],
+    [
+      "write flags",
+      `openSync(p, constants.O_WRONLY | constants.O_CREAT);`,
+      "no-fs-write",
+    ],
+    ["ftruncate", `ftruncateSync(fd);`, "no-fs-write"],
+    [
+      "eval marker",
+      `if (text.includes("croak-eval-synthetic")) block();`,
+      "no-eval-marker",
+    ],
+    [
+      "eval marker comment",
+      `// SYNTHETIC croak eval fixture`,
+      "no-eval-marker",
+    ],
   ])("flags %s", (_name, text, rule) => {
     expect(rules(text)).toContain(rule);
   });
 
-  it("does not confuse lookalikes", () => {
+  it.each([
+    [
+      "lookalike names",
+      `retrieval(x); const evaluate = 1; myrequire(x); renameVar(); isFunction(f);`,
+    ],
+    ["type-only import", `import type { A } from "./a.ts";`],
+    ["package type field", `if (pkg.type === "module") esm = true;`],
+    ["a truncate helper", `const short = truncate(line, 120);`],
+    ["stdout writes", `process.stdout.write(text);`],
+    [
+      "read-only open",
+      `openSync(p, constants.O_RDONLY | constants.O_NOFOLLOW);`,
+    ],
+  ])("does not flag %s", (_name, text) => {
+    expect(rules(text)).toEqual([]);
+  });
+
+  it("applies execution rules to test files too", () => {
+    expect(rules(`await import(join(CASES, "next.config.js"));`, true)).toEqual(
+      ["no-dynamic-import"],
+    );
     expect(
       rules(
-        `retrieval(x); const evaluate = 1; myrequire(x); renameVar(); import type { A } from "./a.ts";`,
+        `execSync("x"); import { execSync } from "node:child_process";`,
+        true,
       ),
+    ).toContain("no-process-spawn");
+  });
+
+  it("lets test files write fixtures and mention the eval marker", () => {
+    expect(rules(`writeFileSync(p, "x"); mkdirSync(d);`, true)).toEqual([]);
+    expect(
+      rules(`expect(text).toContain("croak-eval-synthetic");`, true),
     ).toEqual([]);
   });
 
   it("reports the line number", () => {
-    expect(checkSource("src/x.ts", "ok\nok\neval(x)\n")).toEqual([
+    expect(checkSource("src/x.ts", "ok\nok\neval(x)\n", false)).toEqual([
       { file: "src/x.ts", line: 3, rule: "no-eval", text: "eval(x)" },
     ]);
   });
@@ -77,6 +129,7 @@ describe("checkPackageJson", () => {
     "optionalDependencies",
     "peerDependencies",
     "bundleDependencies",
+    "bundledDependencies",
   ])("flags non-empty %s", (field) => {
     expect(
       checkPackageJson({ [field]: { left_pad: "1" } }).map((v) => v.rule),
@@ -87,14 +140,19 @@ describe("checkPackageJson", () => {
     expect(checkPackageJson({ dependencies: {} })).toEqual([]);
   });
 
-  it.each(["preinstall", "install", "postinstall", "prepare"])(
-    "flags a %s script in croak itself",
-    (script) => {
-      expect(
-        checkPackageJson({ scripts: { [script]: "node x.js" } }).map(
-          (v) => v.rule,
-        ),
-      ).toEqual(["no-install-scripts"]);
-    },
-  );
+  it.each([
+    "preinstall",
+    "install",
+    "postinstall",
+    "prepublish",
+    "preprepare",
+    "prepare",
+    "postprepare",
+  ])("flags a %s script in croak itself", (script) => {
+    expect(
+      checkPackageJson({ scripts: { [script]: "node x.js" } }).map(
+        (v) => v.rule,
+      ),
+    ).toEqual(["no-install-scripts"]);
+  });
 });

@@ -11,6 +11,7 @@ import { performance } from "node:perf_hooks";
 import { CODE_PATTERNS } from "../signals/code.ts";
 import { hiddenCode } from "../signals/hidden.ts";
 import { parseJsonc } from "../signals/jsonc.ts";
+import { OBFUSCATION_PATTERNS } from "../signals/obfuscation.ts";
 import { analyzeShell, MAX_SCRIPT_LENGTH } from "../signals/shell.ts";
 
 const LENGTH = 100_000;
@@ -46,6 +47,12 @@ const FRAGMENTS = [
   "Function(",
   "id_",
   "Login ",
+  "\\x",
+  "_0x1",
+  "globalThis[",
+  "window[a",
+  "QUJD",
+  "['push'](",
 ];
 
 export function pathological(length: number): string[] {
@@ -148,7 +155,10 @@ const SCANNERS: ReadonlyArray<{
 ];
 
 function main(): number {
-  const regexRuns = timePatterns(CODE_PATTERNS, pathological(LENGTH));
+  const regexRuns = timePatterns(
+    [...CODE_PATTERNS, ...OBFUSCATION_PATTERNS],
+    pathological(LENGTH),
+  );
   const scannerRuns = SCANNERS.map(({ what, scan, inputs, budgetMs }) => ({
     runs: timeScanner(what, scan, inputs()),
     budgetMs,
@@ -168,7 +178,7 @@ function main(): number {
       `SLOW ${s.what} on ${s.input}: ${s.ms.toFixed(1)} ms\n`,
     );
   process.stdout.write(
-    `redos: ${CODE_PATTERNS.length} patterns × ${pathological(LENGTH).length} inputs + ${SCANNERS.length} scanners; ` +
+    `redos: ${CODE_PATTERNS.length + OBFUSCATION_PATTERNS.length} patterns × ${pathological(LENGTH).length} inputs + ${SCANNERS.length} scanners; ` +
       `worst ${worst?.ms.toFixed(1) ?? "0"} ms (${worst?.what ?? "-"})` +
       `${slow.length > 0 ? `; ${slow.length} over budget` : ""}\n`,
   );

@@ -39,6 +39,8 @@ describe("repo/unscanned", () => {
     "sub/package-lock.json",
     "assets/video.mp4",
     "pnpm-lock.yaml",
+    "node_modules/typescript/lib/lib.dom.d.ts",
+    "types/index.d.mts",
   ])("ignores an oversized %s (lockfile or non-code)", (path) => {
     expect(unscanned(repo([big(path)]))).toEqual([]);
   });
@@ -47,5 +49,20 @@ describe("repo/unscanned", () => {
     expect(unscanned(repo([{ path: "a.js", kind: "file", size: 10 }]))).toEqual(
       [],
     );
+  });
+
+  it("downgrades oversized files inside node_modules to info (bundles there are normal)", () => {
+    for (const path of [
+      "node_modules/vite/dist/node.js",
+      "packages/a/node_modules/x/big.js",
+    ]) {
+      expect(unscanned(repo([big(path)]))).toEqual([
+        expect.objectContaining({
+          ruleId: "repo/unscanned",
+          severity: "info",
+          file: path,
+        }),
+      ]);
+    }
   });
 });

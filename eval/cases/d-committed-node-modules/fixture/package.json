@@ -1,0 +1,11 @@
+{
+  "name": "node-test-task",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "fast-utils": "1.0.0"
+  }
+}

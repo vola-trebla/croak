@@ -1,0 +1,10 @@
+{
+  "id": "benign-installed-project",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "An ordinary project scanned after npm install: node_modules holds a normal package and a >1 MB bundle. croak reports one node_modules-present warning, not a wall of alarms. Benign twin of d-committed-node-modules.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/node-modules-present"]
+  }
+}

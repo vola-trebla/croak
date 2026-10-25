@@ -1,3 +1,4 @@
+import { VERDICT_ICON } from "../ui.ts";
 import type { Verdict } from "../verdict.ts";
 import type { CaseResult, Metrics, Outcome, Ratio } from "./score.ts";
 
@@ -19,12 +20,6 @@ const OUTCOME: Readonly<Record<Outcome, { icon: string; label: string }>> = {
   missed: { icon: "❌", label: "MISSED" },
   under: { icon: "🔸", label: "UNDER" },
   "false-alarm": { icon: "📢", label: "FALSE ALARM" },
-};
-
-const VERDICT_ICON: Readonly<Record<Verdict, string>> = {
-  allow: "🟢",
-  warn: "🟡",
-  block: "🔴",
 };
 
 const BAR_WIDTH = 20;

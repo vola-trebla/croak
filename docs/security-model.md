@@ -98,8 +98,10 @@ not execute analyzed code. Network is likely not covered and needs checking.
   **🟡 warn** means behavior that needs attention was found — never "safe to
   run". **🔴 block** means strong evidence of an attack. The CLI report states
   this on every run.
-- **Install scripts:** any install-time script is at least a warning (code
-  runs). Network alone stays a warning; network combined with secrets, process
+- **Install scripts:** a script made only of known tools (husky, prisma, tsc, …)
+  or `npm run` calls to such scripts, with no network, local files, inline
+  code, or code signals, is an info note (D19); any other install-time script
+  is at least a warning (code runs). Network alone stays a warning; network combined with secrets, process
   spawning, eval, or decoding — in the command, its inline code, or the file it
   runs — is a block, as is download-and-execute in any form (pipe, substitution,
   or a downloaded file run later). Recognizing a known tool (prisma, husky, …)

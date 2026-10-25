@@ -2,9 +2,9 @@
   "id": "benign-playwright-install",
   "kind": "repo",
   "threat": "benign",
-  "description": "postinstall runs `playwright install`, which honestly downloads browsers. Code runs on install, so warn with a known-tool note, never block. Benign twin of d-postinstall-curl-pipe.",
+  "description": "postinstall runs `playwright install`, which honestly downloads browsers. Known tool: an info note (D19), never a block. Benign twin of d-postinstall-curl-pipe.",
   "expect": {
-    "verdict": "warn",
+    "verdict": "allow",
     "rules": ["repo/lifecycle-script"]
   }
 }

@@ -35,17 +35,40 @@ function sortFindings(findings: readonly Finding[]): Finding[] {
   );
 }
 
+/**
+ * Text from the scanned repo (commands, file names, hidden code) is hostile.
+ * Escape C0/C1 control characters and bidi controls so it cannot move the
+ * cursor, erase the 🔴 lines, or reorder the report itself (Trojan Source).
+ */
+function isUnsafe(code: number): boolean {
+  return (
+    code <= 0x1f ||
+    (code >= 0x7f && code <= 0x9f) ||
+    (code >= 0x202a && code <= 0x202e) ||
+    (code >= 0x2066 && code <= 0x2069) ||
+    code === 0x2028 ||
+    code === 0x2029
+  );
+}
+
+export function safe(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    out += isUnsafe(code) ? `\\u${code.toString(16).padStart(4, "0")}` : ch;
+  }
+  return out;
+}
+
 function findingLines(finding: Finding, { emoji }: RenderOptions): string[] {
   const label = emoji
     ? `${SEVERITY_ICON[finding.severity]} ${finding.severity.padEnd(5)}`
     : finding.severity.toUpperCase().padEnd(5);
-  const where =
-    finding.line === undefined
-      ? finding.file
-      : `${finding.file}:${finding.line}`;
+  const file = safe(finding.file);
+  const where = finding.line === undefined ? file : `${file}:${finding.line}`;
   return [
     `  ${label}  ${where}  ${finding.ruleId}`,
-    `${MESSAGE_INDENT}${finding.message}`,
+    `${MESSAGE_INDENT}${safe(finding.message)}`,
   ];
 }
 
@@ -54,14 +77,14 @@ export function renderScan(
   options: RenderOptions,
 ): string {
   const { emoji } = options;
-  const title = `croak repo ${outcome.root}`;
+  const title = `croak repo ${safe(outcome.root)}`;
 
   if (outcome.status === "incomplete") {
     const status = emoji ? `— ${INCOMPLETE_ICON} incomplete` : "- INCOMPLETE";
     return [
       emoji ? `🐸 ${title} ${status}` : `${title} ${status}`,
       "",
-      `  could not finish: ${outcome.reason}`,
+      `  could not finish: ${safe(outcome.reason)}`,
       "  An incomplete scan is not a clean scan.",
       "",
     ].join("\n");

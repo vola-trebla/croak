@@ -51,6 +51,8 @@ describe("codeSignals", () => {
   it.each([
     ["single env var", `const port = process.env.PORT ?? 3000;`],
     ["env index", `const v = process.env[name];`],
+    ["puppeteer $eval", `await page.$eval(".like", (n) => n.innerText);`],
+    ["global-object idiom (lodash)", `var root = Function("return this")();`],
     [
       "destructured env var (esbuild)",
       `const { npm_config_user_agent } = process.env;`,

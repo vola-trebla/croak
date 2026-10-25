@@ -47,11 +47,14 @@ export const CODE_PATTERNS: ReadonlyArray<{
     label: "process library",
     pattern: load("execa|shelljs|cross-spawn"),
   },
-  { signal: "eval", label: "eval", pattern: /\beval\s*\)?\s*\(/ },
+  // Not `$eval(` (Puppeteer and Playwright's page.$eval API).
+  { signal: "eval", label: "eval", pattern: /(?<![\w$])eval\s*\)?\s*\(/ },
+  // Not `Function("return this")`, the old idiom for the global object.
   {
     signal: "eval",
     label: "Function constructor",
-    pattern: /\bnew\s+Function\s*\(|\bFunction\s*\(\s*["'`]/,
+    pattern:
+      /\bnew\s+Function\s*\(|\bFunction\s*\(\s*["'`](?!return this["'`])/,
   },
   { signal: "eval", label: "vm", pattern: load("vm") },
   { signal: "decode", label: "atob", pattern: /\batob\s*\(/ },

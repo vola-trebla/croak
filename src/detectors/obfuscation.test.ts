@@ -78,6 +78,27 @@ describe("repo/obfuscation", () => {
     expect(scan({ "a.js": payload })[0]?.severity).toBe("block");
   });
 
+  it("does not block a Unicode regex next to String.fromCharCode (acorn, comment-json)", () => {
+    const parser = `var E=/[${"\\uD800-\\uDBFF".repeat(5)}]/;function cp(e){return String.fromCharCode(e)}`;
+    expect(scan({ "acorn.js": parser })[0]?.severity).toBe("info");
+  });
+
+  it("does not block embedded wasm decoded from base64 (webpack)", () => {
+    const wasm = `var v="${"AGEA".repeat(80)}";var b=Buffer.from(v,"base64");WebAssembly.compile(b);`;
+    expect(scan({ "bundle.js": wasm })[0]?.severity).toBe("info");
+  });
+
+  it("warns on a computed global call far from any decoding (puppeteer)", () => {
+    const bundle = `globalThis[prefix + name](JSON.stringify(x));\n${"x();\n".repeat(100)}atob(s);`;
+    expect(scan({ "a.js": bundle })[0]?.severity).toBe("warn");
+  });
+
+  it("blocks a computed global call next to decoding", () => {
+    expect(scan({ "a.js": `globalThis[k](atob(payload));` })[0]?.severity).toBe(
+      "block",
+    );
+  });
+
   it("still blocks a strong signal with decoding anywhere in the file", () => {
     expect(
       scan({ "a.js": `${names}\n${"x();\n".repeat(100)}atob(p);` })[0]

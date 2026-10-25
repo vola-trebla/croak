@@ -27,6 +27,22 @@ export const INSTALL_SCRIPTS = [
   "dependencies",
 ] as const;
 
+/** The only scripts npm runs for a package installed from the registry. */
+export const DEPENDENCY_INSTALL_SCRIPTS = [
+  "preinstall",
+  "install",
+  "postinstall",
+] as const;
+
+export interface LifecyclePolicy {
+  /** Which code-signal combinations block. */
+  readonly suspicious: (signals: ReadonlySet<CodeSignal>) => boolean;
+  /** Which scripts run on install. */
+  readonly scripts: readonly string[];
+  /** Only the top-level package.json runs (a dependency, not a repo with workspaces). */
+  readonly rootOnly: boolean;
+}
+
 /**
  * Tools that run no project code: their install-time use can be an info note
  * (D19). Everything they do is decided by the tool, not by files in the repo.
@@ -294,7 +310,7 @@ export function assessor(
 function manifestFindings(
   repo: RepoSnapshot,
   path: string,
-  suspicious: (signals: ReadonlySet<CodeSignal>) => boolean,
+  { suspicious, scripts: installScripts }: LifecyclePolicy,
 ): Finding[] {
   const dir = posix.dirname(path) === "." ? "" : posix.dirname(path);
   const text = repo.read(path);
@@ -320,7 +336,7 @@ function manifestFindings(
   const isRoutine = routineChecker(scripts);
   const assess = assessor(repo, dir, scripts, suspicious);
 
-  for (const name of INSTALL_SCRIPTS) {
+  for (const name of installScripts) {
     const command = scripts[name];
     if (typeof command !== "string") continue;
     const { block, reasons, knownTools } = assess(command);
@@ -371,21 +387,26 @@ function manifestFindings(
 
 /**
  * Install-time scripts in every package.json outside node_modules (workspaces
- * run theirs too). `suspicious` decides which code-signal combinations block;
- * package contents use a policy that tolerates binary installers.
+ * run theirs too). The policy decides which code-signal combinations block and
+ * which scripts count; package contents use one that tolerates binary
+ * installers and follows npm's rules for registry dependencies.
  */
-export function lifecycleScriptWith(
-  suspicious: (signals: ReadonlySet<CodeSignal>) => boolean,
-): RepoDetector {
+export function lifecycleScriptWith(policy: LifecyclePolicy): RepoDetector {
   return (repo) =>
     repo.entries
       .filter(
         (e) =>
           e.kind === "file" &&
-          posix.basename(e.path) === "package.json" &&
-          !isInNodeModules(e.path),
+          (policy.rootOnly
+            ? e.path === "package.json"
+            : posix.basename(e.path) === "package.json" &&
+              !isInNodeModules(e.path)),
       )
-      .flatMap((e) => manifestFindings(repo, e.path, suspicious));
+      .flatMap((e) => manifestFindings(repo, e.path, policy));
 }
 
-export const lifecycleScript: RepoDetector = lifecycleScriptWith(isSuspicious);
+export const lifecycleScript: RepoDetector = lifecycleScriptWith({
+  suspicious: isSuspicious,
+  scripts: INSTALL_SCRIPTS,
+  rootOnly: false,
+});

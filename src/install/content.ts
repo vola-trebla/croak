@@ -1,6 +1,9 @@
 import { hiddenCodeDetector } from "../detectors/hidden-code.ts";
 import type { RepoDetector } from "../detectors/index.ts";
-import { lifecycleScriptWith } from "../detectors/lifecycle-script.ts";
+import {
+  DEPENDENCY_INSTALL_SCRIPTS,
+  lifecycleScriptWith,
+} from "../detectors/lifecycle-script.ts";
 import { obfuscation } from "../detectors/obfuscation.ts";
 import { unscanned } from "../detectors/unscanned.ts";
 import type { RepoSnapshot } from "../repo-snapshot.ts";
@@ -14,7 +17,11 @@ import type { Finding } from "../verdict.ts";
  */
 const DEPENDENCY_DETECTORS: readonly RepoDetector[] = [
   unscanned,
-  lifecycleScriptWith(isSuspiciousInDependency),
+  lifecycleScriptWith({
+    suspicious: isSuspiciousInDependency,
+    scripts: DEPENDENCY_INSTALL_SCRIPTS,
+    rootOnly: true,
+  }),
   hiddenCodeDetector,
   obfuscation,
 ];

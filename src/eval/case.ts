@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isVerdict, type Verdict } from "../verdict.ts";
 
@@ -103,8 +103,14 @@ export function loadCases(casesDir: string): EvalCase[] {
   return dirs.map((dirName) => {
     const caseDir = join(casesDir, dirName);
     const fixtureDir = join(caseDir, "fixture");
-    if (!existsSync(fixtureDir) || !statSync(fixtureDir).isDirectory()) {
-      throw new CaseError(dirName, "missing fixture/ directory");
+    // lstat: a symlinked fixture/ could point the eval at any directory.
+    if (
+      lstatSync(fixtureDir, { throwIfNoEntry: false })?.isDirectory() !== true
+    ) {
+      throw new CaseError(
+        dirName,
+        "missing fixture/ directory (or it is a symlink)",
+      );
     }
     let raw: unknown;
     try {

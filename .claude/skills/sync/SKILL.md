@@ -1,5 +1,4 @@
 ---
-
 name: sync
 description: After the maintainer merges a PR on GitHub, return to an up-to-date main and clean up the merged branch. Use when the user says /sync, "ОК ЖАБА", "merged", "смержил", or otherwise signals that a PR was merged in the croak repo.
 ---
@@ -15,7 +14,11 @@ description: After the maintainer merges a PR on GitHub, return to an up-to-date
 5. `git fetch --prune`.
 6. Delete the merged local branch:
    - `git branch -d <branch>`.
-   - If `-d` refuses (squash or rebase merge makes the branch look unmerged) and step 3
-     confirmed `MERGED`, use `git branch -D <branch>`.
+   - If `-d` refuses (squash or rebase merge makes the branch look unmerged), force-delete
+     only when the local branch tip is exactly the merged PR head:
+     `git rev-parse <branch>` must equal
+     `gh pr view <branch> --json headRefOid --jq .headRefOid`.
+     Then `git branch -D <branch>`. Otherwise the branch has commits that never reached
+     the PR — stop and report them (`git log <headRefOid>..<branch> --oneline`).
 7. Report: current branch, latest commit (`git log --oneline -3`), and the next step
    from ROADMAP.md.

@@ -120,3 +120,15 @@ treat `3` as a block (fail-closed), because an incomplete scan is never a clean
 one. `--json` emits `{ "schema": 1, ... }`; the schema number changes whenever
 the shape does, since hooks parse it.
 **Trade-off:** scripts that want to fail on warnings must parse the JSON.
+
+## D15 — `node_modules` in a scanned repo: one warning, details as info (2026-10-25)
+
+The first real run (croak on its own repo) warned on a >1 MB vite bundle in
+`node_modules`; installed projects are full of those. Ignoring `node_modules`
+would reopen the "hide it in a committed node_modules" hole. Instead, each
+`node_modules` directory yields one `repo/node-modules-present` warning
+(`croak repo` targets fresh clones, which should not contain installed
+dependencies), and oversized files inside it are `info`.
+**Trade-off:** scanning your own installed project shows one warning per
+`node_modules` directory; a malicious committed `node_modules` is a warn, not
+a block, until content detectors inspect it.

@@ -1,0 +1,11 @@
+{
+  "name": "my-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bundler build"
+  },
+  "devDependencies": {
+    "bundler": "^2.0.0"
+  }
+}

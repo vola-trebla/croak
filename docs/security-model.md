@@ -36,7 +36,10 @@ _content_ is not.
   `core.fsmonitor` command that runs on `git status`) and `hooks/` — and its
   object store is skipped. Nested `.git` directories are walked like any other
   directory: inside a working tree they are a hiding place.
-- `node_modules` is walked on purpose: a committed one can hide code.
+- `node_modules` is walked on purpose: a committed one can hide code. Its
+  presence is itself a warning (`repo/node-modules-present`, one per directory),
+  since `croak repo` checks repos before install; oversized files inside it are
+  `info`, because large bundles are normal in installed dependencies.
 - Files are opened with `O_NOFOLLOW` and only if they were listed as regular
   files — no path traversal through `read()`.
 - `read()` verifies the file's device and inode against the listing and reads

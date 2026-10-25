@@ -1,0 +1,10 @@
+{
+  "id": "d-committed-node-modules",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment ships its own node_modules: a 'utility' dependency hides a payload behind 1 MB of padding, and the app requires it at startup. A fresh clone should never contain installed dependencies.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/node-modules-present"]
+  }
+}

@@ -50,4 +50,19 @@ describe("repo/unscanned", () => {
       [],
     );
   });
+
+  it("downgrades oversized files inside node_modules to info (bundles there are normal)", () => {
+    for (const path of [
+      "node_modules/vite/dist/node.js",
+      "packages/a/node_modules/x/big.js",
+    ]) {
+      expect(unscanned(repo([big(path)]))).toEqual([
+        expect.objectContaining({
+          ruleId: "repo/unscanned",
+          severity: "info",
+          file: path,
+        }),
+      ]);
+    }
+  });
 });

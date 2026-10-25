@@ -70,6 +70,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 ### M2 — `croak repo` (static, offline)
 
 - [x] `croak repo <path>`: human and JSON reports, exit codes, `info` severity
+- [x] `repo/node-modules-present`: installed dependencies in a repo are one warning, not a wall of alarms
 - [ ] Root `package.json` lifecycle scripts
 - [ ] IDE autorun (`.vscode/tasks.json` `runOn: folderOpen`, etc.)
 - [ ] Obfuscation and whitespace-hidden code

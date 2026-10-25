@@ -1,4 +1,6 @@
 node_modules/
+# ...except inside eval fixtures, where a committed node_modules is the test case
+!eval/cases/*/fixture/node_modules/
 dist/
 coverage/
 .env

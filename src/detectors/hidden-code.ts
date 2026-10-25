@@ -8,6 +8,11 @@ const RULE = "repo/hidden-code";
 /** Files a toolchain, IDE, or shell may execute or load. */
 const SCANNED = /\.(?:[cm]?[jt]sx?|json|sh|bash|zsh|py|rb|pl|ps1)$/;
 const MAX_HITS_PER_FILE = 5;
+const SEVERITY_RANK: Readonly<Record<Severity, number>> = {
+  info: 0,
+  warn: 1,
+  block: 2,
+};
 const MAX_SHOWN = 60;
 
 const DESCRIBE: Readonly<Record<HiddenHit["kind"], string>> = {
@@ -51,6 +56,8 @@ export const hiddenCodeDetector: RepoDetector = (repo) =>
     .filter((e) => e.kind === "file" && SCANNED.test(e.path))
     .flatMap((e) =>
       hiddenCode(repo.read(e.path) ?? "")
-        .slice(0, MAX_HITS_PER_FILE)
-        .map((hit) => finding(hit, e.path)),
+        .map((hit) => finding(hit, e.path))
+        // Most severe first, so harmless decoys cannot push the payload past the cap.
+        .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
+        .slice(0, MAX_HITS_PER_FILE),
     );

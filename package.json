@@ -19,8 +19,9 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
-    "eval": "node src/eval/main.ts"
+    "check": "pnpm lint && pnpm typecheck && pnpm invariants && pnpm test",
+    "eval": "node src/eval/main.ts",
+    "invariants": "node src/tools/check-invariants.ts"
   },
   "license": "MIT",
   "devDependencies": {

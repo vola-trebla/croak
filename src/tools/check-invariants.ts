@@ -90,6 +90,7 @@ export const PATTERN_DATA_MARKER = "// croak-invariants: pattern-data";
 const PATTERN_DATA_DIRS = [
   "src/signals/",
   "src/detectors/",
+  "src/install/",
   "src/tools/redos-check.",
 ];
 

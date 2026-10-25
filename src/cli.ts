@@ -47,7 +47,7 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none>] [--offline]
+  croak plan --after <lock> [--before <lock|none>] [--offline | --metadata-only]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
   croak --version
@@ -82,6 +82,7 @@ function parse(argv: readonly string[]) {
       before: { type: "string" },
       after: { type: "string" },
       offline: { type: "boolean" },
+      "metadata-only": { type: "boolean" },
     },
     allowPositionals: true,
     strict: true,
@@ -106,6 +107,7 @@ async function runPlan(
     readonly json?: boolean | undefined;
     readonly plain?: boolean | undefined;
     readonly offline?: boolean | undefined;
+    readonly "metadata-only"?: boolean | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -136,11 +138,10 @@ async function runPlan(
   const outcome =
     values.offline === true
       ? planInstall(before, after)
-      : await planInstallOnline(
-          before,
-          after,
-          deps.fetch === undefined ? {} : { fetch: deps.fetch },
-        );
+      : await planInstallOnline(before, after, {
+          ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+          content: values["metadata-only"] !== true,
+        });
   const stdout =
     values.json === true
       ? planToJson(outcome)

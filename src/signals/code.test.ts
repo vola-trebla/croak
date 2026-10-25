@@ -6,6 +6,7 @@ import {
   codeSignals,
   describeSignals,
   isSuspicious,
+  isSuspiciousInDependency,
 } from "./code.ts";
 
 const signals = (text: string): CodeSignal[] =>
@@ -34,6 +35,12 @@ describe("codeSignals", () => {
     ["npmrc", `path.join(os.homedir(), ".npmrc")`, "secrets"],
     ["whole env", `body: JSON.stringify(process.env)`, "secrets"],
     ["env keys", `Object.keys(process.env)`, "secrets"],
+    [
+      "env entries",
+      `for (const e of Object.entries(process.env)) send(e);`,
+      "secrets",
+    ],
+    ["env walk", `for (const k in process.env) out[k] = 1;`, "secrets"],
     ["shell rc", `appendFileSync("~/.zshrc", line)`, "secrets"],
     ["browser credentials", `join(profile, "Login Data")`, "secrets"],
     ["metamask", `const id = "nkbihfbeogaeaoehlefnkodbefgpgknn";`, "secrets"],
@@ -44,6 +51,14 @@ describe("codeSignals", () => {
   it.each([
     ["single env var", `const port = process.env.PORT ?? 3000;`],
     ["env index", `const v = process.env[name];`],
+    ["puppeteer $eval", `await page.$eval(".like", (n) => n.innerText);`],
+    ["global-object idiom (lodash)", `var root = Function("return this")();`],
+    [
+      "destructured env var (esbuild)",
+      `const { npm_config_user_agent } = process.env;`,
+    ],
+    ["env for a child", `spawn(bin, args, { env: process.env });`],
+    ["env spread for a child", `const env = { ...process.env, CI: "1" };`],
     ["object fields", `config.ssh = true; user.profile.name = "x";`],
     ["regex exec", `const m = /a/.exec(s);`],
     ["base64 encode", `Buffer.from(s).toString("base64")`],
@@ -85,5 +100,19 @@ describe("describeSignals", () => {
     expect(describeSignals(codeSignals(text), "x.js")).toBe(
       "network (x.js:1), secrets (x.js:3)",
     );
+  });
+});
+
+describe("isSuspiciousInDependency", () => {
+  it.each([
+    [["network", "process"], false],
+    [["network", "decode"], false],
+    [["network", "process", "decode"], false],
+    [["network"], false],
+    [["network", "secrets"], true],
+    [["network", "eval"], true],
+    [["eval", "decode"], true],
+  ] as const)("%j → %s", (set, expected) => {
+    expect(isSuspiciousInDependency(new Set(set))).toBe(expected);
   });
 });

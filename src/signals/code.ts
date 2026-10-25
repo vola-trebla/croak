@@ -47,11 +47,14 @@ export const CODE_PATTERNS: ReadonlyArray<{
     label: "process library",
     pattern: load("execa|shelljs|cross-spawn"),
   },
-  { signal: "eval", label: "eval", pattern: /\beval\s*\)?\s*\(/ },
+  // Not `$eval(` (Puppeteer and Playwright's page.$eval API).
+  { signal: "eval", label: "eval", pattern: /(?<![\w$])eval\s*\)?\s*\(/ },
+  // Not `Function("return this")`, the old idiom for the global object.
   {
     signal: "eval",
     label: "Function constructor",
-    pattern: /\bnew\s+Function\s*\(|\bFunction\s*\(\s*["'`]/,
+    pattern:
+      /\bnew\s+Function\s*\(|\bFunction\s*\(\s*["'`](?!return this["'`])/,
   },
   { signal: "eval", label: "vm", pattern: load("vm") },
   { signal: "decode", label: "atob", pattern: /\batob\s*\(/ },
@@ -75,11 +78,13 @@ export const CODE_PATTERNS: ReadonlyArray<{
     label: "private key",
     pattern: /\bid_(?:rsa|ed25519|ecdsa|dsa)\b/,
   },
-  // The whole environment, not process.env.PORT or process.env[name].
+  // The whole environment, not process.env.PORT, a destructured
+  // `{ PORT } = process.env`, or `{ env: process.env }` handed to a child.
   {
     signal: "secrets",
-    label: "process.env",
-    pattern: /\bprocess\s*\.\s*env\b(?!\s*(?:\.|\[|\?\.))/,
+    label: "whole process.env",
+    // passed whole to a call (JSON.stringify, Object.entries, send) or walked with for…in
+    pattern: /\(\s*process\s*\.\s*env\s*[,)]|\bin\s+process\s*\.\s*env\b/,
   },
   { signal: "secrets", label: "home directory", pattern: /\bhomedir\s*\(/ },
   {
@@ -121,6 +126,23 @@ export function isSuspicious(signals: ReadonlySet<CodeSignal>): boolean {
     signals.has("process") ||
     signals.has("eval") ||
     signals.has("decode");
+  return (
+    (signals.has("network") && reach) ||
+    (signals.has("eval") && signals.has("decode"))
+  );
+}
+
+/**
+ * For dependency contents: native-binary installers (esbuild, swc, sharp)
+ * legitimately download a binary, unpack it (String.fromCharCode on a tar
+ * header), and spawn it at install time, so network plus process or decoding
+ * alone only warns there. Network plus secrets or eval still blocks, as does
+ * eval of decoded data.
+ */
+export function isSuspiciousInDependency(
+  signals: ReadonlySet<CodeSignal>,
+): boolean {
+  const reach = signals.has("secrets") || signals.has("eval");
   return (
     (signals.has("network") && reach) ||
     (signals.has("eval") && signals.has("decode"))

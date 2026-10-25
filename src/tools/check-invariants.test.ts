@@ -48,6 +48,11 @@ describe("checkSource", () => {
     ["process.binding", `process.binding("spawn_sync");`, "no-eval"],
     ["process.dlopen", `process.dlopen(m, p);`, "no-eval"],
     ["require", `const x = require(name);`, "no-require"],
+    [
+      "getBuiltinModule",
+      `const cp = process.getBuiltinModule("node:child_process");`,
+      "no-builtin-loader",
+    ],
     ["dynamic import", `const m = await import(path);`, "no-dynamic-import"],
     ["writeFileSync", `writeFileSync(p, data);`, "no-fs-write"],
     ["writeSync", `writeSync(fd, data);`, "no-fs-write"],
@@ -166,6 +171,17 @@ describe("pattern-data files", () => {
       `const f = new Function(code);`,
       "no-eval",
     ],
+    [
+      "the closing line of a multi-line import",
+      `} from "node:child_process";`,
+      "no-forbidden-import",
+    ],
+    [
+      "a getBuiltinModule statement",
+      `const cp = process.getBuiltinModule("node:child_process");`,
+      "no-builtin-loader",
+    ],
+    ["a process.dlopen statement", `process.dlopen(m, p);`, "no-eval"],
   ])("still flag %s", (_name, body, rule) => {
     expect(data(body)).toContain(rule);
   });

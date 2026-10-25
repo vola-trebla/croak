@@ -55,6 +55,12 @@ const SOURCE_RULES: ReadonlyArray<{
       /\beval\s*\)?\s*\(|\bFunction\s*\(|\bprocess\s*\.\s*(?:binding|_linkedBinding|dlopen)\b/,
   },
   { rule: "no-require", scope: "all", pattern: /\brequire\s*\(/ },
+  // process.getBuiltinModule("child_process") loads any built-in by name.
+  {
+    rule: "no-builtin-loader",
+    scope: "all",
+    pattern: /\bgetBuiltinModule\s*\(/,
+  },
   { rule: "no-dynamic-import", scope: "all", pattern: /\bimport\s*\(/ },
   {
     rule: "no-fs-write",
@@ -115,6 +121,23 @@ const STATEMENT_RULES: ReadonlyArray<{
     rule: "no-eval",
     pattern: new RegExp(
       String.raw`${ASSIGNED}(?:\(0,\s*)?(?:eval\s*\)?|new\s+Function)\s*\(`,
+    ),
+  },
+  {
+    // The closing line of a multi-line import: } from "node:child_process";
+    rule: "no-forbidden-import",
+    pattern: new RegExp(
+      String.raw`^\s*\}?\s*from\s*["'](?:node:)?(?:${FORBIDDEN_MODULES})["']`,
+    ),
+  },
+  {
+    rule: "no-builtin-loader",
+    pattern: new RegExp(`${ASSIGNED}[\\w.]*getBuiltinModule\\s*\\(`),
+  },
+  {
+    rule: "no-eval",
+    pattern: new RegExp(
+      `${ASSIGNED}process\\s*\\.\\s*(?:binding|_linkedBinding|dlopen)\\b`,
     ),
   },
 ];

@@ -85,3 +85,29 @@ code within what Node can strip (no enums, no parameter properties).
 Eval code lives in `src/eval/` but is excluded from the published build.
 **Trade-off:** no enums/namespaces/parameter properties; imports look unusual
 to people used to `.js` specifiers.
+
+## D11 — POSIX only for now (2026-10-25)
+
+Safe reads rely on `O_NOFOLLOW` and inode checks. On Windows `O_NOFOLLOW` does
+not exist and junctions behave differently, so croak refuses to scan there
+rather than run with a silently weaker guard. `package.json` declares
+`"os": ["darwin", "linux"]`.
+**Trade-off:** no Windows users until someone designs the equivalent guard.
+
+## D12 — Eval regression rule: once passed, always passes (2026-10-25)
+
+A test runs the registered detectors over every case and fails if a case that
+passed in any `eval/history/*.json` snapshot no longer passes. Snapshots are
+recorded at the end of each milestone. Changing a case's expectation on
+purpose means recording a new snapshot in the same PR.
+**Trade-off:** a deliberate behavior change needs an explicit history update.
+
+## D13 — Milestone reviews cover the diff since the last review (2026-10-25)
+
+The M1 batch review took about 5 minutes on the whole codebase, and that would
+grow with the repo. After each review the merge commit is tagged
+`review/<milestone>`; the next `toad-reviewer` run covers
+`git diff review/<previous>...HEAD` plus the modules that diff touches.
+A whole-codebase review happens only on request (e.g. before M8).
+Depth (probes that verify findings) stays: it found the real issues in M0 and M1.
+**Trade-off:** cross-cutting problems in untouched code surface later.

@@ -32,23 +32,36 @@ _content_ is not.
 ### 2. Read safely
 
 - Directory walks never follow symlinks; symlinks are recorded, not read.
+- The root `.git` contributes only what git itself executes — `config` (e.g. a
+  `core.fsmonitor` command that runs on `git status`) and `hooks/` — and its
+  object store is skipped. Nested `.git` directories are walked like any other
+  directory: inside a working tree they are a hiding place.
+- `node_modules` is walked on purpose: a committed one can hide code.
 - Files are opened with `O_NOFOLLOW` and only if they were listed as regular
   files — no path traversal through `read()`.
+- `read()` verifies the file's device and inode against the listing and reads
+  at most one byte past the cap, so a file swapped (even via an intermediate
+  directory) or grown after listing raises `SnapshotIntegrityError`.
+- POSIX only: without `O_NOFOLLOW` (Windows) croak refuses to scan instead of
+  silently losing the guard; `package.json` declares `darwin` and `linux`.
 - Tarballs (M3) are never extracted to disk. Gunzip with `maxOutputLength`
   (decompression bombs), parse tar entries in memory. With no disk writes,
   `../` entries and symlink entries cannot escape.
 
 ### 3. Bound every resource
 
-| Limit                     | Value   | On exceed                              |
-| ------------------------- | ------- | -------------------------------------- |
-| file size read            | 1 MB    | file recorded as `oversized`, not read |
-| entries per repo          | 100,000 | `SnapshotLimitError` → fail closed     |
-| directory depth           | 64      | `SnapshotLimitError` → fail closed     |
-| decompressed tarball (M3) | TBD     | fail closed                            |
-| scan time (M2)            | TBD     | fail closed                            |
+| Limit                                     | Value   | On exceed                              |
+| ----------------------------------------- | ------- | -------------------------------------- |
+| file size read                            | 1 MB    | file recorded as `oversized`, not read |
+| directory entries (files, dirs, symlinks) | 100,000 | `SnapshotLimitError` → fail closed     |
+| directory depth                           | 64      | `SnapshotLimitError` → fail closed     |
+| decompressed tarball (M3)                 | TBD     | fail closed                            |
+| scan time (M2)                            | TBD     | fail closed                            |
 
-An incomplete scan is never reported as a clean scan.
+An incomplete scan is never reported as a clean scan. Oversized code files
+(JS/TS/JSON, `.git` config and hooks; lockfiles exempt) produce a
+`repo/unscanned` warning from a detector that is always registered; in agent
+mode (M4) unscanned code is fail-closed.
 
 ### 4. Regexes over hostile text must not blow up (M2)
 
@@ -94,7 +107,11 @@ not execute analyzed code. Network is likely not covered and needs checking.
 
 ### 8. Eval fixtures
 
-Payloads are inert (`echo`, `localhost`, `.invalid` domains) and marked
-`SYNTHETIC croak eval fixture`. **Detectors must never key off that marker** —
-a detector that does is cheating the eval. Real samples are referenced by name
+Payloads are inert (`echo`, `localhost`, `.invalid` domains). **Every**
+fixture — malicious and benign — carries the `SYNTHETIC croak eval fixture`
+marker and the `croak-eval-synthetic` token in a readable file (enforced by a
+test), so a detector keying off them gets false alarms rather than a perfect
+score; `pnpm invariants` also forbids the marker in non-test code. Fixtures
+cannot contain a `.git` directory (git refuses to commit one), so `.git`
+attacks are covered by unit tests on generated directories instead. Real samples are referenced by name
 and hash only; `eval/samples/` is gitignored.

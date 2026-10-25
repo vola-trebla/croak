@@ -60,14 +60,12 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 ### M1 — Eval dataset first
 
-- [ ] Benign set: top-N npm packages (false-positive baseline)
-- [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git)
 - [x] Synthetic "test assignment" repos with harmless payloads, each detector with a benign twin
 - [x] Mechanical invariant checks in CI (`pnpm invariants`)
 - [x] Security model (`docs/security-model.md`) and snapshot resource limits
 - [x] Eval runner + metrics: block/flag recall, false alarms, rule recall, latency (emoji + plain + JSON output)
 - [x] Case format + first synthetic cases (null baseline: 0% recall)
-- [ ] Cost per verdict (with the LLM layer, M5)
+- [x] Safety-floor detector `repo/unscanned`; regression guard against `eval/history`
 
 ### M2 — `croak repo` (static, offline)
 
@@ -81,6 +79,8 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 ### M3 — npm install plan + registry signals
 
+- [ ] Benign set: top-N npm packages (false-positive baseline) — moved from M1, install eval needs it
+- [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git) — moved from M1
 - [ ] Threat model for running npm on untrusted input: temp dir with only manifest + lockfile, minimal env, no `git:`/`file:`/URL resolution (signals instead), tests proving no script runs
 - [ ] Lockfile diff from a non-executing install plan
 - [ ] Signals: package exists, age, install-time vectors (scripts, `binding.gyp`, prebuilt binaries), new deps vs previous version, provenance dropped, maintainer change
@@ -96,6 +96,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 - [ ] Version-diff analysis only (cheap, focused)
 - [ ] Escalate-only policy enforced in code
+- [ ] Cost per verdict
 - [ ] Ablation eval: rules vs rules+Haiku vs rules+stronger model
 - [ ] Prompt-injection red-team set (target: 0 successful downgrades)
 

@@ -1,0 +1,10 @@
+{
+  "id": "d-obfuscated-string-array",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: src/utils.js looks like javascript-obfuscator output: a rotated string array, _0x names, and a call through a computed global. The decoded strings only spell console.log.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/obfuscation"]
+  }
+}

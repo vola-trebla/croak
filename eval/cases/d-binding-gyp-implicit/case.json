@@ -1,0 +1,10 @@
+{
+  "id": "d-binding-gyp-implicit",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment with a binding.gyp whose build action runs a script: npm runs node-gyp rebuild on install with no script in package.json. croak warns on the implicit install; reading gyp actions is future work.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

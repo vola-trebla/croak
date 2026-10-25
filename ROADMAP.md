@@ -71,12 +71,12 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 - [x] `croak repo <path>`: human and JSON reports, exit codes, `info` severity
 - [x] `repo/node-modules-present`: installed dependencies in a repo are one warning, not a wall of alarms
-- [ ] Root `package.json` lifecycle scripts
+- [x] Lifecycle scripts in every `package.json` outside `node_modules` (incl. implicit `binding.gyp`), via a shell analyzer and code signals
 - [ ] IDE autorun (`.vscode/tasks.json` `runOn: folderOpen`, etc.)
 - [ ] Obfuscation and whitespace-hidden code
 - [ ] Suspicious code in build configs (`*.config.js`)
-- [ ] Facts → signals → verdict model; decide on an `info` level that does not affect the verdict
-- [ ] ReDoS tests: detectors under pathological input with a time budget
+- [x] Facts → signals → verdict model; `info` level that does not affect the verdict
+- [x] ReDoS guard: detectors under pathological input with a time budget, own process + CI timeout
 - [ ] Spike: run analysis under `node --permission` (read-only, no child processes)
 
 ### M3 — npm install plan + registry signals

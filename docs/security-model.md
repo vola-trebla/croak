@@ -94,6 +94,20 @@ not execute analyzed code. Network is likely not covered and needs checking.
 
 ### 7. Verdict semantics
 
+- **🟢 allow** means nothing suspicious was found — not a guarantee.
+  **🟡 warn** means behavior that needs attention was found — never "safe to
+  run". **🔴 block** means strong evidence of an attack. The CLI report states
+  this on every run.
+- **Install scripts:** any install-time script is at least a warning (code
+  runs). Network alone stays a warning; network combined with secrets, process
+  spawning, eval, or decoding — in the command, its inline code, or the file it
+  runs — is a block, as is download-and-execute in any form (pipe, substitution,
+  or a downloaded file run later). Recognizing a known tool (prisma, husky, …)
+  adds an info note and never lowers anything else in the same command.
+- **Analysis depth (known limit):** croak reads the script and the files it runs
+  directly. It does not follow `require`/`import` from those files yet, so a
+  clean-looking `setup.js` that requires a malicious module is only as visible
+  as the module itself is to other detectors.
 - **Facts → signals → verdict.** The presence of a file (`tasks.json`, a
   `postinstall`) is a fact, not a finding. Verdicts come from what the fact
   does and its context. Every detector has a malicious case and a benign twin

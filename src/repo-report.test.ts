@@ -76,6 +76,18 @@ describe("renderScan", () => {
   });
 });
 
+describe("verdict meaning", () => {
+  it("never presents yellow or green as safe", () => {
+    const warn = renderScan({ ...complete, verdict: "warn" }, { emoji: false });
+    expect(warn).toContain("Needs your attention");
+    expect(warn).toContain("This is not a safe verdict");
+    expect(renderScan(clean, { emoji: false })).toContain("Not a guarantee");
+    expect(renderScan(complete, { emoji: false })).toContain(
+      "Do not install or run this",
+    );
+  });
+});
+
 describe("scanToJson", () => {
   it("emits a versioned, machine-readable report", () => {
     expect(JSON.parse(scanToJson(complete))).toMatchObject({

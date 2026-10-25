@@ -1,0 +1,10 @@
+{
+  "id": "d-postinstall-inline-decode",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: postinstall runs node -e with eval of a base64-decoded payload.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

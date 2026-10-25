@@ -1,0 +1,10 @@
+{
+  "id": "benign-husky-prepare",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "prepare runs husky to install git hooks. Code runs on install, so warn with a known-tool note, never block. Benign twin of d-postinstall-inline-decode.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

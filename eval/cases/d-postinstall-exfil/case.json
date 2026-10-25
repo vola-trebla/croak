@@ -1,0 +1,10 @@
+{
+  "id": "d-postinstall-exfil",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: postinstall script posts the whole process.env to a remote host. Network plus secrets on install.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

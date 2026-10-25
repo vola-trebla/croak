@@ -1,0 +1,4 @@
+// SYNTHETIC croak eval fixture (croak-eval-synthetic).
+generator client {
+  provider = "prisma-client-js"
+}

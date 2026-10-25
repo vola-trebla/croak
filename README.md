@@ -47,7 +47,8 @@ data and never lets anything inside run (how: [security model](docs/security-mod
 | 🔏  | **Is the seal intact?**                   | missing or dropped [provenance](https://docs.npmjs.com/generating-provenance-statements) signatures |
 | 🤖  | **Ask an expert (optional)**              | an LLM reviews the _diff_ between versions — and can only raise the alarm, never lower it           |
 
-Then it gives a verdict: 🟢 **allow**, 🟡 **warn**, or 🔴 **block** — with
+Then it gives a verdict — 🟢 **allow** (nothing suspicious found, not a
+guarantee), 🟡 **warn** (needs your attention, never "safe"), or 🔴 **block** — with
 reasons a human _and_ an agent can act on (planned output):
 
 ```
@@ -66,8 +67,9 @@ croak repo .          # 🧪 early: scan an unfamiliar repo before you install o
 Plus a **Claude Code hook** (🚧 planned) that puts croak in front of every
 install command an agent runs.
 
-`croak repo` already runs end to end, but with a single detector (files too
-large to scan) it catches very little yet. Exit codes: `0` allow/warn,
+`croak repo` runs end to end and checks install scripts, committed
+`node_modules`, and files too large to scan; IDE autorun and hidden or
+obfuscated code are next. Exit codes: `0` allow/warn,
 `1` block, `2` usage error, `3` scan incomplete — agents should treat `3` as a
 block. `--json` gives a versioned report for tools.
 
@@ -89,6 +91,8 @@ block. `--json` gives a versioned report for tools.
 
 Being honest about limits matters more than marketing:
 - Code that's clean at install and turns malicious later, at runtime
+- Install scripts that pull the payload in through `require` from the file they
+  run: croak reads the script and the files it runs directly, not deeper (yet)
 - Long-game maintainer takeovers (think xz-utils)
 - A compromised registry or signing infrastructure
 - Malware that's already on your machine
@@ -106,30 +110,40 @@ pnpm eval
 ```
 
 ```
-🐸 croak eval — 12 cases (5 malicious, 7 benign)
+🐸 croak eval — 22 cases (11 malicious, 11 benign)
 
+  ✅ benign-husky-prepare         expected 🟡 warn   got 🟡 warn
+  ✅ benign-installed-project     expected 🟡 warn   got 🟡 warn
   ✅ benign-large-lockfile        expected 🟢 allow  got 🟢 allow
   ✅ benign-long-line-config      expected 🟢 allow  got 🟢 allow
   ✅ benign-minified-vendor       expected 🟢 allow  got 🟢 allow
-  🔸 benign-postinstall-copy-env  expected 🟡 warn   got 🟢 allow  UNDER  missing: repo/lifecycle-script
-  🔸 benign-prisma-postinstall    expected 🟡 warn   got 🟢 allow  UNDER  missing: repo/lifecycle-script
+  ✅ benign-native-module         expected 🟡 warn   got 🟡 warn
+  ✅ benign-playwright-install    expected 🟡 warn   got 🟡 warn
+  ✅ benign-postinstall-copy-env  expected 🟡 warn   got 🟡 warn
+  ✅ benign-prisma-postinstall    expected 🟡 warn   got 🟡 warn
   ✅ benign-vite-app              expected 🟢 allow  got 🟢 allow
   ✅ benign-vscode-build-task     expected 🟢 allow  got 🟢 allow
+  ✅ d-binding-gyp-implicit       expected 🟡 warn   got 🟡 warn
+  ✅ d-committed-node-modules     expected 🟡 warn   got 🟡 warn
   ❌ d-config-obfuscated          expected 🔴 block  got 🟢 allow  MISSED  missing: repo/obfuscation
+  ✅ d-known-tool-chained         expected 🔴 block  got 🔴 block
   ✅ d-oversized-config           expected 🟡 warn   got 🟡 warn
-  ❌ d-postinstall                expected 🔴 block  got 🟢 allow  MISSED  missing: repo/lifecycle-script
+  ✅ d-postinstall                expected 🟡 warn   got 🟡 warn
+  ✅ d-postinstall-curl-pipe      expected 🔴 block  got 🔴 block
+  ✅ d-postinstall-exfil          expected 🔴 block  got 🔴 block
+  ✅ d-postinstall-inline-decode  expected 🔴 block  got 🔴 block
   ❌ d-tailwind-hidden-code       expected 🔴 block  got 🟢 allow  MISSED  missing: repo/hidden-code
   ❌ d-vscode-autorun             expected 🔴 block  got 🟢 allow  MISSED  missing: repo/ide-autorun
 
-  block recall    0/5    0%  ░░░░░░░░░░░░░░░░░░░░
-  flag recall     1/5   20%  ████░░░░░░░░░░░░░░░░
-  false alarms    0/7    0%  ░░░░░░░░░░░░░░░░░░░░
-  rule recall     1/7   14%  ███░░░░░░░░░░░░░░░░░
-  time          2 ms
+  block recall   4/11   36%  ███████░░░░░░░░░░░░░
+  flag recall    8/11   73%  ███████████████░░░░░
+  false alarms   0/11    0%  ░░░░░░░░░░░░░░░░░░░░
+  rule recall   14/17   82%  ████████████████░░░░
+  time          7 ms
 ```
 
-One detector exists so far: the safety floor `repo/unscanned` (a file too big to
-read is never a clean scan). Every ❌ that turns into ✅ is progress you can see,
+Three detectors exist so far: install scripts, committed `node_modules`, and
+the safety floor `repo/unscanned` (a file too big to read is never a clean scan). Every ❌ that turns into ✅ is progress you can see,
 and a case that ever passed is not allowed to fail again. Format and metrics:
 [eval/README.md](eval/README.md).
 

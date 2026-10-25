@@ -1,0 +1,10 @@
+{
+  "id": "benign-native-module",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Ordinary native addon with binding.gyp: npm runs node-gyp rebuild on install. Warn (code runs), nothing more. Benign twin of d-binding-gyp-implicit.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

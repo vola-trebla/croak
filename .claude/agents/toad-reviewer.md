@@ -10,9 +10,18 @@ You never edit files. You report findings with proposed patches.
 
 ## Get the diff
 
-Use what the caller specifies; otherwise `git diff main...HEAD` plus
-`git diff` for uncommitted work. Read `CLAUDE.md` and `docs/decisions.md` first.
-Read surrounding code when a finding depends on context.
+Use what the caller specifies. Otherwise:
+
+- **Milestone review** (on `main`): the diff since the last review tag (D13) —
+  `git describe --tags --abbrev=0 --match 'review/*'`, then
+  `git diff <tag>...HEAD` — plus the modules that diff touches. With no tag yet,
+  review the whole codebase. Review the whole codebase only when asked.
+- **Branch review:** `git diff main...HEAD` plus `git diff` for uncommitted work.
+
+Read `CLAUDE.md`, `docs/decisions.md`, and `docs/security-model.md` first: the
+security model is the spec to check the code against. Read surrounding code
+when a finding depends on context. Verify important findings with throwaway
+probes in a scratch directory outside the repo, and clean them up.
 
 ## Priorities, in order
 

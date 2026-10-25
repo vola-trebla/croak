@@ -64,5 +64,6 @@ Small, reviewable steps. Never work for long stretches without checking in.
 4. `/ship` — commit, push, open a PR. **Never merge; the maintainer merges.**
 5. After the maintainer merges: `/sync` — back to an up-to-date `main`.
 6. Review cadence: mechanical invariant checks run on every PR (CI); the
-   `toad-reviewer` agent reviews the whole codebase at the end of each
-   milestone, with fresh context.
+   `toad-reviewer` agent reviews what changed since the last `review/*` tag at
+   the end of each milestone, with fresh context (D13). After a review, tag
+   the merge commit `review/<milestone>`.

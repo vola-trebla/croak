@@ -259,3 +259,42 @@ hallucinated name). Provenance that never existed is "no data", not a signal;
 verifying signatures is M7. Any registry failure makes the check incomplete.
 **Trade-off:** a hijack that keeps the old publisher and never had
 provenance is only caught by its content (M3 3/4).
+
+## D27 — Package contents: read in memory, judged as a dependency (2026-10-25)
+
+`croak plan` downloads the tarball of every new or changed registry version
+(https, registry.npmjs.org only), verifies it against the lockfile's
+integrity hash (a mismatch blocks), and reads it in memory with hard limits
+(security model §3); any limit or registry failure makes the check
+incomplete. The repo detectors then run with a dependency policy: npm runs
+only `preinstall`, `install` and `postinstall`, only from the package's own
+`package.json`; network plus spawning or decoding is a binary installer and
+warns, network plus secrets or eval blocks. Each version is compared with its
+previous one: a new install script warns, and blocks together with a
+registry warning; a new dependency that is itself under 30 days old blocks —
+how the 2026 axios release smuggled in `plain-crypto-js`.
+**Trade-off:** large plans download a lot; a plan over 300 MB is incomplete
+rather than partly checked.
+
+## D28 — Real packages recalibrate the rules (2026-10-25)
+
+Running `croak-install` on lodash, axios, react, esbuild, sharp, puppeteer,
+typescript and next blocked five of them. None was an attack. Changes:
+- Obfuscation: weak signals (escapes, base64 blobs) block only next to code
+  execution (eval, Function, vm), since decoding alone makes data (parsers'
+  Unicode tables, webpack's wasm); local strong signals block only next to
+  eval or decoding; on lines over 1,000 characters "next to" means within
+  200 characters. `$eval(` and `Function("return this")` are not eval.
+- Secrets: the whole `process.env` counts only when passed to a call or
+  walked, not when destructured or handed to a child process.
+- A new publisher alone is info, and does not count with provenance (a CI
+  identity); with an install script it still blocks (D26). Prebuilt `.node`
+  binaries and large JSON data files are info.
+- Platform packages the lockfile marks for another `os`/`cpu` are skipped:
+  npm will not install them here.
+  After the changes: 0 blocks on all eight; warnings left on esbuild (an
+  install script that downloads a binary), puppeteer and next (releases under
+  7 days old, a computed global call). Eval and the repo corpus are unchanged.
+  **Trade-off:** escapes decoded and run through a child process rather than
+  eval are no longer an obfuscation block; the lifecycle rules still see the
+  spawn at install time.

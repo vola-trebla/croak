@@ -51,7 +51,7 @@ export function nearPopularName(name: string): string | undefined {
 
 /**
  * Registry signals for one new or changed version. Each signal alone is a
- * warning (D25), except a new publisher, which alone is context (D27); two
+ * warning (D25), except a new publisher, which alone is context (D28); two
  * patterns block (D26): an install script with dropped
  * provenance or a new publisher (a hijacked maintainer account), and a
  * typo-squat name on a brand-new package.

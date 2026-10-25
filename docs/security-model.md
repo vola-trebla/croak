@@ -48,18 +48,24 @@ _content_ is not.
 - POSIX only: without `O_NOFOLLOW` (Windows) croak refuses to scan instead of
   silently losing the guard; `package.json` declares `darwin` and `linux`.
 - Tarballs (M3) are never extracted to disk. Gunzip with `maxOutputLength`
-  (decompression bombs), parse tar entries in memory. With no disk writes,
-  `../` entries and symlink entries cannot escape.
+  (decompression bombs), parse tar entries in memory, verify every header
+  checksum. With no disk writes, `../` entries and symlink entries cannot
+  escape. Tarballs come only from `registry.npmjs.org` over https and must
+  match the lockfile's integrity hash, or the package blocks (D27).
 
 ### 3. Bound every resource
 
-| Limit                                     | Value   | On exceed                              |
-| ----------------------------------------- | ------- | -------------------------------------- |
-| file size read                            | 1 MB    | file recorded as `oversized`, not read |
-| directory entries (files, dirs, symlinks) | 100,000 | `SnapshotLimitError` → fail closed     |
-| directory depth                           | 64      | `SnapshotLimitError` → fail closed     |
-| decompressed tarball (M3)                 | TBD     | fail closed                            |
-| scan time (M2)                            | TBD     | fail closed                            |
+| Limit                                     | Value   | On exceed                               |
+| ----------------------------------------- | ------- | --------------------------------------- |
+| file size read                            | 1 MB    | file recorded as `oversized`, not read  |
+| directory entries (files, dirs, symlinks) | 100,000 | `SnapshotLimitError` → fail closed      |
+| directory depth                           | 64      | `SnapshotLimitError` → fail closed      |
+| file size read in a tarball (M3)          | 8 MB    | entry recorded as `oversized`, not read |
+| decompressed tarball (M3)                 | 256 MB  | `TarballError` → incomplete             |
+| tarball entries (M3)                      | 20,000  | `TarballError` → incomplete             |
+| one tarball download (M3)                 | 100 MB  | `RegistryError` → incomplete            |
+| all tarballs of one plan (M3)             | 300 MB  | incomplete                              |
+| scan time (M2)                            | TBD     | fail closed                             |
 
 An incomplete scan is never reported as a clean scan. Oversized code files
 (JS/TS/JSON, `.git` config and hooks; lockfiles exempt) produce a

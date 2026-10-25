@@ -35,7 +35,8 @@ And in 2026 this is happening constantly:
 ## 🛂 What croak does
 
 Think of `npm install` as a courier whose parcels **unpack themselves**.
-croak is the customs officer at your door. It never opens the parcel, but it:
+croak is the customs officer at your door. It x-rays the contents as plain
+data and never lets anything inside run (how: [security model](docs/security-model.md)):
 
 |     | Check                                     | Catches                                                                                             |
 | --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |

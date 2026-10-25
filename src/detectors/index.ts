@@ -1,5 +1,6 @@
 import type { RepoSnapshot } from "../repo-snapshot.ts";
 import type { Finding } from "../verdict.ts";
+import { gitConfig } from "./git-config.ts";
 import { hiddenCodeDetector } from "./hidden-code.ts";
 import { ideAutorun } from "./ide-autorun.ts";
 import { lifecycleScript } from "./lifecycle-script.ts";
@@ -17,6 +18,7 @@ export const repoDetectors: readonly RepoDetector[] = [
   ideAutorun,
   hiddenCodeDetector,
   obfuscation,
+  gitConfig,
 ];
 
 export function scanRepo(

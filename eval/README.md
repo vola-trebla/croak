@@ -59,8 +59,10 @@ Malicious cases cannot expect `allow`; benign cases cannot expect `block`.
 - Never commit real malware. Real samples are referenced by name/hash only and
   live in the gitignored `eval/samples/`.
 - Fixtures are excluded from Biome, TypeScript, and Vitest.
-- Fixtures cannot contain a `.git` directory (git refuses to commit one);
-  `.git` attacks are tested with generated directories in unit tests.
+- Fixtures cannot contain a `.git` directory (git refuses to commit one), nor a
+  `.gitmodules` with `update = !command` (git's fsck, enforced by GitHub,
+  rejects it). Those attacks are covered by unit tests instead — and the
+  second one can only arrive through a zip or another host, not GitHub.
 
 ## History and regressions
 

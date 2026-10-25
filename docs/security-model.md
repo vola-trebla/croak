@@ -93,6 +93,10 @@ a marker file is planned from a local tarball, and the test fails if the
 marker exists or the project changed. A plain `npm install` of the same bait
 does run it.
 
+`croak plan` itself makes network requests in one place: it fetches each
+new package's metadata from registry.npmjs.org (names validated against npm's
+rules first, 15 s timeout, 50 MB cap per response). `--offline` skips them.
+
 This is isolation, not a sandbox: npm still talks to the network and parses
 untrusted registry metadata, and `--ignore-scripts` is not treated as one. A
 lockfile diff is not the whole story either: croak checks every new or

@@ -4,31 +4,37 @@ import type { PlanOutcome } from "./install/scan.ts";
 import { type ScanOutcome, ScanTargetError } from "./scan.ts";
 
 describe("cli", () => {
-  it.each([["--version"], ["-v"]])("prints the version with %s", (flag) => {
-    expect(run([flag])).toEqual({
-      code: 0,
-      stdout: `${VERSION}\n`,
-      stderr: "",
-    });
-  });
+  it.each([["--version"], ["-v"]])(
+    "prints the version with %s",
+    async (flag) => {
+      expect(await run([flag])).toEqual({
+        code: 0,
+        stdout: `${VERSION}\n`,
+        stderr: "",
+      });
+    },
+  );
 
-  it.each([[[]], [["--help"]], [["-h"]]])("prints help for %j", (argv) => {
-    const result = run(argv);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("croak before you install");
-    expect(result.stderr).toBe("");
-  });
+  it.each([[[]], [["--help"]], [["-h"]]])(
+    "prints help for %j",
+    async (argv) => {
+      const result = await run(argv);
+      expect(result.code).toBe(0);
+      expect(result.stdout).toContain("croak before you install");
+      expect(result.stderr).toBe("");
+    },
+  );
 
-  it("reports an unknown flag as a usage error, not a crash", () => {
-    const result = run(["--yolo"]);
+  it("reports an unknown flag as a usage error, not a crash", async () => {
+    const result = await run(["--yolo"]);
     expect(result.code).toBe(EXIT_USAGE);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain("--yolo");
     expect(result.stderr).toContain("Usage:");
   });
 
-  it("reports an unexpected argument as a usage error", () => {
-    const result = run(["install", "lodash"]);
+  it("reports an unexpected argument as a usage error", async () => {
+    const result = await run(["install", "lodash"]);
     expect(result.code).toBe(EXIT_USAGE);
     expect(result.stderr).toContain("install");
   });
@@ -56,10 +62,10 @@ const deps = (result: ScanOutcome | Error, seen: string[] = []): CliDeps => ({
 });
 
 describe("croak repo", () => {
-  it("scans the given path, defaulting to the current directory", () => {
+  it("scans the given path, defaulting to the current directory", async () => {
     const seen: string[] = [];
-    run(["repo", "some/dir"], deps(outcome("allow"), seen));
-    run(["repo"], deps(outcome("allow"), seen));
+    await run(["repo", "some/dir"], deps(outcome("allow"), seen));
+    await run(["repo"], deps(outcome("allow"), seen));
     expect(seen).toEqual(["some/dir", "."]);
   });
 
@@ -67,24 +73,24 @@ describe("croak repo", () => {
     ["allow", EXIT.ok],
     ["warn", EXIT.ok],
     ["block", EXIT.block],
-  ] as const)("exits %s → %i", (verdict, code) => {
-    expect(run(["repo", "."], deps(outcome(verdict))).code).toBe(code);
+  ] as const)("exits %s → %i", async (verdict, code) => {
+    expect((await run(["repo", "."], deps(outcome(verdict)))).code).toBe(code);
   });
 
-  it("exits 3 when the scan could not complete, so agents can fail closed", () => {
+  it("exits 3 when the scan could not complete, so agents can fail closed", async () => {
     const incomplete: ScanOutcome = {
       status: "incomplete",
       root: ".",
       reason: "too deep",
       durationMs: 1,
     };
-    const result = run(["repo", "."], deps(incomplete));
+    const result = await run(["repo", "."], deps(incomplete));
     expect(result.code).toBe(EXIT.incomplete);
     expect(result.stdout).toContain("too deep");
   });
 
-  it("reports a missing or non-directory target as a usage error", () => {
-    const result = run(
+  it("reports a missing or non-directory target as a usage error", async () => {
+    const result = await run(
       ["repo", "nope"],
       deps(new ScanTargetError("nope is not a directory")),
     );
@@ -92,8 +98,8 @@ describe("croak repo", () => {
     expect(result.stderr).toContain("nope is not a directory");
   });
 
-  it("prints JSON with --json", () => {
-    const result = run(["repo", ".", "--json"], deps(outcome("block")));
+  it("prints JSON with --json", async () => {
+    const result = await run(["repo", ".", "--json"], deps(outcome("block")));
     expect(JSON.parse(result.stdout)).toMatchObject({
       schema: 1,
       verdict: "block",
@@ -101,9 +107,11 @@ describe("croak repo", () => {
     expect(result.code).toBe(EXIT.block);
   });
 
-  it("rejects unknown commands and extra arguments", () => {
-    expect(run(["scan", "."], deps(outcome("allow"))).code).toBe(EXIT_USAGE);
-    expect(run(["repo", "a", "b"], deps(outcome("allow"))).code).toBe(
+  it("rejects unknown commands and extra arguments", async () => {
+    expect((await run(["scan", "."], deps(outcome("allow")))).code).toBe(
+      EXIT_USAGE,
+    );
+    expect((await run(["repo", "a", "b"], deps(outcome("allow")))).code).toBe(
       EXIT_USAGE,
     );
   });
@@ -145,9 +153,9 @@ describe("croak plan", () => {
     },
   };
 
-  it("compares two lockfiles and reports a verdict", () => {
-    const result = run(
-      ["plan", "--before", "before.json", "--after", "after.json"],
+  it("compares two lockfiles and reports a verdict", async () => {
+    const result = await run(
+      ["plan", "--before", "before.json", "--after", "after.json", "--offline"],
       planDeps,
     );
     expect(result.code).toBe(EXIT.ok);
@@ -155,18 +163,28 @@ describe("croak plan", () => {
     expect(result.stdout).toContain("install/source");
   });
 
-  it("treats --before none as a fresh install", () => {
-    const result = run(
-      ["plan", "--before", "none", "--after", "after.json", "--json"],
+  it("treats --before none as a fresh install", async () => {
+    const result = await run(
+      [
+        "plan",
+        "--before",
+        "none",
+        "--after",
+        "after.json",
+        "--json",
+        "--offline",
+      ],
       planDeps,
     );
     const report: PlanOutcome & { schema: number } = JSON.parse(result.stdout);
     expect(report).toMatchObject({ schema: 1, kind: "install-plan", added: 2 });
   });
 
-  it("requires --after and readable files", () => {
-    expect(run(["plan"], planDeps).code).toBe(EXIT_USAGE);
-    expect(run(["plan", "--after", "missing.json"], planDeps)).toMatchObject({
+  it("requires --after and readable files", async () => {
+    expect((await run(["plan"], planDeps)).code).toBe(EXIT_USAGE);
+    expect(
+      await run(["plan", "--after", "missing.json"], planDeps),
+    ).toMatchObject({
       code: EXIT_USAGE,
       stderr: expect.stringContaining("missing.json"),
     });

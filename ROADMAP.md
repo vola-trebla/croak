@@ -89,7 +89,8 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git) — moved from M1
 - [x] Threat model for running npm on untrusted input: isolated wrapper (temp dir with only manifest + lockfile, empty env and npm config, git disabled), offline CI proof that no script runs (D24)
 - [x] Lockfile diff from a non-executing install plan: `croak plan` + `croak-install`, every new/changed version incl. transitive; lockfile signals (install scripts, non-registry sources, missing integrity)
-- [ ] Signals: package exists, age, install-time vectors (scripts, `binding.gyp`, prebuilt binaries), new deps vs previous version, provenance dropped, maintainer change
+- [x] Registry signals: package exists (did-you-mean hint in `croak-install`), release age (🟡 only), provenance dropped, new publisher, typo-squat names, brand-new packages; blocking combinations (D26)
+- [ ] Content signals: install-time vectors in the tarball (scripts, `binding.gyp`, prebuilt binaries), new deps and scripts vs the previous version
 - [ ] Verdict cache keyed by `name@version + integrity`
 
 ### M4 — Agent integration

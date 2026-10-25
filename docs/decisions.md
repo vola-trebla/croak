@@ -245,3 +245,17 @@ compared with earlier versions, or that fails to verify, is a different and
 stronger signal.
 **Trade-off:** a brand-new malicious version with no other signal is only a
 warning.
+
+## D26 — Install signals: alone they warn, two patterns block (2026-10-25)
+
+Registry signals per new or changed version — release under 7 days old,
+provenance dropped compared with recent versions, a publisher who did not
+publish earlier versions, a name one keystroke from a popular package, a
+package created under 30 days ago — are each a 🟡. Two combinations are 🔴:
+an install script together with dropped provenance or a new publisher (the
+shape of a hijacked maintainer account, as in the 2026 axios incident), and a
+typo-squat name on a brand-new package (typo-squatting or a registered
+hallucinated name). Provenance that never existed is "no data", not a signal;
+verifying signatures is M7. Any registry failure makes the check incomplete.
+**Trade-off:** a hijack that keeps the old publisher and never had
+provenance is only caught by its content (M3 3/4).

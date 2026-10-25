@@ -16,6 +16,7 @@ git config core.hooksPath .githooks   # once per clone: pre-commit + pre-push ga
 pnpm check         # lint + typecheck + test — run before every commit
 pnpm format        # Biome autofix
 pnpm build         # tsc -> dist/
+pnpm eval          # run the eval (see eval/README.md)
 ```
 
 Note: pnpm 12 does not accept `-s`.
@@ -45,6 +46,8 @@ Note: pnpm 12 does not accept `-s`.
 - Pure core, thin I/O shell (see `run()` in `src/cli.ts`).
 - Small focused modules, flat structure.
 - Tests co-located: `foo.ts` → `foo.test.ts`. New detectors need eval cases.
+- Relative imports use the `.ts` extension (Node runs `src/` directly; tsc
+  rewrites them to `.js` on build).
 - Fail fast with explicit error types; never swallow errors.
 - Everything in the repo is in English: code, comments, commits, PRs, docs.
 

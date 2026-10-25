@@ -1,0 +1,7 @@
+{
+  "id": "benign-prisma-postinstall",
+  "kind": "repo",
+  "threat": "benign",
+  "description": "Legitimate postinstall: prisma generate. Worth a warning (code runs on install), never a block. Benign twin of d-postinstall.",
+  "expect": { "verdict": "warn", "rules": ["repo/lifecycle-script"] }
+}

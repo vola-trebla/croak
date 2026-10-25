@@ -62,7 +62,9 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 - [ ] Benign set: top-N npm packages (false-positive baseline)
 - [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git)
-- [ ] Synthetic "test assignment" repos with harmless payloads (exfil to `localhost`)
+- [x] Synthetic "test assignment" repos with harmless payloads, each detector with a benign twin
+- [x] Mechanical invariant checks in CI (`pnpm invariants`)
+- [x] Security model (`docs/security-model.md`) and snapshot resource limits
 - [x] Eval runner + metrics: block/flag recall, false alarms, rule recall, latency (emoji + plain + JSON output)
 - [x] Case format + first synthetic cases (null baseline: 0% recall)
 - [ ] Cost per verdict (with the LLM layer, M5)
@@ -73,9 +75,13 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [ ] IDE autorun (`.vscode/tasks.json` `runOn: folderOpen`, etc.)
 - [ ] Obfuscation and whitespace-hidden code
 - [ ] Suspicious code in build configs (`*.config.js`)
+- [ ] Facts → signals → verdict model; decide on an `info` level that does not affect the verdict
+- [ ] ReDoS tests: detectors under pathological input with a time budget
+- [ ] Spike: run analysis under `node --permission` (read-only, no child processes)
 
 ### M3 — npm install plan + registry signals
 
+- [ ] Threat model for running npm on untrusted input: temp dir with only manifest + lockfile, minimal env, no `git:`/`file:`/URL resolution (signals instead), tests proving no script runs
 - [ ] Lockfile diff from a non-executing install plan
 - [ ] Signals: package exists, age, install-time vectors (scripts, `binding.gyp`, prebuilt binaries), new deps vs previous version, provenance dropped, maintainer change
 - [ ] Verdict cache keyed by `name@version + integrity`
@@ -99,8 +105,10 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 ### M7 — Crypto layer (the diploma chapter)
 
-- [ ] Verify Sigstore provenance attestations
-- [ ] Diff tarball contents against source at the attested commit
+Three separate mechanisms, never merged into one "verified" badge:
+- [ ] Registry signatures: the tarball is what the registry has
+- [ ] Provenance (Sigstore): which workflow built it from which commit — signal on _changes_ (provenance dropped, repo or workflow changed); never lowers severity
+- [ ] Tarball vs source at the attested commit: flag new executable entry points (install scripts, `bin`, native binaries), not ordinary build output
 
 ### M8 — Public release
 

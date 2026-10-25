@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.test.ts", "src/eval/**"],
+  "exclude": ["src/**/*.test.ts", "src/eval/**", "src/tools/**"],
   "compilerOptions": {
     "sourceMap": false
   }

@@ -6,6 +6,7 @@ first. It statically checks what an install (or an unfamiliar repo) would do
 self-correct.
 - Plan and milestones: [ROADMAP.md](ROADMAP.md)
 - Why things are the way they are: [docs/decisions.md](docs/decisions.md)
+- What croak trusts and how analysis stays safe: [docs/security-model.md](docs/security-model.md)
 
 ## Commands
 
@@ -13,7 +14,7 @@ self-correct.
 nvm use            # Node 24.2+ (see .nvmrc)
 pnpm install
 git config core.hooksPath .githooks   # once per clone: pre-commit + pre-push gates
-pnpm check         # lint + typecheck + test — run before every commit
+pnpm check         # lint + typecheck + invariants + test — run before every commit
 pnpm format        # Biome autofix
 pnpm build         # tsc -> dist/
 pnpm eval          # run the eval (see eval/README.md)
@@ -45,7 +46,9 @@ Note: pnpm 12 does not accept `-s`.
   earn it. KISS and YAGNI beat speculative abstraction.
 - Pure core, thin I/O shell (see `run()` in `src/cli.ts`).
 - Small focused modules, flat structure.
-- Tests co-located: `foo.ts` → `foo.test.ts`. New detectors need eval cases.
+- Tests co-located: `foo.ts` → `foo.test.ts`.
+- Every detector ships with two eval cases: a malicious one it must catch and a
+  benign twin it must not flag. Detectors never key off the `SYNTHETIC` marker.
 - Relative imports use the `.ts` extension (Node runs `src/` directly; tsc
   rewrites them to `.js` on build).
 - Fail fast with explicit error types; never swallow errors.

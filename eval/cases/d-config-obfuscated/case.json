@@ -1,0 +1,7 @@
+{
+  "id": "d-config-obfuscated",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: next.config.js builds a call from hex-escaped strings and evals a base64 blob when the dev server starts.",
+  "expect": { "verdict": "block", "rules": ["repo/obfuscation"] }
+}

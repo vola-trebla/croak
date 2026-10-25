@@ -1,0 +1,7 @@
+{
+  "id": "d-tailwind-hidden-code",
+  "kind": "repo",
+  "threat": "D",
+  "description": "Fake test assignment: tailwind.config.js hides an eval of a base64 payload after hundreds of spaces on the last line, off-screen in most editors.",
+  "expect": { "verdict": "block", "rules": ["repo/hidden-code"] }
+}

@@ -1,0 +1,103 @@
+{
+  "results": [
+    {
+      "id": "benign-minified-vendor",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.3649169999999984
+    },
+    {
+      "id": "benign-prisma-postinstall",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "allow",
+      "outcome": "missed",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": [],
+      "missingRules": ["repo/lifecycle-script"],
+      "durationMs": 0.22454199999999958
+    },
+    {
+      "id": "benign-vite-app",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.14187499999999886
+    },
+    {
+      "id": "d-config-obfuscated",
+      "threat": "D",
+      "expected": "block",
+      "got": "allow",
+      "outcome": "missed",
+      "expectedRules": ["repo/obfuscation"],
+      "firedRules": [],
+      "missingRules": ["repo/obfuscation"],
+      "durationMs": 0.13308299999999917
+    },
+    {
+      "id": "d-postinstall",
+      "threat": "D",
+      "expected": "block",
+      "got": "allow",
+      "outcome": "missed",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": [],
+      "missingRules": ["repo/lifecycle-script"],
+      "durationMs": 0.10466699999999918
+    },
+    {
+      "id": "d-tailwind-hidden-code",
+      "threat": "D",
+      "expected": "block",
+      "got": "allow",
+      "outcome": "missed",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": [],
+      "missingRules": ["repo/hidden-code"],
+      "durationMs": 0.09708399999999529
+    },
+    {
+      "id": "d-vscode-autorun",
+      "threat": "D",
+      "expected": "block",
+      "got": "allow",
+      "outcome": "missed",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": [],
+      "missingRules": ["repo/ide-autorun"],
+      "durationMs": 0.10358300000000042
+    }
+  ],
+  "metrics": {
+    "cases": 7,
+    "malicious": 4,
+    "benign": 3,
+    "blockRecall": {
+      "hit": 0,
+      "total": 4
+    },
+    "flagRecall": {
+      "hit": 0,
+      "total": 4
+    },
+    "falseAlarms": {
+      "hit": 0,
+      "total": 3
+    },
+    "ruleRecall": {
+      "hit": 0,
+      "total": 5
+    }
+  },
+  "durationMs": 1.3469580000000008
+}

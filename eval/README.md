@@ -51,6 +51,9 @@ Malicious cases cannot expect `allow`; benign cases cannot expect `block`.
 
 - Payloads are inert: `echo`, `localhost`, or reserved `.invalid` domains.
 - Mark payload files with a `SYNTHETIC croak eval fixture` comment.
+- **Detectors must never key off that marker** — that would cheat the eval.
+- Every detector gets a malicious case and a benign twin (e.g. `d-postinstall`
+  and `benign-prisma-postinstall`).
 - Never commit real malware. Real samples are referenced by name/hash only and
   live in the gitignored `eval/samples/`.
 - Fixtures are excluded from Biome, TypeScript, and Vitest.

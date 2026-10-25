@@ -60,7 +60,7 @@ reasons a human _and_ an agent can act on (planned output):
 ### Two modes
 
 ```bash
-croak install <pkg>   # 🚧 planned: check an install plan before anything executes
+croak-install <pkg>   # 🧪 early: plan an npm install, check it before anything executes
 croak repo .          # 🧪 early: scan an unfamiliar repo before you install or open it
 ```
 

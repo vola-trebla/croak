@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type CliDeps, EXIT, EXIT_USAGE, run, VERSION } from "./cli.ts";
+import type { PlanOutcome } from "./install/scan.ts";
 import { type ScanOutcome, ScanTargetError } from "./scan.ts";
 
 describe("cli", () => {
@@ -105,5 +106,69 @@ describe("croak repo", () => {
     expect(run(["repo", "a", "b"], deps(outcome("allow"))).code).toBe(
       EXIT_USAGE,
     );
+  });
+});
+
+describe("croak plan", () => {
+  const lock = (pkgs: object) =>
+    JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...pkgs } });
+  const files: Record<string, string> = {
+    "before.json": lock({
+      "node_modules/a": {
+        version: "1.0.0",
+        resolved: "https://registry.npmjs.org/a/-/a-1.0.0.tgz",
+        integrity: "sha512-x",
+      },
+    }),
+    "after.json": lock({
+      "node_modules/a": {
+        version: "1.0.0",
+        resolved: "https://registry.npmjs.org/a/-/a-1.0.0.tgz",
+        integrity: "sha512-x",
+      },
+      "node_modules/b": {
+        version: "1.0.0",
+        resolved: "git+https://x.invalid/b.git",
+        integrity: "sha512-y",
+      },
+    }),
+  };
+  const planDeps: CliDeps = {
+    emoji: false,
+    scan: () => {
+      throw new Error("not used");
+    },
+    readFile: (path) => {
+      const text = files[path];
+      if (text === undefined) throw new Error(`ENOENT ${path}`);
+      return text;
+    },
+  };
+
+  it("compares two lockfiles and reports a verdict", () => {
+    const result = run(
+      ["plan", "--before", "before.json", "--after", "after.json"],
+      planDeps,
+    );
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.stdout).toContain("croak plan");
+    expect(result.stdout).toContain("install/source");
+  });
+
+  it("treats --before none as a fresh install", () => {
+    const result = run(
+      ["plan", "--before", "none", "--after", "after.json", "--json"],
+      planDeps,
+    );
+    const report: PlanOutcome & { schema: number } = JSON.parse(result.stdout);
+    expect(report).toMatchObject({ schema: 1, kind: "install-plan", added: 2 });
+  });
+
+  it("requires --after and readable files", () => {
+    expect(run(["plan"], planDeps).code).toBe(EXIT_USAGE);
+    expect(run(["plan", "--after", "missing.json"], planDeps)).toMatchObject({
+      code: EXIT_USAGE,
+      stderr: expect.stringContaining("missing.json"),
+    });
   });
 });

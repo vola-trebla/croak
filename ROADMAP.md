@@ -87,8 +87,8 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 - [ ] Benign set: top-N npm packages (false-positive baseline) — moved from M1, install eval needs it
 - [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git) — moved from M1
-- [ ] Threat model for running npm on untrusted input: temp dir with only manifest + lockfile, minimal env, no `git:`/`file:`/URL resolution (signals instead), tests proving no script runs
-- [ ] Lockfile diff from a non-executing install plan
+- [x] Threat model for running npm on untrusted input: isolated wrapper (temp dir with only manifest + lockfile, empty env and npm config, git disabled), offline CI proof that no script runs (D24)
+- [x] Lockfile diff from a non-executing install plan: `croak plan` + `croak-install`, every new/changed version incl. transitive; lockfile signals (install scripts, non-registry sources, missing integrity)
 - [ ] Signals: package exists, age, install-time vectors (scripts, `binding.gyp`, prebuilt binaries), new deps vs previous version, provenance dropped, maintainer change
 - [ ] Verdict cache keyed by `name@version + integrity`
 

@@ -73,17 +73,30 @@ backtracking (ReDoS) is a denial-of-service vector. Keep patterns simple, cap
 the line length a detector scans, and test detectors against pathological
 input with a time budget.
 
-### 5. The one external process: npm/pnpm for install plans (M3)
+### 5. The one external process: npm for install plans (M3, D24)
 
-This is the weakest point of the design: running a package manager against an
-untrusted project. Before shipping M3:
-- copy only `package.json` and the lockfile into a temporary directory — the
-  project's `.npmrc` is not used unless the user opts in;
-- run with `--package-lock-only` / `--lockfile-only` and `--ignore-scripts`;
-- run with a minimal environment (no `NPM_TOKEN`, cloud credentials, etc.);
-- do not resolve `git:`, `file:`, `link:`, or URL dependencies — report them
-  as signals instead;
-- prove with tests that no lifecycle script runs on this path.
+croak itself never spawns a process. Planning an install needs npm, so that
+lives in one small wrapper, `scripts/croak-install.sh`, and croak only reads
+its result (`croak plan --before <lock> --after <lock>`). The wrapper:
+- works in a fresh temporary directory with copies of `package.json` and the
+  lockfile only — the project's `.npmrc` is not used, and the project's own
+  files are never modified;
+- runs npm with an empty environment and empty user/global npm config, so no
+  auth tokens or cloud credentials are visible to it;
+- uses the public registry only, and sets `git` to `/usr/bin/false`, so git
+  dependencies fail the plan instead of being cloned (fail closed);
+- runs `npm install --package-lock-only --ignore-scripts`.
+
+`scripts/test-croak-install.sh` (in CI) proves the path runs no lifecycle
+script: a bait package whose `preinstall`/`postinstall`/`prepare` would create
+a marker file is planned from a local tarball, and the test fails if the
+marker exists or the project changed. A plain `npm install` of the same bait
+does run it.
+
+This is isolation, not a sandbox: npm still talks to the network and parses
+untrusted registry metadata, and `--ignore-scripts` is not treated as one. A
+lockfile diff is not the whole story either: croak checks every new or
+changed package version in the planned tree, transitive ones included.
 
 ### 6. Least privilege: run croak sandboxed (checked 2026-10-25, D23)
 

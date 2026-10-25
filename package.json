@@ -5,10 +5,12 @@
   "description": "Croak before you install: a pre-execution gate for package installs, built for AI agents",
   "type": "module",
   "bin": {
-    "croak": "./dist/cli.js"
+    "croak": "./dist/cli.js",
+    "croak-install": "./scripts/croak-install.sh"
   },
   "files": [
-    "dist"
+    "dist",
+    "scripts/croak-install.sh"
   ],
   "engines": {
     "node": ">=24.2.0"

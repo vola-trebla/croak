@@ -223,3 +223,25 @@ verdicts while spawning, writing, workers, and eval are denied. CI runs a
 sandboxed scan on every PR; the M4 hook will invoke croak this way. Network
 is not covered by Node 24 and stays a documented gap.
 **Trade-off:** callers must pass the target as an allowed read path.
+
+## D24 — Install planning: npm runs in a wrapper, croak reads lockfiles (2026-10-25)
+
+To know the exact tree an install brings in, npm must resolve it. Running npm
+from croak would break the never-spawn invariant and the sandbox (D23); a
+home-made resolver would be approximate. Instead a small wrapper
+(`croak-install`) runs `npm install --package-lock-only --ignore-scripts` in an
+isolated temporary directory and hands croak two lockfiles; `croak plan`
+judges every new or changed package version, transitive ones included. The
+isolation is documented in the security model §5 and proven offline in CI.
+**Trade-off:** two steps instead of one; npm is isolated, not sandboxed.
+
+## D25 — Release age is a weak signal (2026-10-25)
+
+A version published in the last 7 days is a 🟡 on its own and never a 🔴 by
+itself: many legitimate releases are new. It only strengthens other signals,
+such as suspicious content or a change in provenance. Likewise, missing
+provenance is "no data", not an attack; a provenance that disappeared
+compared with earlier versions, or that fails to verify, is a different and
+stronger signal.
+**Trade-off:** a brand-new malicious version with no other signal is only a
+warning.

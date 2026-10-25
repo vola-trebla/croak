@@ -181,3 +181,12 @@ native builds (`node-gyp`) stay warnings; suspicious combinations still block.
 Corpus: 🟡 repos 7 → 5, warnings 35 → 26, all remaining explainable.
 **Trade-off:** croak trusts a known tool's name; whether that tool's package
 is itself honest is the install check's job (M3).
+
+## D23 — croak runs under Node's permission model (2026-10-26)
+
+Checked in practice: with `--permission`, read access limited to croak and the
+target, and `--disallow-code-generation-from-strings`, croak gives the same
+verdicts while spawning, writing, workers, and eval are denied. CI runs a
+sandboxed scan on every PR; the M4 hook will invoke croak this way. Network
+is not covered by Node 24 and stays a documented gap.
+**Trade-off:** callers must pass the target as an allowed read path.

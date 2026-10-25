@@ -77,7 +77,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [ ] Suspicious code in build configs (`*.config.js`)
 - [x] Facts → signals → verdict model; `info` level that does not affect the verdict
 - [x] ReDoS guard: detectors under pathological input with a time budget, own process + CI timeout
-- [ ] Spike: run analysis under `node --permission` (read-only, no child processes)
+- [x] Spike: run analysis under `node --permission` (read-only, no child processes) — works; sandboxed scan in CI (D23)
 
 ### M3 — npm install plan + registry signals
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LockfileError, parseLockfile } from "./lockfile.ts";
+import { installsOn, LockfileError, parseLockfile } from "./lockfile.ts";
 
 const lock = (packages: Record<string, object>, lockfileVersion = 3) =>
   JSON.stringify({
@@ -61,5 +61,43 @@ describe("parseLockfile", () => {
     ],
   ])("rejects %s", (_name, text) => {
     expect(() => parseLockfile(text)).toThrow(LockfileError);
+  });
+});
+
+describe("installsOn", () => {
+  const [entry] = parseLockfile(
+    JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        "node_modules/@esbuild/darwin-arm64": {
+          version: "0.28.2",
+          os: ["darwin"],
+          cpu: ["arm64"],
+        },
+      },
+    }),
+  );
+  const at = (os: string, cpu: string) =>
+    entry !== undefined && installsOn(entry, { os, cpu });
+
+  it("follows npm's os and cpu fields", () => {
+    expect(at("darwin", "arm64")).toBe(true);
+    expect(at("linux", "arm64")).toBe(false);
+    expect(at("darwin", "x64")).toBe(false);
+  });
+
+  it("treats a missing field as any platform and honours negations", () => {
+    const [any] = parseLockfile(
+      JSON.stringify({
+        lockfileVersion: 3,
+        packages: { "node_modules/a": { version: "1.0.0", os: ["!win32"] } },
+      }),
+    );
+    expect(
+      any !== undefined && installsOn(any, { os: "linux", cpu: "x64" }),
+    ).toBe(true);
+    expect(
+      any !== undefined && installsOn(any, { os: "win32", cpu: "x64" }),
+    ).toBe(false);
   });
 });

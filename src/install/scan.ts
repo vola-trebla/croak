@@ -2,7 +2,12 @@ import { performance } from "node:perf_hooks";
 import { aggregate, type Finding, type Verdict } from "../verdict.ts";
 import { contentFindings } from "./content.ts";
 import { type InstallDetector, installDetectors } from "./detectors.ts";
-import { LockfileError, parseLockfile } from "./lockfile.ts";
+import {
+  installsOn,
+  LockfileError,
+  type Platform,
+  parseLockfile,
+} from "./lockfile.ts";
 import { addedDependencyFindings, metadataFindings } from "./metadata.ts";
 import { diffLockfiles, type PlanChange } from "./plan.ts";
 import {
@@ -83,6 +88,8 @@ export interface OnlineOptions {
   readonly content?: boolean;
   /** Total compressed tarball bytes one plan may download. */
   readonly maxDownloadBytes?: number;
+  /** Where npm will install (default: this machine). Platform packages for others are not downloaded. */
+  readonly platform?: Platform;
 }
 
 const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
@@ -202,9 +209,26 @@ function firstVersion(doc: unknown): string {
  * block; a plan over the download budget is incomplete, never partially clean.
  */
 async function contentOf(
-  changes: readonly PlanChange[],
+  all: readonly PlanChange[],
   options: OnlineOptions,
 ): Promise<Finding[]> {
+  const platform = options.platform ?? {
+    os: process.platform,
+    cpu: process.arch,
+  };
+  const changes = all.filter((c) => installsOn(c.entry, platform));
+  const skipped = all.length - changes.length;
+  const notes: Finding[] =
+    skipped === 0
+      ? []
+      : [
+          {
+            ruleId: "install/other-platform",
+            severity: "info",
+            file: "package-lock.json",
+            message: `${skipped} package(s) built for other platforms not downloaded: npm will not install them on ${platform.os}-${platform.cpu}`,
+          },
+        ];
   const budget = options.maxDownloadBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES;
   let downloaded = 0;
   const fetchOptions =
@@ -237,5 +261,5 @@ async function contentOf(
       );
     return contentFindings(label, snapshotTarball(data));
   });
-  return results.flat();
+  return [...notes, ...results.flat()];
 }

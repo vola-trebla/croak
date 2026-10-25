@@ -18,6 +18,8 @@ const entry = (name: string, extra: Partial<LockEntry> = {}): LockEntry => ({
   link: false,
   dev: false,
   optional: false,
+  os: [],
+  cpu: [],
   ...extra,
 });
 const change = (name: string, extra: Partial<LockEntry> = {}): PlanChange => ({

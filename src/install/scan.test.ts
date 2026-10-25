@@ -258,6 +258,41 @@ describe("planInstallOnline: package contents", () => {
     });
   });
 
+  it("does not download platform packages npm will not install here", async () => {
+    const urls: string[] = [];
+    const lockfile = JSON.stringify({
+      lockfileVersion: 3,
+      packages: {
+        "": {},
+        "node_modules/p": {
+          version: "1.0.0",
+          resolved: "https://registry.npmjs.org/p/-/p-1.0.0.tgz",
+          integrity: "sha512-x",
+          os: ["win32"],
+          cpu: ["x64"],
+          optional: true,
+        },
+      },
+    });
+    const outcome = await planInstallOnline(undefined, lockfile, {
+      fetch: async (input) => {
+        urls.push(String(input));
+        return new Response(packument, { status: 200 });
+      },
+      now,
+      platform: { os: "darwin", cpu: "arm64" },
+    });
+    expect(urls.some((url) => url.endsWith(".tgz"))).toBe(false);
+    expect(outcome).toMatchObject({ status: "complete", verdict: "allow" });
+    expect(outcome.status === "complete" && outcome.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "install/other-platform",
+        severity: "info",
+        message: expect.stringContaining("darwin-arm64"),
+      }),
+    ]);
+  });
+
   it("is incomplete when the plan exceeds the download budget", async () => {
     const tgz = tarball({ "package.json": "{}", "a.js": "x".repeat(5000) });
     const outcome = await planInstallOnline(undefined, planWith(sri(tgz)), {

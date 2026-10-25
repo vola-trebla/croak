@@ -14,6 +14,9 @@ export interface LockEntry {
   readonly link: boolean;
   readonly dev: boolean;
   readonly optional: boolean;
+  /** npm's `os` / `cpu` fields: values a platform package accepts or (with `!`) refuses. */
+  readonly os: readonly string[];
+  readonly cpu: readonly string[];
 }
 
 export class LockfileError extends Error {
@@ -29,6 +32,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const asString = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
+
+const asStrings = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
+
+/** npm's rule: refused by `!value`; if any value is listed without `!`, it must be one of them. */
+function accepts(list: readonly string[], value: string): boolean {
+  if (list.includes(`!${value}`)) return false;
+  const allowed = list.filter((v) => !v.startsWith("!"));
+  return allowed.length === 0 || allowed.includes(value);
+}
+
+export interface Platform {
+  /** process.platform, e.g. darwin, linux, win32. */
+  readonly os: string;
+  /** process.arch, e.g. arm64, x64. */
+  readonly cpu: string;
+}
+
+/** Whether npm would install this entry on the platform (platform packages for other systems are skipped). */
+export function installsOn(entry: LockEntry, platform: Platform): boolean {
+  return accepts(entry.os, platform.os) && accepts(entry.cpu, platform.cpu);
+}
 
 /** `node_modules/a/node_modules/@s/b` → `@s/b`. */
 function nameFromPath(path: string): string {
@@ -66,6 +93,8 @@ export function parseLockfile(text: string): LockEntry[] {
         link: raw.link === true,
         dev: raw.dev === true,
         optional: raw.optional === true,
+        os: asStrings(raw.os),
+        cpu: asStrings(raw.cpu),
       },
     ];
   });

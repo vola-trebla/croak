@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fast gate: lint + format check on staged files only.
+# Enable once per clone: git config core.hooksPath .githooks
+exec pnpm exec biome check --staged --no-errors-on-unmatched

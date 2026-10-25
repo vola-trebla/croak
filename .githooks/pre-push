@@ -1,0 +1,3 @@
+#!/bin/sh
+# Full gate before anything leaves the machine: lint + typecheck + tests.
+exec pnpm check

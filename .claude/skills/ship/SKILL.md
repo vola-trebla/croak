@@ -1,5 +1,4 @@
 ---
-
 name: ship
 description: Commit the current work on a properly named branch, push it, and open a GitHub pull request for the maintainer to review and merge. Use when the user says /ship, "ship it", "commit and open a PR", or when a small task is done and ready for review in the croak repo. Never merges.
 ---

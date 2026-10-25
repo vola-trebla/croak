@@ -10,8 +10,9 @@ self-correct.
 ## Commands
 
 ```bash
-nvm use            # Node 24 (see .nvmrc)
+nvm use            # Node 24.2+ (see .nvmrc)
 pnpm install
+git config core.hooksPath .githooks   # once per clone: pre-commit + pre-push gates
 pnpm check         # lint + typecheck + test — run before every commit
 pnpm format        # Biome autofix
 pnpm build         # tsc -> dist/
@@ -24,6 +25,7 @@ Note: pnpm 12 does not accept `-s`.
 1. **croak never executes analyzed code.** No `eval`, `new Function`, `require`,
    `import()`, `child_process` on analyzed files or package contents. Install
    plans use `--package-lock-only` / `--lockfile-only` with `--ignore-scripts`.
+   Vitest only collects `src/**/*.test.ts` — fixtures may ship their own tests.
 2. **The LLM layer can only escalate.** Deterministic findings are the floor; an
    LLM result may raise severity but must never lower or remove a finding.
    Package contents are untrusted input to the LLM (prompt injection).
@@ -55,4 +57,6 @@ Small, reviewable steps. Never work for long stretches without checking in.
 3. Log notable decisions in `docs/decisions.md`.
 4. `/ship` — commit, push, open a PR. **Never merge; the maintainer merges.**
 5. After the maintainer merges: `/sync` — back to an up-to-date `main`.
-6. `toad-reviewer` agent — project-specific review of a diff with fresh context.
+6. Review cadence: mechanical invariant checks run on every PR (CI); the
+   `toad-reviewer` agent reviews the whole codebase at the end of each
+   milestone, with fresh context.

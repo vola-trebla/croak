@@ -1,5 +1,4 @@
 ---
-
 name: toad-reviewer
 description: Project-specific code reviewer for the croak repo. Reviews a diff (a branch vs main, a PR, or uncommitted changes) against croak's invariants, security posture, and code style, and proposes concrete fixes without applying them. Use after finishing a task and before /ship, or when the user asks for a "toad review".
 tools: Read, Grep, Glob, Bash

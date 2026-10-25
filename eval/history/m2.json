@@ -1,0 +1,378 @@
+{
+  "results": [
+    {
+      "id": "benign-gitmodules",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 1.620750000000001
+    },
+    {
+      "id": "benign-husky-prepare",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 2.5088329999999956
+    },
+    {
+      "id": "benign-icon-font-map",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": ["repo/obfuscation"],
+      "missingRules": [],
+      "durationMs": 0.9156669999999991
+    },
+    {
+      "id": "benign-installed-project",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/node-modules-present"],
+      "firedRules": ["repo/node-modules-present", "repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.6169579999999968
+    },
+    {
+      "id": "benign-large-lockfile",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.33866700000000094
+    },
+    {
+      "id": "benign-long-line-config",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.28087500000000176
+    },
+    {
+      "id": "benign-minified-vendor",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.49362499999999443
+    },
+    {
+      "id": "benign-native-module",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.3558750000000046
+    },
+    {
+      "id": "benign-playwright-install",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.5305000000000035
+    },
+    {
+      "id": "benign-postinstall-copy-env",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.841667000000001
+    },
+    {
+      "id": "benign-prisma-postinstall",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.34745799999999605
+    },
+    {
+      "id": "benign-rtl-locale",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 1.0964169999999882
+    },
+    {
+      "id": "benign-vite-app",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.28000000000000114
+    },
+    {
+      "id": "benign-vscode-build-task",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.698291999999995
+    },
+    {
+      "id": "benign-vscode-jsonc",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.24729200000000162
+    },
+    {
+      "id": "benign-vscode-npm-watch",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.381582999999992
+    },
+    {
+      "id": "d-binding-gyp-implicit",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.20437499999999886
+    },
+    {
+      "id": "d-committed-node-modules",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/node-modules-present"],
+      "firedRules": ["repo/node-modules-present", "repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.2862089999999995
+    },
+    {
+      "id": "d-config-obfuscated",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/obfuscation"],
+      "firedRules": ["repo/obfuscation"],
+      "missingRules": [],
+      "durationMs": 0.41920899999999506
+    },
+    {
+      "id": "d-known-tool-chained",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.42045800000001066
+    },
+    {
+      "id": "d-obfuscated-string-array",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/obfuscation"],
+      "firedRules": ["repo/obfuscation"],
+      "missingRules": [],
+      "durationMs": 0.3294999999999959
+    },
+    {
+      "id": "d-oversized-config",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/unscanned"],
+      "firedRules": ["repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.38829199999999275
+    },
+    {
+      "id": "d-postinstall",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.4428750000000008
+    },
+    {
+      "id": "d-postinstall-curl-pipe",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.24220799999999088
+    },
+    {
+      "id": "d-postinstall-exfil",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.30862499999999216
+    },
+    {
+      "id": "d-postinstall-inline-decode",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.1500830000000093
+    },
+    {
+      "id": "d-tailwind-hidden-code",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 0.46237499999999443
+    },
+    {
+      "id": "d-trojan-source",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 0.5402080000000069
+    },
+    {
+      "id": "d-vertical-hidden",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 0.285499999999999
+    },
+    {
+      "id": "d-vscode-autorun",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.309708999999998
+    },
+    {
+      "id": "d-vscode-hidden-nested",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.397625000000005
+    },
+    {
+      "id": "d-vscode-npm-autorun",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.41116699999999184
+    }
+  ],
+  "metrics": {
+    "cases": 32,
+    "malicious": 16,
+    "benign": 16,
+    "blockRecall": {
+      "hit": 11,
+      "total": 16
+    },
+    "flagRecall": {
+      "hit": 16,
+      "total": 16
+    },
+    "falseAlarms": {
+      "hit": 0,
+      "total": 16
+    },
+    "ruleRecall": {
+      "hit": 23,
+      "total": 23
+    }
+  },
+  "durationMs": 18.39187499999999
+}

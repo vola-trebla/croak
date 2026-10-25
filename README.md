@@ -203,4 +203,4 @@ croak is what that thesis turns into thirteen years later.
 
 ## 📄 License
 
-MIT (to be added before the public release).
+[MIT](LICENSE). Found a way around croak? See [SECURITY.md](SECURITY.md).

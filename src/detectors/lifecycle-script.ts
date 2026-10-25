@@ -168,7 +168,7 @@ function routineChecker(
  * hooks), recursively. Signals are combined across the whole call graph, so
  * an attack split across two scripts still blocks. Memoized per script name.
  */
-function assessor(
+export function assessor(
   repo: RepoSnapshot,
   dir: string,
   scripts: Record<string, unknown>,

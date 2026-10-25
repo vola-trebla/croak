@@ -25,7 +25,8 @@
     "test": "vitest run",
     "check": "pnpm lint && pnpm typecheck && pnpm invariants && pnpm test",
     "eval": "node src/eval/main.ts",
-    "invariants": "node src/tools/check-invariants.ts"
+    "invariants": "node src/tools/check-invariants.ts",
+    "croak": "node src/cli.ts"
   },
   "license": "MIT",
   "devDependencies": {

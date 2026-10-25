@@ -18,6 +18,7 @@ pnpm check         # lint + typecheck + invariants + test — run before every c
 pnpm format        # Biome autofix
 pnpm build         # tsc -> dist/
 pnpm eval          # run the eval (see eval/README.md)
+pnpm croak repo .  # run the CLI from source
 ```
 
 Note: pnpm 12 does not accept `-s`.

@@ -60,11 +60,16 @@ reasons a human _and_ an agent can act on (planned output):
 
 ```bash
 croak install <pkg>   # 🚧 planned: check an install plan before anything executes
-croak repo .          # 🚧 planned: scan an unfamiliar repo before you install or open it
+croak repo .          # 🧪 early: scan an unfamiliar repo before you install or open it
 ```
 
 Plus a **Claude Code hook** (🚧 planned) that puts croak in front of every
 install command an agent runs.
+
+`croak repo` already runs end to end, but with a single detector (files too
+large to scan) it catches very little yet. Exit codes: `0` allow/warn,
+`1` block, `2` usage error, `3` scan incomplete — agents should treat `3` as a
+block. `--json` gives a versioned report for tools.
 
 ## 🧠 Design principles
 
@@ -154,6 +159,7 @@ pnpm install
 git config core.hooksPath .githooks   # pre-commit + pre-push checks
 pnpm check                            # lint + typecheck + invariants + tests
 pnpm eval                             # run the eval
+pnpm croak repo <path>                # run croak from source
 ```
 
 Working with an AI agent on this repo? Start with [CLAUDE.md](CLAUDE.md).

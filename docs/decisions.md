@@ -111,3 +111,12 @@ grow with the repo. After each review the merge commit is tagged
 A whole-codebase review happens only on request (e.g. before M8).
 Depth (probes that verify findings) stays: it found the real issues in M0 and M1.
 **Trade-off:** cross-cutting problems in untouched code surface later.
+
+## D14 — `croak repo` exit codes and a versioned JSON report (2026-10-25)
+
+`0` allow or warn, `1` block, `2` usage error, `3` scan incomplete. Warnings
+print but do not fail the process: a human decides. Agent integrations (M4)
+treat `3` as a block (fail-closed), because an incomplete scan is never a clean
+one. `--json` emits `{ "schema": 1, ... }`; the schema number changes whenever
+the shape does, since hooks parse it.
+**Trade-off:** scripts that want to fail on warnings must parse the JSON.

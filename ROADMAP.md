@@ -17,7 +17,8 @@ same curves sign every npm package with provenance.
 - **Deterministic first, LLM second.** Rules are fast, free, and offline.
   The LLM layer is optional (BYOK) and **can only raise severity, never lower it**.
 - **Fail-closed for agents, warn for humans.** If a check cannot complete,
-  an agent is blocked; a human gets a warning and decides. An LLM timeout alone
+  or the verdict is 🔴, an agent is blocked; on 🟡 the agent asks the user
+  (D20); a human gets the report and decides. An LLM timeout alone
   falls back to deterministic checks.
 - **Eval-driven.** No detector ships without eval cases. Every PR runs the eval.
 - **Zero (or near-zero) runtime dependencies.** croak is itself an npm package,
@@ -91,7 +92,8 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 ### M4 — Agent integration
 
 - [ ] Claude Code `PreToolUse` hook on install commands
-- [ ] Fail-closed for agents
+- [ ] Agent policy (D20): 🔴 and "scan incomplete" block; 🟡 does not block — the agent sees the warning and asks the user to confirm
+- [ ] A nested install (`cd client && npm install`) triggers a fresh check of that install
 - [ ] Actionable feedback for the agent ("did you mean `jscodeshift`?")
 
 ### M5 — LLM triage (BYOK, Haiku by default)
@@ -113,9 +115,10 @@ Three separate mechanisms, never merged into one "verified" badge:
 - [ ] Provenance (Sigstore): which workflow built it from which commit — signal on _changes_ (provenance dropped, repo or workflow changed); never lowers severity
 - [ ] Tarball vs source at the attested commit: flag new executable entry points (install scripts, `bin`, native binaries), not ordinary build output
 
-### M8 — Public release
+### M8 — npm release
 
-- [ ] Open the repo, publish from CI with provenance
+- [ ] Open the repo — moved earlier: right after M2, marked early-stage (D21)
+- [ ] Publish `@vola-trebla/croak` from CI with provenance (name checked for conflicts first, D22)
 - [ ] Article: "From a 2013 ECC diploma to croak"
 
 ### Later

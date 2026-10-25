@@ -32,8 +32,9 @@ Note: pnpm 12 does not accept `-s`.
 2. **The LLM layer can only escalate.** Deterministic findings are the floor; an
    LLM result may raise severity but must never lower or remove a finding.
    Package contents are untrusted input to the LLM (prompt injection).
-3. **Fail-closed for agents, warn for humans.** An LLM failure alone falls back
-   to deterministic checks.
+3. **Fail-closed for agents, warn for humans.** 🔴 and "incomplete" block an
+   agent; 🟡 makes it ask the user (D20). An LLM failure alone falls back to
+   deterministic checks.
 4. **Zero runtime dependencies** (D4). Use Node built-ins. Any exception needs a
    decision record.
 5. **Never commit real malware.** Eval references real samples by name/hash

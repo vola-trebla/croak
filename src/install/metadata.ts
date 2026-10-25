@@ -97,11 +97,13 @@ export function metadataFindings(
     facts.earlier.length > 0 &&
     !facts.earlier.some((v) => v.publisher === facts.publisher);
   const hijack = entry.hasInstallScript && (provenanceDropped || newPublisher);
+  const recentRelease =
+    facts.ageDays !== undefined && facts.ageDays < RECENT_DAYS;
   const pattern = hijack
     ? "; with an install script, this is the pattern of a hijacked maintainer account"
     : "";
 
-  if (facts.ageDays !== undefined && facts.ageDays < RECENT_DAYS) {
+  if (recentRelease) {
     findings.push(
       finding(
         "install/recent-release",
@@ -138,6 +140,21 @@ export function metadataFindings(
       ),
     );
   }
+  const previous = facts.earlier[0];
+  if (
+    previous !== undefined &&
+    facts.installScripts.length > 0 &&
+    previous.installScripts.length === 0
+  ) {
+    const risky = recentRelease || provenanceDropped || newPublisher;
+    findings.push(
+      finding(
+        "install/new-install-script",
+        risky ? "block" : "warn",
+        `adds an install script (${facts.installScripts.join(", ")}) that ${previous.version} did not have${risky ? ", in a release that also shows a registry warning: the pattern of a hijacked release" : ""}`,
+      ),
+    );
+  }
   if (isNewPackage)
     findings.push(
       finding(
@@ -147,4 +164,43 @@ export function metadataFindings(
       ),
     );
   return findings;
+}
+
+/**
+ * Dependencies this version adds compared with its previous version. A new
+ * dependency is context; a new dependency that is itself a brand-new package
+ * is how the 2026 axios release smuggled in its payload (D27), so it blocks.
+ */
+export function addedDependencyFindings(
+  change: PlanChange,
+  facts: VersionFacts,
+  createdByName: ReadonlyMap<string, Date | undefined>,
+  now: Date = new Date(),
+): Finding[] {
+  const previous = facts.earlier[0];
+  if (previous === undefined) return [];
+  const added = facts.dependencies.filter(
+    (name) => !previous.dependencies.includes(name),
+  );
+  const file = `${change.entry.name}@${change.entry.version ?? "?"}`;
+  return added.map((name): Finding => {
+    const created = createdByName.get(name);
+    const days =
+      created === undefined
+        ? undefined
+        : Math.floor((now.getTime() - created.getTime()) / DAY_MS);
+    return days !== undefined && days < NEW_PACKAGE_DAYS
+      ? {
+          ruleId: "install/new-dependency",
+          severity: "block",
+          file,
+          message: `adds dependency ${name}, a package created ${days} day(s) ago, that ${previous.version} did not have: how hijacked releases smuggle in a payload`,
+        }
+      : {
+          ruleId: "install/new-dependency",
+          severity: "info",
+          file,
+          message: `adds dependency ${name} (not in ${previous.version})`,
+        };
+  });
 }

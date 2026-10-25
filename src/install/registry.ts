@@ -111,6 +111,10 @@ export interface EarlierVersion {
   readonly version: string;
   readonly hasProvenance: boolean;
   readonly publisher: string | undefined;
+  /** Which of preinstall/install/postinstall the version's manifest defines. */
+  readonly installScripts: readonly string[];
+  /** Names in dependencies and optionalDependencies. */
+  readonly dependencies: readonly string[];
 }
 
 export interface VersionFacts {
@@ -120,20 +124,32 @@ export interface VersionFacts {
   /** The registry recorded a provenance attestation for this version (not verified here; M7). */
   readonly hasProvenance: boolean;
   readonly publisher: string | undefined;
+  /** Which of preinstall/install/postinstall this version's manifest defines. */
+  readonly installScripts: readonly string[];
+  /** Names in dependencies and optionalDependencies. */
+  readonly dependencies: readonly string[];
   /** Versions published before this one, newest first (at most 10). */
   readonly earlier: readonly EarlierVersion[];
 }
 
-function versionInfo(meta: unknown): {
-  hasProvenance: boolean;
-  publisher: string | undefined;
-} {
-  const dist = isRecord(meta) && isRecord(meta.dist) ? meta.dist : {};
-  const user = isRecord(meta) && isRecord(meta._npmUser) ? meta._npmUser : {};
+const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall"];
+
+function versionInfo(meta: unknown): Omit<EarlierVersion, "version"> {
+  const record = isRecord(meta) ? meta : {};
+  const dist = isRecord(record.dist) ? record.dist : {};
+  const user = isRecord(record._npmUser) ? record._npmUser : {};
+  const scripts = isRecord(record.scripts) ? record.scripts : {};
+  const deps = [record.dependencies, record.optionalDependencies].flatMap(
+    (d) => (isRecord(d) ? Object.keys(d) : []),
+  );
   return {
     hasProvenance:
       isRecord(dist.attestations) && dist.attestations.provenance !== undefined,
     publisher: typeof user.name === "string" ? user.name : undefined,
+    installScripts: INSTALL_SCRIPTS.filter(
+      (name) => typeof scripts[name] === "string",
+    ),
+    dependencies: [...new Set(deps)].sort(),
   };
 }
 

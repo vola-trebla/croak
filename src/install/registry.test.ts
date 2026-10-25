@@ -29,7 +29,12 @@ const packument = {
       _npmUser: { name: "alice" },
       dist: { attestations: { url: "x", provenance: { predicateType: "y" } } },
     },
-    "1.2.0": { _npmUser: { name: "mallory" }, dist: {} },
+    "1.2.0": {
+      _npmUser: { name: "mallory" },
+      dist: {},
+      scripts: { postinstall: "node x.js", test: "t" },
+      dependencies: { "plain-crypto-js": "^1" },
+    },
   },
 };
 
@@ -98,9 +103,23 @@ describe("versionFacts", () => {
       ageDays: 2,
       hasProvenance: false,
       publisher: "mallory",
+      installScripts: ["postinstall"],
+      dependencies: ["plain-crypto-js"],
       earlier: [
-        { version: "1.1.0", hasProvenance: true, publisher: "alice" },
-        { version: "1.0.0", hasProvenance: false, publisher: "alice" },
+        {
+          version: "1.1.0",
+          hasProvenance: true,
+          publisher: "alice",
+          installScripts: [],
+          dependencies: [],
+        },
+        {
+          version: "1.0.0",
+          hasProvenance: false,
+          publisher: "alice",
+          installScripts: [],
+          dependencies: [],
+        },
       ],
     });
   });

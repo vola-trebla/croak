@@ -132,12 +132,30 @@ export async function planInstallOnline(
   if (local.status === "incomplete") return local;
   const before =
     beforeText === undefined ? undefined : parseLockfile(beforeText);
-  const changes = diffLockfiles(before, parseLockfile(afterText)).filter(
+  const fromRegistry = diffLockfiles(before, parseLockfile(afterText)).filter(
     (c) =>
       !c.entry.link &&
       c.entry.version !== undefined &&
       c.entry.resolved?.startsWith(`${REGISTRY}/`) === true,
   );
+  // npm skips platform packages for other systems, so they are not checked.
+  const platform = options.platform ?? {
+    os: process.platform,
+    cpu: process.arch,
+  };
+  const changes = fromRegistry.filter((c) => installsOn(c.entry, platform));
+  const skipped = fromRegistry.length - changes.length;
+  const notes: Finding[] =
+    skipped === 0
+      ? []
+      : [
+          {
+            ruleId: "install/other-platform",
+            severity: "info",
+            file: "package-lock.json",
+            message: `${skipped} package(s) built for other platforms not checked: npm will not install them on ${platform.os}-${platform.cpu}`,
+          },
+        ];
   const names = [...new Set(changes.map((c) => c.entry.name))];
   try {
     const fetchOptions =
@@ -166,7 +184,7 @@ export async function planInstallOnline(
     });
     const content =
       options.content === false ? [] : await contentOf(changes, options);
-    const findings = [...local.findings, ...remote, ...content];
+    const findings = [...local.findings, ...notes, ...remote, ...content];
     return {
       ...local,
       verdict: aggregate(findings),
@@ -209,26 +227,9 @@ function firstVersion(doc: unknown): string {
  * block; a plan over the download budget is incomplete, never partially clean.
  */
 async function contentOf(
-  all: readonly PlanChange[],
+  changes: readonly PlanChange[],
   options: OnlineOptions,
 ): Promise<Finding[]> {
-  const platform = options.platform ?? {
-    os: process.platform,
-    cpu: process.arch,
-  };
-  const changes = all.filter((c) => installsOn(c.entry, platform));
-  const skipped = all.length - changes.length;
-  const notes: Finding[] =
-    skipped === 0
-      ? []
-      : [
-          {
-            ruleId: "install/other-platform",
-            severity: "info",
-            file: "package-lock.json",
-            message: `${skipped} package(s) built for other platforms not downloaded: npm will not install them on ${platform.os}-${platform.cpu}`,
-          },
-        ];
   const budget = options.maxDownloadBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES;
   let downloaded = 0;
   const fetchOptions =
@@ -261,5 +262,5 @@ async function contentOf(
       );
     return contentFindings(label, snapshotTarball(data));
   });
-  return [...notes, ...results.flat()];
+  return results.flat();
 }

@@ -258,7 +258,7 @@ describe("planInstallOnline: package contents", () => {
     });
   });
 
-  it("does not download platform packages npm will not install here", async () => {
+  it("does not check platform packages npm will not install here", async () => {
     const urls: string[] = [];
     const lockfile = JSON.stringify({
       lockfileVersion: 3,
@@ -277,12 +277,12 @@ describe("planInstallOnline: package contents", () => {
     const outcome = await planInstallOnline(undefined, lockfile, {
       fetch: async (input) => {
         urls.push(String(input));
-        return new Response(packument, { status: 200 });
+        return new Response("{}", { status: 200 });
       },
       now,
       platform: { os: "darwin", cpu: "arm64" },
     });
-    expect(urls.some((url) => url.endsWith(".tgz"))).toBe(false);
+    expect(urls).toEqual([]);
     expect(outcome).toMatchObject({ status: "complete", verdict: "allow" });
     expect(outcome.status === "complete" && outcome.findings).toEqual([
       expect.objectContaining({

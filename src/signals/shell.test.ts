@@ -116,4 +116,21 @@ describe("analyzeShell: facts", () => {
         .runScripts,
     ).toEqual([]);
   });
+
+  it("reports modifiers that change what a command does", () => {
+    expect(
+      analyzeShell("NODE_OPTIONS='--require ./x.js' tsc").modifiers,
+    ).toEqual(["sets NODE_OPTIONS"]);
+    expect(analyzeShell("echo x >> ~/.zshenv").modifiers).toEqual([
+      "redirects input or output",
+    ]);
+    expect(analyzeShell("sudo tsc").modifiers).toEqual(["runs through sudo"]);
+    expect(analyzeShell("npx --yes --package=evil tsc").modifiers).toEqual([
+      "runs through npx --yes --package=evil",
+    ]);
+    expect(analyzeShell("pnpm -r run build").modifiers).toEqual([
+      "runs scripts across workspaces",
+    ]);
+    expect(analyzeShell("npx husky && tsc -p .").modifiers).toEqual([]);
+  });
 });

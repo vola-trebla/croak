@@ -168,16 +168,25 @@ starts with a short plan, and stops at a checkpoint if it runs long. `/ship`
 checks the size before opening a PR.
 **Trade-off:** more PRs and merges per feature; each is reviewable in minutes.
 
-## D19 — Known-tool install scripts are info, not warnings (2026-10-25)
+## D19 — Inert-tool install scripts are info, not warnings (2026-10-25, hardened after the M2 review)
 
 The real-world corpus put 7 of 13 popular repositories at 🟡 for routine
 scripts like `prepare: husky` or `prepare: npm run build` → `tsc`. Warnings
-that everyone learns to ignore defeat the tool. A script is now info when
-every command is a known tool or a package-manager call to a script that is
-itself routine (resolved through `scripts`, depth ≤ 5, cycles rejected), and
-nothing else is present: no network, local files, inline code, or code
-signals. Unknown commands, nested installs (`cd client && npm install`), and
-native builds (`node-gyp`) stay warnings; suspicious combinations still block.
-Corpus: 🟡 repos 7 → 5, warnings 35 → 26, all remaining explainable.
-**Trade-off:** croak trusts a known tool's name; whether that tool's package
-is itself honest is the install check's job (M3).
+that everyone learns to ignore defeat the tool. A script is info only when
+every command is an **inert** tool (husky, tsc, simple-git-hooks, echo, …) or a
+package-manager call that runs a script which is itself routine — including
+npm's `pre`/`post` hooks for it — and nothing else is present: no network,
+local files, inline code, code signals, environment assignments
+(`NODE_OPTIONS=…`, `PATH=…`), redirects, wrappers (`sudo`, `npx --package`),
+or workspace-wide runs (`-r`, `--filter`). Every package-manager call must run
+a script, so `npm install x && npm run build` is not routine.
+
+The M2 review laundered the first version into info several ways (an env
+preload before `tsc`, a nested install, a redirect into `~/.zshenv`, a
+`prebuild` hook) and showed that tools like vite, prisma, turbo, or
+patch-package execute code from the repo. Those are now **executing** tools:
+recognized with a note, but the script stays a warning. Resolution is
+memoized per script, so a layered script graph cannot stall the scan.
+**Trade-off:** croak trusts an inert tool's name; whether that tool's package
+is itself honest is the install check's job (M3). Some 🟡 returned on the
+corpus — that is the honest number.

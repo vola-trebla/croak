@@ -21,6 +21,12 @@ export interface ShellFacts {
   readonly commands: readonly string[];
   /** package.json scripts run via `npm run X`, `pnpm X`, `yarn X`, `npm test`, … */
   readonly runScripts: readonly string[];
+  /**
+   * Things that change what a command does beyond its name: environment
+   * assignments (NODE_OPTIONS=…, PATH=…), redirects, command wrappers (sudo,
+   * env, npx with flags), workspace-wide package-manager flags (-r, --filter).
+   */
+  readonly modifiers: readonly string[];
   /** Quotes or nesting could not be parsed; nothing else is reliable. */
   readonly unparsable: boolean;
 }
@@ -354,43 +360,80 @@ const urlFileName = (url: string): string =>
   basename(url.split(/[?#]/)[0] ?? "");
 
 /** The real command after env assignments and wrappers, with its arguments. */
-function resolveCommand(command: Command):
-  | {
-      readonly name: string;
-      readonly raw: string;
-      readonly args: readonly Word[];
-    }
-  | undefined {
+const NPX_LIKE = new Set(["npx", "pnpx", "bunx"]);
+const WORKSPACE_FLAGS = new Set([
+  "-r",
+  "--recursive",
+  "--filter",
+  "-F",
+  "-w",
+  "--workspace",
+  "--workspaces",
+  "-ws",
+  "--if-present",
+]);
+
+interface Resolved {
+  readonly name: string;
+  readonly raw: string;
+  readonly args: readonly Word[];
+  readonly modifiers: readonly string[];
+}
+
+/** The real command after env assignments and wrappers, with its arguments. */
+function resolveCommand(command: Command): Resolved | undefined {
   const words = [...command.words];
+  const modifiers: string[] = [];
   while (words.length > 0) {
     const first = words[0];
     if (first === undefined) break;
     if (ASSIGNMENT.test(first.text)) {
+      modifiers.push(`sets ${first.text.slice(0, first.text.indexOf("="))}`);
       words.shift();
       continue;
     }
     const name = normalizeName(first.text);
     if (WRAPPERS.has(name)) {
       words.shift();
+      const flags: string[] = [];
       // Skip wrapper flags (sudo -u user, nice -n 5, npx --yes).
       while (words[0]?.text.startsWith("-")) {
-        const flag = words.shift()?.text;
+        const flag = words.shift()?.text ?? "";
+        flags.push(flag);
         if (
-          (flag === "-u" || flag === "-n" || flag === "-g") &&
+          (flag === "-u" ||
+            flag === "-n" ||
+            flag === "-g" ||
+            flag === "-p" ||
+            flag === "--package") &&
           words.length > 1
-        )
+        ) {
           words.shift();
+        }
       }
+      // A bare npx runs a local bin; npx with flags or any other wrapper changes what runs.
+      if (!NPX_LIKE.has(name) || flags.length > 0)
+        modifiers.push(
+          `runs through ${name}${flags.length > 0 ? ` ${flags.join(" ")}` : ""}`,
+        );
       continue;
     }
     if (
       PACKAGE_RUNNERS.has(name) &&
       (words[1]?.text === "exec" || words[1]?.text === "dlx")
     ) {
+      modifiers.push(`runs through ${name} ${words[1]?.text}`);
       words.splice(0, 2);
       continue;
     }
-    return { name, raw: first.text, args: words.slice(1) };
+    const args = words.slice(1);
+    if (
+      (PACKAGE_RUNNERS.has(name) || name === "bun") &&
+      args.some((a) => WORKSPACE_FLAGS.has(a.text.split("=")[0] ?? ""))
+    ) {
+      modifiers.push("runs scripts across workspaces");
+    }
+    return { name, raw: first.text, args, modifiers };
   }
   return undefined;
 }
@@ -402,6 +445,7 @@ interface Acc {
   inlineCode: string[];
   commands: string[];
   runScripts: string[];
+  modifiers: string[];
   downloaded: Set<string>;
 }
 
@@ -419,6 +463,7 @@ function newAcc(): Acc {
     inlineCode: [],
     commands: [],
     runScripts: [],
+    modifiers: [],
     downloaded: new Set(),
   };
 }
@@ -499,6 +544,9 @@ function walkCommand(
   if (resolved === undefined) return { downloader: false, interpreter: false };
   const { name, raw, args } = resolved;
   acc.commands.push(name);
+  acc.modifiers.push(...resolved.modifiers);
+  if (command.redirects.length > 0)
+    acc.modifiers.push("redirects input or output");
   const script = scriptName(name, args);
   if (script !== undefined) acc.runScripts.push(script);
 
@@ -599,6 +647,7 @@ function merge(into: Acc, from: Acc): void {
   into.inlineCode.push(...from.inlineCode);
   into.commands.push(...from.commands);
   into.runScripts.push(...from.runScripts);
+  into.modifiers.push(...from.modifiers);
   for (const d of from.downloaded) into.downloaded.add(d);
 }
 
@@ -610,6 +659,7 @@ export function analyzeShell(command: string): ShellFacts {
     inlineCode: [],
     commands: [],
     runScripts: [],
+    modifiers: [],
     unparsable: true,
   };
   if (command.length > MAX_SCRIPT_LENGTH) return unparsable;
@@ -634,6 +684,7 @@ export function analyzeShell(command: string): ShellFacts {
     inlineCode: acc.inlineCode,
     commands: acc.commands,
     runScripts: acc.runScripts,
+    modifiers: [...new Set(acc.modifiers)],
     unparsable: false,
   };
 }

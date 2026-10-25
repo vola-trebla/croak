@@ -25,45 +25,51 @@ export const INSTALL_SCRIPTS = [
 ] as const;
 
 /**
- * Tools that legitimately run on install. Recognizing one adds context (an
- * info note); it never lowers the verdict of anything else in the script.
+ * Tools that run no project code: their install-time use can be an info note
+ * (D19). Everything they do is decided by the tool, not by files in the repo.
  */
-const KNOWN_TOOLS = new Set([
-  // install-time tools
-  "prisma",
+const INERT_TOOLS = new Set([
   "husky",
-  "patch-package",
   "simple-git-hooks",
   "lefthook",
-  "ngcc",
-  "nuxt",
-  "nuxi",
-  "svelte-kit",
-  "astro",
-  "playwright",
   "only-allow",
   "opencollective-postinstall",
-  // build tools commonly run from prepare
+  "playwright",
   "tsc",
-  "tsup",
-  "vite",
-  "rollup",
   "esbuild",
-  "webpack",
-  "turbo",
-  "nx",
-  "lerna",
-  "unbuild",
   "swc",
-  "babel",
-  "rimraf",
-  // harmless shell builtins
   "echo",
   "true",
   "exit",
   "printf",
 ]);
 
+/**
+ * Recognized install-time tools that execute code from the repo — a JS/TS
+ * config, workspace tasks, a generator, or patches. Recognizing one adds a
+ * note; the script stays a warning.
+ */
+const EXECUTING_TOOLS = new Set([
+  "prisma",
+  "vite",
+  "webpack",
+  "rollup",
+  "tsup",
+  "unbuild",
+  "babel",
+  "nuxt",
+  "nuxi",
+  "svelte-kit",
+  "astro",
+  "ngcc",
+  "turbo",
+  "nx",
+  "lerna",
+  "patch-package",
+  "rimraf",
+]);
+
+const KNOWN_TOOLS = new Set([...INERT_TOOLS, ...EXECUTING_TOOLS]);
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
 const MAX_SCRIPT_DEPTH = 5;
 
@@ -93,44 +99,63 @@ interface Assessment {
 }
 
 /**
- * True when every command is a known tool or a package-manager call to a
- * script that is itself routine, and nothing else at all is going on: no
- * network, no local files, no inline code, no code signals. Anything unknown
- * or unresolved is not routine (D19).
+ * Decides whether install-time commands are routine (D19): every command is an
+ * inert tool or a package-manager call that runs a script which is itself
+ * routine — including npm's pre/post hooks for that script — and nothing else
+ * is present: no network, local files, inline code, code signals, environment
+ * assignments, redirects, wrappers, or workspace-wide runs. Results are
+ * memoized per script name, so a layered script graph costs linear time.
  */
-function isRoutine(
-  command: string,
+function routineChecker(
   scripts: Record<string, unknown>,
-  depth = 0,
-  visited: ReadonlySet<string> = new Set(),
-): boolean {
-  if (depth > MAX_SCRIPT_DEPTH) return false;
-  const facts = analyzeShell(command);
-  if (
-    facts.unparsable ||
-    facts.downloadExecute ||
-    facts.network ||
-    facts.localFiles.length > 0 ||
-    facts.inlineCode.length > 0 ||
-    codeSignals(command).length > 0 ||
-    facts.commands.length === 0
-  ) {
-    return false;
-  }
-  const runs = new Set(facts.runScripts);
-  const everyCommandKnown = facts.commands.every(
-    (name) =>
-      KNOWN_TOOLS.has(name) || (PACKAGE_MANAGERS.has(name) && runs.size > 0),
-  );
-  if (!everyCommandKnown) return false;
-  return [...runs].every((name) => {
-    const target = scripts[name];
-    return (
-      typeof target === "string" &&
-      !visited.has(name) &&
-      isRoutine(target, scripts, depth + 1, new Set([...visited, name]))
-    );
-  });
+): (command: string) => boolean {
+  const memo = new Map<string, boolean>();
+
+  const scriptIsRoutine = (name: string, depth: number): boolean => {
+    const known = memo.get(name);
+    if (known !== undefined) return known;
+    memo.set(name, false); // a cycle back here is not routine
+    const body = scripts[name];
+    const result =
+      typeof body === "string" &&
+      commandIsRoutine(body, depth + 1) &&
+      [`pre${name}`, `post${name}`].every(
+        (hook) => !(hook in scripts) || scriptIsRoutine(hook, depth + 1),
+      );
+    memo.set(name, result);
+    return result;
+  };
+
+  const commandIsRoutine = (command: string, depth: number): boolean => {
+    if (depth > MAX_SCRIPT_DEPTH) return false;
+    const facts = analyzeShell(command);
+    if (
+      facts.unparsable ||
+      facts.downloadExecute ||
+      facts.network ||
+      facts.localFiles.length > 0 ||
+      facts.inlineCode.length > 0 ||
+      facts.modifiers.length > 0 ||
+      codeSignals(command).length > 0 ||
+      facts.commands.length === 0
+    ) {
+      return false;
+    }
+    // Every package-manager call must run a script: `npm install x` does not.
+    const pmCalls = facts.commands.filter((name) =>
+      PACKAGE_MANAGERS.has(name),
+    ).length;
+    if (pmCalls !== facts.runScripts.length) return false;
+    if (
+      !facts.commands.every(
+        (name) => INERT_TOOLS.has(name) || PACKAGE_MANAGERS.has(name),
+      )
+    )
+      return false;
+    return facts.runScripts.every((name) => scriptIsRoutine(name, depth));
+  };
+
+  return (command) => commandIsRoutine(command, 0);
 }
 
 /** What the script's command does, including the files and inline code it runs. */
@@ -213,6 +238,7 @@ function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
   const scripts =
     isRecord(manifest) && isRecord(manifest.scripts) ? manifest.scripts : {};
   const findings: Finding[] = [];
+  const isRoutine = routineChecker(scripts);
 
   for (const name of INSTALL_SCRIPTS) {
     const command = scripts[name];
@@ -220,7 +246,7 @@ function manifestFindings(repo: RepoSnapshot, path: string): Finding[] {
     const { block, reasons, knownTools } = assess(repo, dir, command);
     const line = scriptLine(text, name);
     const at = line === undefined ? { file: path } : { file: path, line };
-    if (!block && isRoutine(command, scripts)) {
+    if (!block && isRoutine(command)) {
       findings.push({
         ruleId: RULE,
         severity: "info",

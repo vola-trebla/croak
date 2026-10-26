@@ -98,7 +98,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [x] Claude Code `PreToolUse` hook on install commands (`scripts/croak-hook.sh`, D32, D34)
 - [x] Agent policy (D20): 🔴, "incomplete" and unchecked commands → deny; 🟡 → ask the user; 🟢 → silence
 - [x] A nested install (`cd client && npm install`) triggers a fresh check of that install, in npm's own prefix
-- [ ] Actionable feedback for the agent ("did you mean `jscodeshift`?") — deny/ask reasons ship; name suggestions do not yet
+- [x] Actionable feedback for the agent: deny/ask reasons with the findings, and "did you mean `react-dom`?" for names npm does not have or that look like a popular package
 - [x] Verdict cache keyed by tarball sha512 + croak's code, so repeated installs stay fast in the hook (D33) — moved from M3 (D29)
 - [x] Agent-command eval: 43 commands (caught 28/29, untouched 14/14)
 - [ ] Not yet: npm workspaces, `npm-shrinkwrap.json` and private registries (denied for now, D34)

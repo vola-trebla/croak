@@ -315,8 +315,7 @@ function intentsOf(
     const other = OTHER_MANAGERS[name];
     if (
       OTHER_RUNNERS.has(name) ||
-      (other !== undefined &&
-        other.has(args.find((a) => !a.startsWith("-")) ?? ""))
+      other?.has(args.find((a) => !a.startsWith("-")) ?? "") === true
     ) {
       found.push({
         kind: "unchecked",

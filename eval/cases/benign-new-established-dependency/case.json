@@ -1,0 +1,10 @@
+{
+  "id": "benign-new-established-dependency",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: httpkit 1.14.1 adds formkit, a dependency that has existed for years.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

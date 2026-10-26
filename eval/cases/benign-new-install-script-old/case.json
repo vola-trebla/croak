@@ -1,0 +1,10 @@
+{
+  "id": "benign-new-install-script-old",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: a release two months old adds a postinstall script. Worth a look, not an attack pattern.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["install/new-install-script"]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "crypto-shim-x",
+  "time": {
+    "created": "2026-10-24T00:00:00.000Z",
+    "4.2.1": "2026-10-24T00:00:00.000Z"
+  },
+  "versions": {
+    "4.2.1": {
+      "name": "crypto-shim-x",
+      "version": "4.2.1",
+      "_npmUser": {
+        "name": "lee"
+      },
+      "dist": {}
+    }
+  }
+}

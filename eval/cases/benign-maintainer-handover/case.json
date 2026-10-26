@@ -1,0 +1,10 @@
+{
+  "id": "benign-maintainer-handover",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: a new maintainer publishes 3.4.1 with no install script. A new publisher alone is context (D28).",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

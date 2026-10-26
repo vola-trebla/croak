@@ -1,0 +1,17 @@
+{
+  "name": "leftpadder",
+  "time": {
+    "created": "2021-05-04T00:00:00.000Z",
+    "2.0.0": "2025-12-29T00:00:00.000Z"
+  },
+  "versions": {
+    "2.0.0": {
+      "name": "leftpadder",
+      "version": "2.0.0",
+      "_npmUser": {
+        "name": "kim"
+      },
+      "dist": {}
+    }
+  }
+}

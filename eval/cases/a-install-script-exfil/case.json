@@ -1,0 +1,10 @@
+{
+  "id": "a-install-script-exfil",
+  "kind": "install",
+  "threat": "A",
+  "description": "Hijacked release with clean metadata: the postinstall script it always had now posts process.env to a remote host. Only the content shows it.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

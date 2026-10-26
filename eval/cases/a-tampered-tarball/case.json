@@ -1,0 +1,10 @@
+{
+  "id": "a-tampered-tarball",
+  "kind": "install",
+  "threat": "A",
+  "description": "The served tarball does not match the lockfile's integrity hash: tampered in transit or at the source. Twin: benign-popular-package, whose tarball verifies.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/integrity"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "a-new-install-script-recent",
+  "kind": "install",
+  "threat": "A",
+  "description": "Hijacked release: 2.0.1 adds a postinstall script that 2.0.0 did not have, and was published yesterday.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/new-install-script"]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "nodebridge",
+  "time": {
+    "created": "2021-11-20T00:00:00.000Z",
+    "6.0.0": "2026-06-27T00:00:00.000Z",
+    "6.0.1": "2026-10-05T00:00:00.000Z"
+  },
+  "versions": {
+    "6.0.0": {
+      "name": "nodebridge",
+      "version": "6.0.0",
+      "_npmUser": {
+        "name": "ana"
+      },
+      "dist": {},
+      "scripts": {
+        "postinstall": "node setup.js"
+      }
+    },
+    "6.0.1": {
+      "name": "nodebridge",
+      "version": "6.0.1",
+      "_npmUser": {
+        "name": "ana"
+      },
+      "dist": {},
+      "scripts": {
+        "postinstall": "node setup.js"
+      }
+    }
+  }
+}

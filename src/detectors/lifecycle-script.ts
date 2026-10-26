@@ -34,13 +34,22 @@ export const DEPENDENCY_INSTALL_SCRIPTS = [
   "postinstall",
 ] as const;
 
+/** node_modules/<name>/package.json or node_modules/@scope/<name>/package.json, at any depth. */
+const BUNDLED_MANIFEST =
+  /(?:^|\/)node_modules\/(?:@[^/]+\/)?[^/@][^/]*\/package\.json$/;
+
 export interface LifecyclePolicy {
   /** Which code-signal combinations block. */
   readonly suspicious: (signals: ReadonlySet<CodeSignal>) => boolean;
   /** Which scripts run on install. */
   readonly scripts: readonly string[];
-  /** Only the top-level package.json runs (a dependency, not a repo with workspaces). */
-  readonly rootOnly: boolean;
+  /**
+   * repo: every package.json outside node_modules (workspaces run theirs).
+   * package: the package's own package.json and those of its bundled
+   * dependencies (node_modules/<name>/, at any depth), whose install scripts
+   * npm runs too.
+   */
+  readonly manifests: "repo" | "package";
 }
 
 /**
@@ -397,8 +406,8 @@ export function lifecycleScriptWith(policy: LifecyclePolicy): RepoDetector {
       .filter(
         (e) =>
           e.kind === "file" &&
-          (policy.rootOnly
-            ? e.path === "package.json"
+          (policy.manifests === "package"
+            ? e.path === "package.json" || BUNDLED_MANIFEST.test(e.path)
             : posix.basename(e.path) === "package.json" &&
               !isInNodeModules(e.path)),
       )
@@ -408,5 +417,5 @@ export function lifecycleScriptWith(policy: LifecyclePolicy): RepoDetector {
 export const lifecycleScript: RepoDetector = lifecycleScriptWith({
   suspicious: isSuspicious,
   scripts: INSTALL_SCRIPTS,
-  rootOnly: false,
+  manifests: "repo",
 });

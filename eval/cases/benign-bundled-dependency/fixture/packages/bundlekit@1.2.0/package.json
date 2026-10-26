@@ -1,0 +1,8 @@
+{
+  "name": "bundlekit",
+  "version": "1.2.0",
+  "description": "SYNTHETIC croak eval fixture",
+  "bundleDependencies": [
+    "helper"
+  ]
+}

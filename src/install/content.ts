@@ -1,10 +1,10 @@
-import { hiddenCodeDetector } from "../detectors/hidden-code.ts";
+import { hiddenCodeWith } from "../detectors/hidden-code.ts";
 import type { RepoDetector } from "../detectors/index.ts";
 import {
   DEPENDENCY_INSTALL_SCRIPTS,
   lifecycleScriptWith,
 } from "../detectors/lifecycle-script.ts";
-import { obfuscation } from "../detectors/obfuscation.ts";
+import { obfuscationWith } from "../detectors/obfuscation.ts";
 import { unscannedWith } from "../detectors/unscanned.ts";
 import type { RepoSnapshot } from "../repo-snapshot.ts";
 import { isSuspiciousInDependency } from "../signals/code.ts";
@@ -16,14 +16,16 @@ import type { Finding } from "../verdict.ts";
  * node-modules-present (bundled dependencies are normal in a tarball).
  */
 const DEPENDENCY_DETECTORS: readonly RepoDetector[] = [
-  unscannedWith({ jsonIsData: true }),
+  unscannedWith({ jsonIsData: true, downgradeInstalled: false }),
   lifecycleScriptWith({
     suspicious: isSuspiciousInDependency,
     scripts: DEPENDENCY_INSTALL_SCRIPTS,
-    rootOnly: true,
+    manifests: "package",
   }),
-  hiddenCodeDetector,
-  obfuscation,
+  // Bundled dependencies (node_modules inside the tarball) are code npm
+  // installs and runs: judged like the package itself, never downgraded.
+  hiddenCodeWith({ downgradeInstalled: false }),
+  obfuscationWith({ downgradeInstalled: false }),
 ];
 
 /** Findings for one package's contents, with paths prefixed by `name@version/`. */

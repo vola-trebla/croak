@@ -1,12 +1,16 @@
+import { posix } from "node:path";
 import { gunzipSync } from "node:zlib";
 import type { RepoEntry, RepoSnapshot } from "../repo-snapshot.ts";
 
 /**
  * Reads an npm package tarball (gzip + ustar, with pax and GNU long names)
  * entirely in memory and exposes it as a RepoSnapshot, so the repo detectors
- * run on package contents unchanged. Nothing is ever written to disk, so `../`
- * paths and link entries cannot escape anywhere; they are recorded as data.
- * The archive is hostile input: every resource is bounded (D27).
+ * run on package contents unchanged. Nothing is ever written to disk.
+ * The archive is hostile input: every resource is bounded (D27), and it must
+ * read the way npm's tar (node-tar) reads it — a file croak sees differently
+ * from what npm installs is a bypass. Where the two could disagree (one zero
+ * block, a pax size, unknown entry types, duplicate or `../` paths) the
+ * archive is rejected instead of read one way.
  */
 
 export interface TarLimits {
@@ -58,8 +62,8 @@ function verifyChecksum(block: Buffer): void {
 }
 
 /** pax records: "<len> key=value\n" … */
-function paxPath(data: Buffer): string | undefined {
-  let path: string | undefined;
+function paxRecords(data: Buffer): Map<string, string> {
+  const records = new Map<string, string>();
   let offset = 0;
   while (offset < data.length) {
     const space = data.indexOf(0x20, offset);
@@ -73,23 +77,40 @@ function paxPath(data: Buffer): string | undefined {
       length <= 0 ||
       offset + length > data.length
     )
-      break;
+      throw new TarballError("malformed pax header");
     const record = data
       .subarray(space + 1, offset + length - 1)
       .toString("utf8");
     const eq = record.indexOf("=");
-    if (eq !== -1 && record.slice(0, eq) === "path")
-      path = record.slice(eq + 1);
+    if (eq !== -1) records.set(record.slice(0, eq), record.slice(eq + 1));
     offset += length;
   }
-  return path;
+  return records;
 }
 
-/** Drop the archive's top-level directory (`package/` in npm tarballs). */
+/** POSIX ustar ("ustar\0" + "00"): only then does node-tar read the name prefix. */
+const isUstar = (block: Buffer): boolean =>
+  block.toString("latin1", 257, 265) === "ustar\u000000";
+
+/** Drop the archive's top-level directory (`package/` in npm tarballs), as npm does. */
 function relative(path: string): string {
   const slash = path.indexOf("/");
-  return slash === -1 ? path : path.slice(slash + 1);
+  const rest = slash === -1 ? "" : path.slice(slash + 1);
+  if (rest === "") return "";
+  const normalized = posix.normalize(rest).replace(/\/+$/, "");
+  if (
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized.startsWith("/")
+  )
+    throw new TarballError(`entry escapes the package: ${path}`);
+  return normalized === "." ? "" : normalized;
 }
+
+const FILE_TYPES = new Set(["0", "\0", "7"]);
+const LINK_TYPES = new Set(["1", "2"]);
+/** Devices, FIFOs and directories carry no code. */
+const IGNORED_TYPES = new Set(["3", "4", "5", "6"]);
 
 export function snapshotTarball(
   gzipped: Buffer,
@@ -112,20 +133,31 @@ export function snapshotTarball(
 
   const entries: RepoEntry[] = [];
   const contents = new Map<string, { start: number; size: number }>();
+  const seen = new Set<string>();
   let headers = 0;
   let pendingName: string | undefined;
+  let pendingSize: number | undefined;
   let offset = 0;
 
   while (offset + BLOCK <= tar.length) {
     const block = tar.subarray(offset, offset + BLOCK);
-    if (block.every((byte) => byte === 0)) break; // end-of-archive marker
+    if (block.every((byte) => byte === 0)) {
+      // node-tar ends the archive only at two zero blocks in a row; a single
+      // one followed by more entries would hide them from croak alone.
+      const next = tar.subarray(offset + BLOCK, offset + 2 * BLOCK);
+      if (next.length === BLOCK && !next.every((byte) => byte === 0))
+        throw new TarballError(
+          "a zero block in the middle of the archive: entries after it would be hidden",
+        );
+      break;
+    }
     headers += 1;
     if (headers > maxEntries)
       throw new TarballError(`more than ${maxEntries} entries`);
     verifyChecksum(block);
 
-    const size = octal(block, 124, 12);
     const type = String.fromCharCode(block[156] ?? 0);
+    const size = pendingSize ?? octal(block, 124, 12);
     const dataStart = offset + BLOCK;
     if (dataStart + size > tar.length)
       throw new TarballError(
@@ -134,27 +166,52 @@ export function snapshotTarball(
     const data = tar.subarray(dataStart, dataStart + size);
     offset = dataStart + Math.ceil(size / BLOCK) * BLOCK;
 
-    if (type === "x") {
-      pendingName = paxPath(data) ?? pendingName;
+    if (type === "x" || type === "X") {
+      const records = paxRecords(data);
+      pendingName = records.get("path") ?? pendingName;
+      const paxSize = records.get("size");
+      if (paxSize !== undefined) {
+        if (!/^\d{1,15}$/.test(paxSize))
+          throw new TarballError(`invalid pax size: ${paxSize}`);
+        pendingSize = Number(paxSize);
+      }
       continue;
     }
-    if (type === "L") {
+    if (type === "L" || type === "N") {
       pendingName = data.toString("utf8").replace(/\0+$/, "");
       continue;
     }
-    if (type === "g") continue; // global pax header
+    if (type === "K") continue; // long link target: not a name
+    if (type === "g") {
+      const records = paxRecords(data);
+      if (records.has("path") || records.has("size"))
+        throw new TarballError(
+          "a global pax header sets path or size for later entries",
+        );
+      continue;
+    }
 
-    const prefix = text(block, 345, 155);
+    const prefix = isUstar(block) ? text(block, 345, 155) : "";
     const headerName = text(block, 0, 100);
     const name =
       pendingName ?? (prefix === "" ? headerName : `${prefix}/${headerName}`);
     pendingName = undefined;
+    pendingSize = undefined;
     const path = relative(name);
-    if (path === "" || type === "5") continue; // directories
 
-    if (type === "1" || type === "2") {
+    if (IGNORED_TYPES.has(type) || path === "") continue;
+    if (!FILE_TYPES.has(type) && !LINK_TYPES.has(type))
+      throw new TarballError(
+        `unknown entry type ${JSON.stringify(type)} for ${name}`,
+      );
+    if (seen.has(path))
+      throw new TarballError(
+        `${path} appears twice: npm installs the last copy`,
+      );
+    seen.add(path);
+    if (LINK_TYPES.has(type)) {
       entries.push({ path, kind: "symlink", size: 0 });
-    } else if (type === "0" || type === "\0" || type === "7") {
+    } else {
       entries.push({
         path,
         kind: size > maxFileBytes ? "oversized" : "file",
@@ -162,7 +219,6 @@ export function snapshotTarball(
       });
       if (size <= maxFileBytes) contents.set(path, { start: dataStart, size });
     }
-    // Other types (devices, FIFOs) carry no code and are ignored.
   }
 
   entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));

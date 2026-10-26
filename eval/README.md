@@ -108,3 +108,19 @@ Fetching is a shell script on purpose: croak itself never spawns processes.
 It fetches one commit, no submodules, with hooks and Git LFS filters
 disabled. On legitimate projects a block is almost certainly a false alarm,
 and every warning should be explainable. Not run in CI (needs the network).
+
+## Package corpus (false-alarm check for installs)
+
+`eval/packages.json` pins 61 popular npm packages by version: frameworks,
+minified bundles, parsers, native modules, binary installers. Each is checked
+on its own with `croak plan` (a one-entry lockfile built from the registry) at
+the clock the list was pinned on, so release ages stay the same.
+
+```bash
+pnpm corpus:packages   # needs the network; prints every block and warning
+```
+
+Transitive dependencies are not walked: popular packages are mostly someone
+else's transitive dependencies already. On these packages a block is almost
+certainly a false alarm; a release under 7 days old or an install script is
+an expected warning. Exits 1 on any block or unchecked package. Not run in CI.

@@ -6,7 +6,8 @@ import { createHash } from "node:crypto";
  */
 
 export const REGISTRY = "https://registry.npmjs.org";
-const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
+// @prisma/client's package document alone is 68 MB (2026-10).
+const DEFAULT_MAX_BYTES = 200 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 15_000;
 // Legacy packages may contain capitals (JSONStream); new ones may not.
 const NAME =
@@ -113,6 +114,8 @@ export interface EarlierVersion {
   readonly publisher: string | undefined;
   /** Which of preinstall/install/postinstall the version's manifest defines. */
   readonly installScripts: readonly string[];
+  /** Their commands, one `name: command` per line, to tell a changed script from the same one. */
+  readonly installCommands: string;
   /** Names in dependencies and optionalDependencies. */
   readonly dependencies: readonly string[];
 }
@@ -126,6 +129,7 @@ export interface VersionFacts {
   readonly publisher: string | undefined;
   /** Which of preinstall/install/postinstall this version's manifest defines. */
   readonly installScripts: readonly string[];
+  readonly installCommands: string;
   /** Names in dependencies and optionalDependencies. */
   readonly dependencies: readonly string[];
   /** Versions published before this one, newest first (at most 10). */
@@ -149,6 +153,11 @@ function versionInfo(meta: unknown): Omit<EarlierVersion, "version"> {
     installScripts: INSTALL_SCRIPTS.filter(
       (name) => typeof scripts[name] === "string",
     ),
+    installCommands: INSTALL_SCRIPTS.filter(
+      (name) => typeof scripts[name] === "string",
+    )
+      .map((name) => `${name}: ${String(scripts[name])}`)
+      .join("\n"),
     dependencies: [...new Set(deps)].sort(),
   };
 }

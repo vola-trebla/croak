@@ -1,0 +1,10 @@
+{
+  "id": "benign-handover-same-script",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: a maintainer who never published before releases 3.4.1 with the same install script as 3.4.0 (sqlite3 2026-03). A warning, not the hijack pattern (D30).",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["install/publisher"]
+  }
+}

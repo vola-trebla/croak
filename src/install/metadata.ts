@@ -100,7 +100,17 @@ export function metadataFindings(
     facts.publisher !== undefined &&
     facts.earlier.length > 0 &&
     !facts.earlier.some((v) => v.publisher === facts.publisher);
-  const hijack = entry.hasInstallScript && (provenanceDropped || newPublisher);
+  // A new publisher only matters with install-time code that is new: the same
+  // install script as before (sqlite3's prebuild-install) runs files the
+  // content checks read anyway (D30).
+  const previous = facts.earlier[0];
+  const sameScript =
+    previous !== undefined &&
+    facts.installCommands !== "" &&
+    previous.installCommands === facts.installCommands;
+  const hijack =
+    entry.hasInstallScript &&
+    (provenanceDropped || (newPublisher && !sameScript));
   const recentRelease =
     facts.ageDays !== undefined && facts.ageDays < RECENT_DAYS;
   const pattern = hijack
@@ -131,8 +141,8 @@ export function metadataFindings(
         "install/publisher",
         // Alone it is context: maintainers rotate and orgs publish from
         // service accounts (microsoft1es, GitHub Actions).
-        hijack ? "block" : "info",
-        `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}`,
+        hijack ? "block" : entry.hasInstallScript ? "warn" : "info",
+        `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}${!hijack && entry.hasInstallScript && sameScript && previous !== undefined ? `; it runs the same install script as ${previous.version}` : ""}`,
       ),
     );
   }
@@ -146,7 +156,6 @@ export function metadataFindings(
       ),
     );
   }
-  const previous = facts.earlier[0];
   if (
     previous !== undefined &&
     facts.installScripts.length > 0 &&

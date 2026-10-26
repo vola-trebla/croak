@@ -310,3 +310,15 @@ and npm removes most of them anyway. The eval stays synthetic, with the
 references showing which real attacks each synthetic case stands for.
 **Trade-off:** no measured recall on real samples until a gitignored local
 run is added; the numbers are for synthetic attacks only.
+
+## D30 — A new publisher blocks only with a new or changed install script (2026-10-26)
+
+The package corpus blocked sqlite3 6.0.1: a maintainer listed on the package,
+who had not published before, released it with the install script it had
+for years. D26's hijack pattern (install script plus a new publisher) now
+needs the install script to be new or changed compared with the previous
+version; the same script with a new publisher is a 🟡. Dropped provenance
+with an install script still blocks either way.
+**Trade-off:** a hijacker who keeps `node install.js` and edits `install.js`
+is left to the content checks; if the edit looks harmless there, it is a 🟡
+(the agent asks), not a 🔴.

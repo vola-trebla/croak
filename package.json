@@ -31,7 +31,8 @@
     "croak": "node src/cli.ts",
     "redos": "node src/tools/redos-check.ts",
     "corpus:fetch": "sh scripts/corpus-fetch.sh",
-    "corpus": "node src/tools/corpus.ts"
+    "corpus": "node src/tools/corpus.ts",
+    "corpus:packages": "node src/tools/package-corpus.ts"
   },
   "license": "MIT",
   "devDependencies": {

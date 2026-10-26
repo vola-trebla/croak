@@ -38,6 +38,7 @@ const FAKE_FS = new Set([
   "/repo/frontend/package.json",
   "/repo/server",
   "/repo/server/package.json",
+  "/repo/src",
   "/repo/node_modules/.bin/tsc",
 ]);
 

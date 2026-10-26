@@ -10,6 +10,7 @@ import {
   fileContentCache,
 } from "./install/content-cache.ts";
 import { installedLockfile } from "./install/installed.ts";
+import { suggestNames } from "./install/metadata.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   type PlanOutcome,
@@ -185,6 +186,18 @@ export async function run(
   argv: readonly string[],
   deps: CliDeps = DEFAULT_DEPS,
 ): Promise<CliResult> {
+  // Suggestions for package names npm does not have (croak-install on E404).
+  if (argv[0] === "suggest") {
+    const lines = argv.slice(1).flatMap((spec) => {
+      const names = suggestNames(decodeURIComponent(spec));
+      return names.length === 0
+        ? []
+        : [
+            `  ${spec}: did you mean ${names.map((n) => `\`${n}\``).join(", ")}?\n`,
+          ];
+    });
+    return { code: EXIT.ok, stdout: lines.join(""), stderr: "" };
+  }
   // The agent hook's two steps (scripts/croak-hook.sh); they read files only.
   if (argv[0] === "hook")
     return runHook(argv.slice(1), {

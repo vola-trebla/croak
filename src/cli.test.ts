@@ -190,3 +190,16 @@ describe("croak plan", () => {
     });
   });
 });
+
+describe("croak suggest", () => {
+  it("prints did-you-mean lines only for names it can place", async () => {
+    const result = await run(
+      ["suggest", "lodahs", "zzzzzzzzqq"],
+      deps(outcome("allow")),
+    );
+    expect(result).toMatchObject({
+      code: 0,
+      stdout: "  lodahs: did you mean `lodash`?\n",
+    });
+  });
+});

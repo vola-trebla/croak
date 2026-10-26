@@ -114,6 +114,11 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
     echo "croak-install: a requested package does not exist on npm. Check the name:" >&2
     echo "AI agents often invent plausible package names, and attackers register them." >&2
     grep -E "404|is not in this registry" "$work/npm.log" | head -n 3 >&2
+    missing=$(sed -n 's#.*404 Not Found - GET https://registry.npmjs.org/\([^ ]*\).*#\1#p' "$work/npm.log" | sort -u)
+    # shellcheck disable=SC2086 # one registry path per word, from npm's own log
+    set -f
+    [ -z "$missing" ] || croak "$work" suggest $missing >&2
+    set +f
     exit 2
   fi
   echo "croak-install: npm could not plan this install, so it was not checked:" >&2

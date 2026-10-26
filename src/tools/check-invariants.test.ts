@@ -242,3 +242,22 @@ describe("checkPackageJson", () => {
     ).toEqual(["no-install-scripts"]);
   });
 });
+
+describe("the write allowlist (D33)", () => {
+  it("lets only the content cache write, and only that rule", () => {
+    const write = "writeFileSync(p, d);";
+    expect(checkSource("src/install/content-cache.ts", write, false)).toEqual(
+      [],
+    );
+    expect(
+      checkSource("src/install/scan.ts", write, false).map((v) => v.rule),
+    ).toEqual(["no-fs-write"]);
+    expect(
+      checkSource(
+        "src/install/content-cache.ts",
+        `import { exec } from "node:child_process";`,
+        false,
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+});

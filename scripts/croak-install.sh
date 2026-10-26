@@ -42,15 +42,36 @@ case "$mode" in
 esac
 
 self=$(realpath "$0" 2>/dev/null || echo "$0")
-cli="$(dirname "$self")/../dist/cli.js"
+root=$(cd "$(dirname "$self")/.." && pwd -P)
+cli="$root/dist/cli.js"
 [ -f "$cli" ] || { echo "croak-install: $cli not found (run pnpm build in the croak repo)" >&2; exit 2; }
+
+# croak runs sandboxed (D23, D33): it may read croak itself, the plan's files
+# and this project, and write only its cache; spawning, workers and eval are
+# denied. The network is not covered by Node's permission model.
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/croak/content"
+write_cache=""
+if mkdir -p "$cache" 2>/dev/null && chmod 700 "$cache" 2>/dev/null; then
+  real_cache=$(cd "$cache" && pwd -P)
+  write_cache="--allow-fs-read=$real_cache --allow-fs-write=$real_cache"
+fi
+project=$(pwd -P)
+croak() { # croak <extra read path> <args...>
+  extra=$1
+  shift
+  # shellcheck disable=SC2086 # write_cache is two fixed flags or empty
+  node --permission --allow-fs-read="$root" --allow-fs-read="$project" --allow-fs-read="$extra" \
+    $write_cache --disallow-code-generation-from-strings "$cli" "$@"
+}
 
 if [ "$mode" = ci ]; then
   # npm ci removes node_modules and installs the lockfile as is: nothing to plan.
-  exec node "$cli" plan --before none --after package-lock.json $json
+  croak "$project" plan --before none --after package-lock.json $json
+  exit $?
 fi
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/croak-install.XXXXXX")
+# The real path: Node's permission model checks resolved paths (/var → /private/var).
+work=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/croak-install.XXXXXX")" && pwd -P)
 trap 'rm -rf "$work"' EXIT INT TERM
 before=none
 if [ "$mode" = empty ]; then
@@ -84,4 +105,4 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
   exit 3
 fi
 
-node "$cli" plan --before "$before" --after "$work/package-lock.json" $json
+croak "$work" plan --before "$before" --after "$work/package-lock.json" $json

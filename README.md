@@ -115,6 +115,9 @@ against the lockfile hash and read in memory, never extracted or run.
 hidden code, obfuscation, dangerous git config, committed `node_modules`, and
 files too large to scan.
 
+Content checks are cached by tarball hash in `~/.cache/croak` (registry facts
+are always fresh), so a repeated install is checked in under a second.
+
 Exit codes: `0` allow/warn, `1` block, `2` usage error, `3` check incomplete —
 agents should treat `3` as a block. `--json` gives a versioned report for tools.
 

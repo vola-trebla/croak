@@ -150,9 +150,23 @@ covered**: Node 24 has no network permission, so `fetch` still works inside
 the sandbox. CI runs croak sandboxed on every PR, so a change that needs any
 of the denied capabilities fails the build.
 
+`croak-install` (and so the agent hook) runs `croak plan` this way: read
+access to croak, the project and the plan's temporary directory; write
+access only to croak's cache directory (D33). The hook's own plan and decide
+steps are not sandboxed: they parse the command text and check which paths
+exist, and never touch package code.
+
+The one thing croak writes is its content verdict cache
+(`$XDG_CACHE_HOME/croak/content`, default `~/.cache/croak/content`;
+directory 0700, files 0600), from one file the invariant tripwire allows
+(`src/install/content-cache.ts`). Entries are keyed by the tarball's sha512
+and croak's own code, so changed rules never reuse an old verdict; a corrupt
+entry or one croak cannot read is a miss. Someone who can write that
+directory can forge verdicts, but they can already change your files.
+`croak plan --no-cache` skips it.
+
 Known gap: a target outside the read allowlist crashes croak with a raw
-`ERR_ACCESS_DENIED` stack instead of a clean error. To fix with the M4 hook,
-which will run croak sandboxed by default.
+`ERR_ACCESS_DENIED` stack instead of a clean error.
 
 ### 7. Verdict semantics
 

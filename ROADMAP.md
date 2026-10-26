@@ -85,7 +85,8 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 ### M3 — npm install plan + registry signals
 
-- [ ] Benign set: top-N npm packages (false-positive baseline) — moved from M1, install eval needs it
+- [x] Benign set: 61 pinned popular npm packages, `pnpm corpus:packages` (false-positive baseline: 0 blocks) — moved from M1
+- [x] Install eval: six attacks with benign twins against a fake in-memory registry
 - [ ] Malicious set: references only — names, versions, hashes and sources from `ossf/malicious-packages` and incident reports, in the docs; no tarballs in git, and the eval stays synthetic (D29) — moved from M1
 - [x] Threat model for running npm on untrusted input: isolated wrapper (temp dir with only manifest + lockfile, empty env and npm config, git disabled), offline CI proof that no script runs (D24)
 - [x] Lockfile diff from a non-executing install plan: `croak plan` + `croak-install`, every new/changed version incl. transitive; lockfile signals (install scripts, non-registry sources, missing integrity)

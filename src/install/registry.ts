@@ -132,8 +132,56 @@ export interface VersionFacts {
   readonly installCommands: string;
   /** Names in dependencies and optionalDependencies. */
   readonly dependencies: readonly string[];
-  /** Versions published before this one, newest first (at most 10). */
+  /**
+   * Settled history: versions published at least SETTLED_DAYS before this
+   * one, newest first (at most 10). Fresh versions are left out, so a decoy
+   * an attacker published a day earlier cannot become the baseline.
+   */
   readonly earlier: readonly EarlierVersion[];
+  /** The version this one follows: its semver predecessor in the settled history. */
+  readonly previous: EarlierVersion | undefined;
+}
+
+/** Days a version must have been public to count as history (D25's 7 days). */
+export const SETTLED_DAYS = 7;
+
+const SEMVER =
+  /^(\d{1,15})\.(\d{1,15})\.(\d{1,15})(?:-([0-9A-Za-z.-]{1,100}))?(?:\+.*)?$/;
+
+/** Semver order (prereleases before their release); undefined if either is not semver. */
+export function compareVersions(a: string, b: string): number | undefined {
+  const x = SEMVER.exec(a);
+  const y = SEMVER.exec(b);
+  if (x === null || y === null) return undefined;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(x[i]) - Number(y[i]);
+    if (d !== 0) return d;
+  }
+  const [px, py] = [x[4], y[4]];
+  if (px === py) return 0;
+  if (px === undefined) return 1;
+  if (py === undefined) return -1;
+  return px < py ? -1 : 1;
+}
+
+/** The highest settled version below `version`, else the newest settled one. */
+function predecessor(
+  version: string,
+  earlier: readonly EarlierVersion[],
+): EarlierVersion | undefined {
+  const below = earlier.filter(
+    (v) => (compareVersions(v.version, version) ?? 1) < 0,
+  );
+  return (
+    below.reduce<EarlierVersion | undefined>(
+      (best, v) =>
+        best === undefined ||
+        (compareVersions(v.version, best.version) ?? 0) > 0
+          ? v
+          : best,
+      undefined,
+    ) ?? earlier[0]
+  );
 }
 
 const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall"];
@@ -182,7 +230,9 @@ export function versionFacts(
     .map((v) => ({ v, at: date(time[v]) }))
     .filter(
       (e): e is { v: string; at: Date } =>
-        e.at !== undefined && published !== undefined && e.at < published,
+        e.at !== undefined &&
+        published !== undefined &&
+        published.getTime() - e.at.getTime() >= SETTLED_DAYS * DAY_MS,
     )
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, 10)
@@ -196,6 +246,7 @@ export function versionFacts(
         : Math.floor((now.getTime() - published.getTime()) / DAY_MS),
     ...versionInfo(versions[version]),
     earlier,
+    previous: predecessor(version, earlier),
   };
 }
 

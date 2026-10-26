@@ -103,7 +103,7 @@ export function metadataFindings(
   // A new publisher only matters with install-time code that is new: the same
   // install script as before (sqlite3's prebuild-install) runs files the
   // content checks read anyway (D30).
-  const previous = facts.earlier[0];
+  const { previous } = facts;
   const sameScript =
     previous !== undefined &&
     facts.installCommands !== "" &&
@@ -192,7 +192,7 @@ export function addedDependencyFindings(
   createdByName: ReadonlyMap<string, Date | undefined>,
   now: Date = new Date(),
 ): Finding[] {
-  const previous = facts.earlier[0];
+  const { previous } = facts;
   if (previous === undefined) return [];
   const added = facts.dependencies.filter(
     (name) => !previous.dependencies.includes(name),

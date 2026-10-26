@@ -26,27 +26,34 @@ const change = (name: string, extra: Partial<LockEntry> = {}): PlanChange => ({
   kind: "added",
   entry: entry(name, extra),
 });
-const facts = (extra: Partial<VersionFacts> = {}): VersionFacts => ({
-  created: new Date("2020-01-01"),
-  published: new Date("2026-01-01"),
-  ageDays: 300,
-  hasProvenance: false,
-  publisher: "alice",
-  installScripts: [],
-  installCommands: "",
-  dependencies: [],
-  earlier: [
-    {
-      version: "1.0.0",
-      hasProvenance: false,
-      publisher: "alice",
-      installScripts: [],
-      installCommands: "",
-      dependencies: [],
-    },
-  ],
-  ...extra,
-});
+const facts = (extra: Partial<VersionFacts> = {}): VersionFacts => {
+  const base: Omit<VersionFacts, "previous"> = {
+    created: new Date("2020-01-01"),
+    published: new Date("2026-01-01"),
+    ageDays: 300,
+    hasProvenance: false,
+    publisher: "alice",
+    installScripts: [],
+    installCommands: "",
+    dependencies: [],
+    earlier: [
+      {
+        version: "1.0.0",
+        hasProvenance: false,
+        publisher: "alice",
+        installScripts: [],
+        installCommands: "",
+        dependencies: [],
+      },
+    ],
+    ...extra,
+  };
+  // The newest settled version is the predecessor unless a test says otherwise.
+  return {
+    ...base,
+    previous: "previous" in extra ? extra.previous : base.earlier[0],
+  };
+};
 const rules = (findings: ReturnType<typeof metadataFindings>) =>
   findings.map((f) => `${f.severity}:${f.ruleId}`);
 
@@ -172,6 +179,36 @@ describe("metadataFindings", () => {
         metadataFindings(change("sqlite", { hasInstallScript: true }), changed),
       ),
     ).toContain("block:install/publisher");
+  });
+
+  it("compares a release with its semver predecessor (no false new-install-script for a backport line)", () => {
+    const withScript = {
+      version: "2.0.0",
+      hasProvenance: false,
+      publisher: "alice",
+      installScripts: ["postinstall"],
+      installCommands: "postinstall: node x.js",
+      dependencies: [],
+    };
+    const backport = facts({
+      installScripts: ["postinstall"],
+      installCommands: "postinstall: node x.js",
+      ageDays: 1,
+      earlier: [
+        {
+          ...withScript,
+          version: "1.9.0",
+          installScripts: [],
+          installCommands: "",
+        },
+      ],
+      previous: withScript,
+    });
+    expect(
+      rules(
+        metadataFindings(change("lib", { hasInstallScript: true }), backport),
+      ),
+    ).not.toContain("block:install/new-install-script");
   });
 
   it("blocks the hijacked-account pattern: install script plus dropped provenance or a new publisher", () => {

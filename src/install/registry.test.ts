@@ -125,7 +125,37 @@ describe("versionFacts", () => {
           dependencies: [],
         },
       ],
+      previous: expect.objectContaining({ version: "1.1.0" }),
     });
+  });
+
+  it("leaves fresh versions out of the history, so a decoy cannot become the baseline", () => {
+    const decoy = {
+      ...packument,
+      time: { ...packument.time, "1.2.0-rc.0": ago(3) },
+      versions: {
+        ...packument.versions,
+        "1.2.0-rc.0": packument.versions["1.2.0"],
+      },
+    };
+    const facts = versionFacts(decoy, "1.2.0", now);
+    expect(facts?.earlier.map((v) => v.version)).toEqual(["1.1.0", "1.0.0"]);
+    expect(facts?.previous?.version).toBe("1.1.0");
+  });
+
+  it("compares a backport with its own release line, not the newest release", () => {
+    const lines = {
+      name: "lib",
+      time: {
+        created: ago(900),
+        "1.4.0": ago(400),
+        "2.0.0": ago(200),
+        "1.4.1": ago(100),
+      },
+      versions: { "1.4.0": {}, "2.0.0": {}, "1.4.1": {} },
+    };
+    expect(versionFacts(lines, "1.4.1", now)?.previous?.version).toBe("1.4.0");
+    expect(versionFacts(lines, "2.0.0", now)?.previous?.version).toBe("1.4.0");
   });
 
   it("returns undefined for a version the registry does not know", () => {

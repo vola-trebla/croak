@@ -9,6 +9,7 @@ import {
   codeFingerprint,
   fileContentCache,
 } from "./install/content-cache.ts";
+import { installedLockfile } from "./install/installed.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   type PlanOutcome,
@@ -57,7 +58,8 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none>] [--offline | --metadata-only] [--no-cache]
+  croak plan --after <lock> [--before <lock|none> | --installed <project>]
+             [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
   croak hook plan|decide the Claude Code hook's steps (used by croak-hook)
@@ -95,6 +97,7 @@ function parse(argv: readonly string[]) {
       offline: { type: "boolean" },
       "metadata-only": { type: "boolean" },
       "no-cache": { type: "boolean" },
+      installed: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -121,6 +124,7 @@ async function runPlan(
     readonly offline?: boolean | undefined;
     readonly "metadata-only"?: boolean | undefined;
     readonly "no-cache"?: boolean | undefined;
+    readonly installed?: string | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -142,7 +146,18 @@ async function runPlan(
   const after = load(values.after);
   if (typeof after !== "string") return after;
   let before: string | undefined;
-  if (values.before !== undefined && values.before !== "none") {
+  if (values.installed !== undefined && values.before !== undefined)
+    return usageError("plan takes --before or --installed, not both");
+  if (values.installed !== undefined) {
+    // What is really in node_modules, verified folder by folder (D34).
+    before = installedLockfile(values.installed, (path) => {
+      try {
+        return read(path);
+      } catch {
+        return undefined;
+      }
+    });
+  } else if (values.before !== undefined && values.before !== "none") {
     const text = load(values.before);
     if (typeof text !== "string") return text;
     before = text;
@@ -176,6 +191,7 @@ export async function run(
       readFile: deps.readFile ?? ((path) => readFileSync(path, "utf8")),
       exists: existsSync,
       home: homedir(),
+      env: process.env,
     });
   let parsed: ReturnType<typeof parse>;
   try {

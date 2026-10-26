@@ -1,0 +1,311 @@
+{
+  "description": "Popular npm packages for false-alarm checks of croak plan. Pinned by version; `now` is the clock the list was pinned on, so release ages stay stable. Run with pnpm corpus:packages (needs the network).",
+  "now": "2026-10-26T00:00:00Z",
+  "packages": [
+    {
+      "name": "react",
+      "version": "19.3.1",
+      "why": "UI library"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.3.1",
+      "why": "large minified bundles"
+    },
+    {
+      "name": "vue",
+      "version": "3.5.44",
+      "why": "framework, prebuilt bundles"
+    },
+    {
+      "name": "svelte",
+      "version": "5.57.3",
+      "why": "compiler"
+    },
+    {
+      "name": "@angular/core",
+      "version": "22.2.3",
+      "why": "framework, large package"
+    },
+    {
+      "name": "next",
+      "version": "16.4.3",
+      "why": "platform binaries via optional deps"
+    },
+    {
+      "name": "express",
+      "version": "5.3.0",
+      "why": "classic server"
+    },
+    {
+      "name": "fastify",
+      "version": "5.12.7",
+      "why": "server"
+    },
+    {
+      "name": "koa",
+      "version": "3.2.1",
+      "why": "server"
+    },
+    {
+      "name": "hono",
+      "version": "4.13.14",
+      "why": "TypeScript framework"
+    },
+    {
+      "name": "axios",
+      "version": "1.20.0",
+      "why": "HTTP client, minified bundles"
+    },
+    {
+      "name": "node-fetch",
+      "version": "3.3.2",
+      "why": "HTTP client"
+    },
+    {
+      "name": "undici",
+      "version": "8.12.3",
+      "why": "HTTP client, wasm"
+    },
+    {
+      "name": "ws",
+      "version": "8.22.0",
+      "why": "WebSocket"
+    },
+    {
+      "name": "socket.io",
+      "version": "4.8.4",
+      "why": "real-time, many deps"
+    },
+    {
+      "name": "lodash",
+      "version": "4.18.1",
+      "why": "minified bundle, Function(\"return this\")"
+    },
+    {
+      "name": "underscore",
+      "version": "1.13.8",
+      "why": "old-style bundle"
+    },
+    {
+      "name": "jquery",
+      "version": "4.0.0",
+      "why": "browser bundle"
+    },
+    {
+      "name": "moment",
+      "version": "2.31.0",
+      "why": "locales"
+    },
+    {
+      "name": "dayjs",
+      "version": "1.11.23",
+      "why": "small library"
+    },
+    {
+      "name": "date-fns",
+      "version": "4.4.0",
+      "why": "many files"
+    },
+    {
+      "name": "chalk",
+      "version": "6.0.1",
+      "why": "ESM, tiny"
+    },
+    {
+      "name": "commander",
+      "version": "15.0.0",
+      "why": "CLI"
+    },
+    {
+      "name": "yargs",
+      "version": "18.2.0",
+      "why": "CLI, locales"
+    },
+    {
+      "name": "debug",
+      "version": "4.4.3",
+      "why": "tiny"
+    },
+    {
+      "name": "uuid",
+      "version": "14.0.3",
+      "why": "crypto"
+    },
+    {
+      "name": "zod",
+      "version": "4.6.7",
+      "why": "TypeScript library"
+    },
+    {
+      "name": "ajv",
+      "version": "8.20.0",
+      "why": "code generation (new Function)"
+    },
+    {
+      "name": "typescript",
+      "version": "7.0.2",
+      "why": "compiler, multi-MB bundles"
+    },
+    {
+      "name": "@babel/core",
+      "version": "8.0.9",
+      "why": "compiler"
+    },
+    {
+      "name": "@babel/parser",
+      "version": "8.0.8",
+      "why": "parser, Unicode tables"
+    },
+    {
+      "name": "acorn",
+      "version": "8.19.0",
+      "why": "parser, Unicode tables"
+    },
+    {
+      "name": "esbuild",
+      "version": "0.28.2",
+      "why": "postinstall installs a binary"
+    },
+    {
+      "name": "@swc/core",
+      "version": "1.16.20",
+      "why": "native binaries via optional deps"
+    },
+    {
+      "name": "vite",
+      "version": "8.3.5",
+      "why": "bundler"
+    },
+    {
+      "name": "webpack",
+      "version": "5.112.2",
+      "why": "bundler, embedded wasm"
+    },
+    {
+      "name": "rollup",
+      "version": "4.65.1",
+      "why": "bundler, native optional deps"
+    },
+    {
+      "name": "terser",
+      "version": "5.51.2",
+      "why": "minifier"
+    },
+    {
+      "name": "prettier",
+      "version": "3.9.10",
+      "why": "formatter, large bundles"
+    },
+    {
+      "name": "eslint",
+      "version": "10.13.0",
+      "why": "linter"
+    },
+    {
+      "name": "jest",
+      "version": "30.5.2",
+      "why": "test runner"
+    },
+    {
+      "name": "vitest",
+      "version": "5.0.5",
+      "why": "test runner"
+    },
+    {
+      "name": "mocha",
+      "version": "12.0.3",
+      "why": "test runner"
+    },
+    {
+      "name": "playwright",
+      "version": "1.64.1",
+      "why": "browser download tool"
+    },
+    {
+      "name": "puppeteer",
+      "version": "25.16.0",
+      "why": "postinstall downloads a browser"
+    },
+    {
+      "name": "prisma",
+      "version": "8.0.0-rc.27",
+      "why": "CLI with engines"
+    },
+    {
+      "name": "@prisma/client",
+      "version": "7.10.1",
+      "why": "postinstall generates code"
+    },
+    {
+      "name": "sharp",
+      "version": "0.35.5",
+      "why": "native image library"
+    },
+    {
+      "name": "bcrypt",
+      "version": "6.0.0",
+      "why": "native build (node-gyp)"
+    },
+    {
+      "name": "sqlite3",
+      "version": "6.0.1",
+      "why": "native, prebuilt binaries"
+    },
+    {
+      "name": "core-js",
+      "version": "3.51.0",
+      "why": "postinstall banner"
+    },
+    {
+      "name": "husky",
+      "version": "9.1.7",
+      "why": "git hooks"
+    },
+    {
+      "name": "nodemon",
+      "version": "3.1.14",
+      "why": "postinstall message"
+    },
+    {
+      "name": "electron",
+      "version": "45.0.0",
+      "why": "postinstall downloads a binary"
+    },
+    {
+      "name": "protobufjs",
+      "version": "8.8.1",
+      "why": "code generation"
+    },
+    {
+      "name": "three",
+      "version": "0.186.1",
+      "why": "large 3D library"
+    },
+    {
+      "name": "rxjs",
+      "version": "7.8.2",
+      "why": "many files"
+    },
+    {
+      "name": "tailwindcss",
+      "version": "4.3.3",
+      "why": "CSS tool"
+    },
+    {
+      "name": "postcss",
+      "version": "8.5.32",
+      "why": "CSS tool"
+    },
+    {
+      "name": "mongoose",
+      "version": "9.11.4",
+      "why": "database"
+    },
+    {
+      "name": "pg",
+      "version": "8.23.1",
+      "why": "database, optional native"
+    }
+  ]
+}

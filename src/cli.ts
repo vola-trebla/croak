@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { parseArgs } from "node:util";
+import { runHook } from "./hook/hook.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   type PlanOutcome,
@@ -50,6 +52,7 @@ Usage:
   croak plan --after <lock> [--before <lock|none>] [--offline | --metadata-only]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
+  croak hook plan|decide the Claude Code hook's steps (used by croak-hook)
   croak --version
   croak --help
 
@@ -154,6 +157,13 @@ export async function run(
   argv: readonly string[],
   deps: CliDeps = DEFAULT_DEPS,
 ): Promise<CliResult> {
+  // The agent hook's two steps (scripts/croak-hook.sh); they read files only.
+  if (argv[0] === "hook")
+    return runHook(argv.slice(1), {
+      readFile: deps.readFile ?? ((path) => readFileSync(path, "utf8")),
+      exists: existsSync,
+      home: homedir(),
+    });
   let parsed: ReturnType<typeof parse>;
   try {
     parsed = parse(argv);

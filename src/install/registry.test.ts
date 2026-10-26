@@ -96,6 +96,33 @@ describe("fetchPackument", () => {
   });
 });
 
+describe("reading a response that breaks off", () => {
+  const broken = (): typeof fetch => async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"name":'));
+          controller.error(new TypeError("terminated"));
+        },
+      }),
+    );
+
+  it("turns a reset after the headers into a RegistryError", async () => {
+    await expect(fetchPackument("lib", { fetch: broken() })).rejects.toThrow(
+      RegistryError,
+    );
+    await expect(
+      fetchTarball(
+        "https://registry.npmjs.org/lib/-/lib-1.0.0.tgz",
+        undefined,
+        {
+          fetch: broken(),
+        },
+      ),
+    ).rejects.toThrow(/reading the response/);
+  });
+});
+
 describe("versionFacts", () => {
   it("reads publish time, provenance, publisher, and history before the version", () => {
     expect(versionFacts(packument, "1.2.0", now)).toEqual({

@@ -47,7 +47,16 @@ async function readCappedBytes(
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    let chunk: Awaited<ReturnType<typeof reader.read>>;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      // A timeout or a reset after the headers: the check is incomplete, not a crash.
+      throw new RegistryError(
+        `reading the response: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const { done, value } = chunk;
     if (done) break;
     total += value.byteLength;
     if (total > maxBytes) {

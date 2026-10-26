@@ -120,6 +120,13 @@ lockfile's integrity hash). `--metadata-only` skips the tarballs; `--offline`
 skips both. A lockfile entry that points anywhere else is reported as
 `install/source`, never silently skipped.
 
+The agent hook (`scripts/croak-hook.sh`, D32) is a second small shell script
+in the same role: it runs `croak hook plan` (read the command, find the
+installs), runs `croak-install` for each, and runs `croak hook decide`. croak
+still only reads files. Any error the script sees is exit 2 (deny); for
+crashes and timeouts it cannot see, the hook must be registered with
+`"onFailure": "block"`, because Claude Code otherwise lets the command through.
+
 This is isolation, not a sandbox: npm still talks to the network and parses
 untrusted registry metadata, and `--ignore-scripts` is not treated as one. A
 lockfile diff is not the whole story either: croak checks every new or

@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { runHook } from "./hook/hook.ts";
+import {
+  type ContentCache,
+  codeFingerprint,
+  fileContentCache,
+} from "./install/content-cache.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   type PlanOutcome,
@@ -39,6 +45,8 @@ export interface CliDeps {
   readonly readFile?: (path: string) => string;
   /** Registry access for `croak plan`; defaults to the global fetch. */
   readonly fetch?: typeof globalThis.fetch;
+  /** Content findings cache for `croak plan` (none in tests). */
+  readonly cache?: ContentCache;
 }
 
 const DEFAULT_DEPS: CliDeps = {
@@ -49,7 +57,7 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none>] [--offline | --metadata-only]
+  croak plan --after <lock> [--before <lock|none>] [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
   croak hook plan|decide the Claude Code hook's steps (used by croak-hook)
@@ -86,6 +94,7 @@ function parse(argv: readonly string[]) {
       after: { type: "string" },
       offline: { type: "boolean" },
       "metadata-only": { type: "boolean" },
+      "no-cache": { type: "boolean" },
     },
     allowPositionals: true,
     strict: true,
@@ -111,6 +120,7 @@ async function runPlan(
     readonly plain?: boolean | undefined;
     readonly offline?: boolean | undefined;
     readonly "metadata-only"?: boolean | undefined;
+    readonly "no-cache"?: boolean | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -143,6 +153,9 @@ async function runPlan(
       ? planInstall(before, after)
       : await planInstallOnline(before, after, {
           ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+          ...(deps.cache === undefined || values["no-cache"] === true
+            ? {}
+            : { cache: deps.cache }),
           content: values["metadata-only"] !== true,
         });
   const stdout =
@@ -202,9 +215,27 @@ export async function run(
 
 // Only touch the process when executed directly, not when imported by tests.
 if (import.meta.main) {
+  // Built on first use: fingerprinting croak's code costs a directory read.
+  let cache: ContentCache | undefined;
+  const contentCache = (): ContentCache => {
+    cache ??= fileContentCache(
+      join(
+        process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"),
+        "croak",
+        "content",
+      ),
+      codeFingerprint(import.meta.dirname),
+    );
+    return cache;
+  };
   const result = await run(process.argv.slice(2), {
     scan: (root) => scanRepoAt(root),
     emoji: process.stdout.isTTY === true,
+    cache: {
+      get: (integrity, label) => contentCache().get(integrity, label),
+      set: (integrity, label, findings) =>
+        contentCache().set(integrity, label, findings),
+    },
   });
   process.stdout.write(result.stdout);
   process.stderr.write(result.stderr);

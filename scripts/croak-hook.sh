@@ -15,6 +15,10 @@ here=$(dirname "$self")
 cli="$here/../dist/cli.js"
 install="$here/croak-install.sh"
 [ -f "$cli" ] || deny "$cli not found (run pnpm build in the croak repo)"
+# Below Node 24.2 the CLI's entry point does not run and exits 0 with no
+# output: every step would "succeed" silently, and every install would pass.
+node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 24 || (a === 24 && b >= 2) ? 0 : 1)' ||
+  deny "croak needs Node 24.2 or later (found $(node --version 2>/dev/null || echo none))"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/croak-hook.XXXXXX") || deny "no temporary directory"
 trap 'rm -rf "$work"' EXIT INT TERM
@@ -22,6 +26,8 @@ cat >"$work/input.json" || deny "could not read the hook input"
 
 node "$cli" hook plan "$work/input.json" >"$work/plan" 2>"$work/plan.err" ||
   deny "$(head -c 400 "$work/plan.err")"
+# A plan always starts with its plan line; anything else means croak did not run.
+head -n 1 "$work/plan" | grep -q "^plan$(printf '\t')" || deny "croak produced no plan"
 
 tab=$(printf '\t')
 while IFS= read -r line; do

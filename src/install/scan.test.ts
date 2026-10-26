@@ -101,6 +101,34 @@ describe("planInstall", () => {
     ).toContain("1.0.0 → 1.1.0");
   });
 
+  it("warns when a registry tarball URL belongs to another package (whole-project review)", () => {
+    const outcome = planInstall(
+      undefined,
+      lock({
+        "node_modules/evil": {
+          name: "lodash",
+          version: "4.17.21",
+          resolved: "https://registry.npmjs.org/evil/-/evil-1.0.0.tgz",
+          integrity: "sha512-x",
+        },
+        "node_modules/string-width-cjs": {
+          name: "string-width",
+          version: "4.2.3",
+          resolved:
+            "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
+          integrity: "sha512-y",
+        },
+      }),
+    );
+    expect(outcome.status === "complete" && outcome.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "install/source",
+        file: "lodash@4.17.21",
+        message: expect.stringContaining("another package"),
+      }),
+    ]);
+  });
+
   it("is incomplete, never clean, when a lockfile cannot be read", () => {
     expect(planInstall(before, "{ nope")).toMatchObject({
       status: "incomplete",

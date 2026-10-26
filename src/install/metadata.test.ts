@@ -33,6 +33,7 @@ const facts = (extra: Partial<VersionFacts> = {}): VersionFacts => ({
   hasProvenance: false,
   publisher: "alice",
   installScripts: [],
+  installCommands: "",
   dependencies: [],
   earlier: [
     {
@@ -40,6 +41,7 @@ const facts = (extra: Partial<VersionFacts> = {}): VersionFacts => ({
       hasProvenance: false,
       publisher: "alice",
       installScripts: [],
+      installCommands: "",
       dependencies: [],
     },
   ],
@@ -95,6 +97,7 @@ describe("metadataFindings", () => {
           hasProvenance: true,
           publisher: "alice",
           installScripts: [],
+          installCommands: "",
           dependencies: [],
         },
       ],
@@ -122,6 +125,55 @@ describe("metadataFindings", () => {
     ).toEqual([]);
   });
 
+  it("warns, not blocks, on a new publisher whose release keeps the same install script (sqlite3)", () => {
+    const same = {
+      installScripts: ["install"],
+      installCommands: "install: prebuild-install -r napi || node-gyp rebuild",
+    };
+    const handover = facts({
+      ...same,
+      publisher: "jonatan",
+      earlier: [
+        {
+          version: "5.1.7",
+          hasProvenance: false,
+          publisher: "daniel",
+          dependencies: [],
+          ...same,
+        },
+      ],
+    });
+    const findings = metadataFindings(
+      change("sqlite", { hasInstallScript: true }),
+      handover,
+    );
+    expect(rules(findings)).toEqual(["warn:install/publisher"]);
+    expect(findings[0]?.message).toContain("same install script as 5.1.7");
+  });
+
+  it("blocks a new publisher whose release changes the install script", () => {
+    const changed = facts({
+      installScripts: ["install"],
+      installCommands: "install: node collect.js",
+      publisher: "mallory",
+      earlier: [
+        {
+          version: "5.1.7",
+          hasProvenance: false,
+          publisher: "daniel",
+          installScripts: ["install"],
+          installCommands: "install: node-gyp rebuild",
+          dependencies: [],
+        },
+      ],
+    });
+    expect(
+      rules(
+        metadataFindings(change("sqlite", { hasInstallScript: true }), changed),
+      ),
+    ).toContain("block:install/publisher");
+  });
+
   it("blocks the hijacked-account pattern: install script plus dropped provenance or a new publisher", () => {
     const hijack = facts({
       publisher: "mallory",
@@ -131,6 +183,7 @@ describe("metadataFindings", () => {
           hasProvenance: true,
           publisher: "alice",
           installScripts: [],
+          installCommands: "",
           dependencies: [],
         },
       ],
@@ -220,6 +273,7 @@ describe("version-to-version changes", () => {
           hasProvenance: true,
           publisher: "x",
           installScripts: [],
+          installCommands: "",
           dependencies: ["follow-redirects"],
         },
       ],

@@ -104,6 +104,7 @@ describe("versionFacts", () => {
       hasProvenance: false,
       publisher: "mallory",
       installScripts: ["postinstall"],
+      installCommands: "postinstall: node x.js",
       dependencies: ["plain-crypto-js"],
       earlier: [
         {
@@ -111,6 +112,7 @@ describe("versionFacts", () => {
           hasProvenance: true,
           publisher: "alice",
           installScripts: [],
+          installCommands: "",
           dependencies: [],
         },
         {
@@ -118,6 +120,7 @@ describe("versionFacts", () => {
           hasProvenance: false,
           publisher: "alice",
           installScripts: [],
+          installCommands: "",
           dependencies: [],
         },
       ],

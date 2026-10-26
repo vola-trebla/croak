@@ -7,9 +7,10 @@
 first: when an agent reaches for `npm install`, croak stops it, explains why,
 and lets the agent fix its own mistake.
 
-> 🚧 **Status: early development.** Nothing here is ready to protect anyone yet.
-> This README describes where we're going; the [roadmap](ROADMAP.md) shows
-> what's actually done.
+> 🚧 **Status: early development.** `croak repo` and the npm install check
+> (`croak-install`) work end to end; the agent hook, the LLM layer and an npm
+> release are not there yet. Use it, but don't rely on it as your only line of
+> defense. The [roadmap](ROADMAP.md) shows what's done.
 
 ---
 
@@ -38,40 +39,56 @@ Think of `npm install` as a courier whose parcels **unpack themselves**.
 croak is the customs officer at your door. It x-rays the contents as plain
 data and never lets anything inside run (how: [security model](docs/security-model.md)):
 
-|     | Check                                     | Catches                                                                                             |
-| --- | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 🔍  | **Does the sender exist?**                | hallucinated and typosquatted packages                                                              |
-| ⚖️  | **What changed since the last delivery?** | a new dependency or install script that appeared in a patch release                                 |
-| 🩻  | **Will anything run on unpack?**          | `postinstall`, `binding.gyp`, prebuilt binaries, IDE autorun tasks                                  |
-| 🕵️  | **Is something hidden?**                  | obfuscated code, payloads in build configs                                                          |
-| 🔏  | **Is the seal intact?**                   | missing or dropped [provenance](https://docs.npmjs.com/generating-provenance-statements) signatures |
-| 🤖  | **Ask an expert (optional)**              | an LLM reviews the _diff_ between versions — and can only raise the alarm, never lower it           |
+|     | Check                                     | Catches                                                                                                                       |
+| --- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 🔍  | **Does the sender exist?**                | hallucinated and typosquatted packages                                                                                        |
+| ⚖️  | **What changed since the last delivery?** | a new dependency or install script that appeared in a patch release                                                           |
+| 🩻  | **Will anything run on unpack?**          | `postinstall`, `binding.gyp`, prebuilt binaries, IDE autorun tasks                                                            |
+| 🕵️  | **Is something hidden?**                  | obfuscated code, payloads in build configs                                                                                    |
+| 🔏  | **Is the seal intact?**                   | a tarball that doesn't match the lockfile hash, dropped [provenance](https://docs.npmjs.com/generating-provenance-statements) |
+| 🤖  | **Ask an expert (optional)**              | an LLM reviews the _diff_ between versions — and can only raise the alarm, never lower it                                     |
 
 Then it gives a verdict — 🟢 **allow** (nothing suspicious found, not a
 guarantee), 🟡 **warn** (needs your attention, never "safe"), or 🔴 **block** — with
-reasons a human _and_ an agent can act on (planned output):
+reasons a human _and_ an agent can act on:
 
 ```
-🔴 blocked: react-codeshift does not exist on npm
-   (this name is a known AI hallucination).
-   Did you mean jscodeshift?
+$ croak-install jscodeshift-react-transform
+croak-install: a requested package does not exist on npm. Check the name:
+AI agents often invent plausible package names, and attackers register them.
+
+$ croak-install esbuild
+croak plan - WARN
+  WARN   esbuild@0.28.2/package.json:10  repo/lifecycle-script
+           postinstall runs `node install.js` on install: network (install.js:93), process (install.js:95), decode (install.js:166)
+  INFO   package-lock.json  install/other-platform
+           25 package(s) built for other platforms not checked: npm will not install them on darwin-arm64
 ```
 
 ### Two modes
 
 ```bash
-croak-install <pkg>   # 🧪 early: plan an npm install, check it before anything executes
-croak repo .          # 🧪 early: scan an unfamiliar repo before you install or open it
+croak-install <pkg>   # plan an npm install, check it before anything executes
+croak repo .          # scan an unfamiliar repo before you install or open it
 ```
 
-Plus a **Claude Code hook** (🚧 planned) that puts croak in front of every
+Plus a **Claude Code hook** (🚧 planned, M4) that puts croak in front of every
 install command an agent runs.
 
-`croak repo` runs end to end with seven detectors: install scripts, VS Code
-autorun tasks, hidden code, obfuscation, dangerous git config, committed
-`node_modules`, and files too large to scan. Exit codes: `0` allow/warn,
-`1` block, `2` usage error, `3` scan incomplete — agents should treat `3` as a
-block. `--json` gives a versioned report for tools.
+**`croak-install`** has npm resolve the install with `--package-lock-only
+--ignore-scripts` in an isolated temp directory (your project's lockfile is
+not touched), then `croak plan` checks every new or changed version,
+transitive ones included: the lockfile (install scripts, sources, integrity),
+the registry (release age, provenance, publisher, look-alike names, brand-new
+packages and dependencies), and the package contents, downloaded and verified
+against the lockfile hash and read in memory, never extracted or run.
+
+**`croak repo`** runs seven detectors: install scripts, VS Code autorun tasks,
+hidden code, obfuscation, dangerous git config, committed `node_modules`, and
+files too large to scan.
+
+Exit codes: `0` allow/warn, `1` block, `2` usage error, `3` check incomplete —
+agents should treat `3` as a block. `--json` gives a versioned report for tools.
 
 ## 🧠 Design principles
 
@@ -93,7 +110,10 @@ Being honest about limits matters more than marketing:
 - Code that's clean at install and turns malicious later, at runtime
 - Install scripts that pull the payload in through `require` from the file they
   run: croak reads the script and the files it runs directly, not deeper (yet)
-- Long-game maintainer takeovers (think xz-utils)
+- Payloads in library code that run only when your app calls it, not at install
+  (chalk and debug, 2025): only the content checks can see those
+- Long-game maintainer takeovers (think xz-utils), or a decoy release published
+  more than a week before the real attack
 - A compromised registry or signing infrastructure
 - Malware that's already on your machine
 - Payloads that only wake up in one specific environment
@@ -102,60 +122,29 @@ croak is a gate, not an antivirus.
 
 ## 📊 The eval
 
-croak is measured against an exam: synthetic malicious repos (with inert
-payloads) and ordinary ones that must _not_ trigger alarms.
+croak is measured against an exam: synthetic malicious repos and installs
+(with inert payloads, served from a fake registry for installs) and ordinary
+ones that must _not_ trigger alarms. Each install case maps to a real attack
+(axios 2026, Shai-Hulud 2025, ua-parser-js 2021…), checked against OSV.
 
 ```bash
 pnpm eval
 ```
 
 ```
-🐸 croak eval — 32 cases (16 malicious, 16 benign)
-
-  ✅ benign-gitmodules            expected 🟢 allow  got 🟢 allow
-  ✅ benign-husky-prepare         expected 🟢 allow  got 🟢 allow
-  ✅ benign-icon-font-map         expected 🟢 allow  got 🟢 allow
-  ✅ benign-installed-project     expected 🟡 warn   got 🟡 warn
-  ✅ benign-large-lockfile        expected 🟢 allow  got 🟢 allow
-  ✅ benign-long-line-config      expected 🟢 allow  got 🟢 allow
-  ✅ benign-minified-vendor       expected 🟢 allow  got 🟢 allow
-  ✅ benign-native-module         expected 🟡 warn   got 🟡 warn
-  ✅ benign-playwright-install    expected 🟢 allow  got 🟢 allow
-  ✅ benign-postinstall-copy-env  expected 🟡 warn   got 🟡 warn
-  ✅ benign-prisma-postinstall    expected 🟡 warn   got 🟡 warn
-  ✅ benign-rtl-locale            expected 🟢 allow  got 🟢 allow
-  ✅ benign-vite-app              expected 🟢 allow  got 🟢 allow
-  ✅ benign-vscode-build-task     expected 🟢 allow  got 🟢 allow
-  ✅ benign-vscode-jsonc          expected 🟢 allow  got 🟢 allow
-  ✅ benign-vscode-npm-watch      expected 🟡 warn   got 🟡 warn
-  ✅ d-binding-gyp-implicit       expected 🟡 warn   got 🟡 warn
-  ✅ d-committed-node-modules     expected 🟡 warn   got 🟡 warn
-  ✅ d-config-obfuscated          expected 🔴 block  got 🔴 block
-  ✅ d-known-tool-chained         expected 🔴 block  got 🔴 block
-  ✅ d-obfuscated-string-array    expected 🔴 block  got 🔴 block
-  ✅ d-oversized-config           expected 🟡 warn   got 🟡 warn
-  ✅ d-postinstall                expected 🟡 warn   got 🟡 warn
-  ✅ d-postinstall-curl-pipe      expected 🔴 block  got 🔴 block
-  ✅ d-postinstall-exfil          expected 🔴 block  got 🔴 block
-  ✅ d-postinstall-inline-decode  expected 🔴 block  got 🔴 block
-  ✅ d-tailwind-hidden-code       expected 🔴 block  got 🔴 block
-  ✅ d-trojan-source              expected 🟡 warn   got 🟡 warn
-  ✅ d-vertical-hidden            expected 🔴 block  got 🔴 block
-  ✅ d-vscode-autorun             expected 🔴 block  got 🔴 block
-  ✅ d-vscode-hidden-nested       expected 🔴 block  got 🔴 block
-  ✅ d-vscode-npm-autorun         expected 🔴 block  got 🔴 block
-
-  block recall  11/16   69%  ██████████████░░░░░░
-  flag recall   16/16  100%  ████████████████████
-  false alarms   0/16    0%  ░░░░░░░░░░░░░░░░░░░░
-  rule recall   23/23  100%  ████████████████████
-  time          30 ms
+🐸 croak eval — 46 cases (23 malicious, 23 benign)
+  …
+  block recall  18/23   78%  ████████████████░░░░
+  flag recall   23/23  100%  ████████████████████
+  false alarms   0/23    0%  ░░░░░░░░░░░░░░░░░░░░
+  rule recall   33/33  100%  ████████████████████
 ```
 
-Every malicious case is flagged with no false alarms on the benign ones, and a
-separate run on 13 pinned real-world repositories (`pnpm corpus`) checks the
-noise level on code we did not write. Every ❌ that turns into ✅ is progress you can see,
-and a case that ever passed is not allowed to fail again. Format and metrics:
+Synthetic cases are written by us, so two more runs check the noise on code we
+did not write: 13 pinned real-world repositories (`pnpm corpus`) and 61 pinned
+popular npm packages (`pnpm corpus:packages`: 0 blocks; the warnings are
+fresh releases and real install scripts). A case that ever passed is not
+allowed to fail again. Format, metrics and the real attacks behind each case:
 [eval/README.md](eval/README.md).
 
 ## 🗺️ Roadmap
@@ -164,8 +153,8 @@ and a case that ever passed is not allowed to fail again. Format and metrics:
 | --- | --------------------------------------------------------------------------- |
 | ✅  | **M0** — foundation: TypeScript, tests, CI, supply-chain-hardened workflows |
 | ✅  | **M1** — eval first: case format, runner, metrics, regression guard         |
-| ⏳  | **M2** — `croak repo`: autorun configs, hidden code, obfuscation            |
-| ⏳  | **M3** — npm install plans + registry signals                               |
+| ✅  | **M2** — `croak repo`: autorun configs, hidden code, obfuscation            |
+| ✅  | **M3** — npm install plans, registry and package-content signals            |
 | ⏳  | **M4** — Claude Code hook, agent-friendly verdicts                          |
 | ⏳  | **M5** — LLM triage of version diffs (Haiku by default)                     |
 | ⏳  | **M6** — pnpm                                                               |
@@ -184,6 +173,8 @@ pnpm install
 git config core.hooksPath .githooks   # pre-commit + pre-push checks
 pnpm check                            # lint + typecheck + invariants + tests
 pnpm eval                             # run the eval
+pnpm corpus:fetch && pnpm corpus      # false-alarm check on real repos (network)
+pnpm corpus:packages                  # false-alarm check on real npm packages (network)
 pnpm croak repo <path>                # run croak from source
 ```
 

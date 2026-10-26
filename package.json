@@ -6,11 +6,13 @@
   "type": "module",
   "bin": {
     "croak": "./dist/cli.js",
-    "croak-install": "./scripts/croak-install.sh"
+    "croak-install": "./scripts/croak-install.sh",
+    "croak-hook": "scripts/croak-hook.sh"
   },
   "files": [
     "dist",
-    "scripts/croak-install.sh"
+    "scripts/croak-install.sh",
+    "scripts/croak-hook.sh"
   ],
   "engines": {
     "node": ">=24.2.0"

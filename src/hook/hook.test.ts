@@ -50,8 +50,13 @@ describe("hookPlan", () => {
     expect(hookPlan(event("npm test"), project).checks).toEqual([]);
   });
 
-  it("skips npx of a bin the project already has, at any parent level", () => {
-    const deps = fs(["/repo", "/repo/web", "/repo/node_modules/.bin/vitest"]);
+  it("skips npx of a bin npm's prefix already has", () => {
+    const deps = fs([
+      "/repo",
+      "/repo/package.json",
+      "/repo/web",
+      "/repo/node_modules/.bin/vitest",
+    ]);
     expect(hookPlan(event("npx vitest run", "/repo/web"), deps).checks).toEqual(
       [],
     );
@@ -85,6 +90,90 @@ describe("hookPlan", () => {
     expect(planLines(hookPlan(event("npm i zod chalk"), project))).toBe(
       "check\t1\tproject\t/repo\tzod\tchalk\n",
     );
+  });
+});
+
+describe("hookPlan: where npm really installs (M4 review)", () => {
+  const files = (extra: Record<string, string> = {}) =>
+    fs(["/repo", "/repo/src", "/repo/packages/a"], {
+      "/repo/package.json": '{"name":"repo"}',
+      ...extra,
+    });
+
+  it("checks npm's prefix, not the directory the agent is in", () => {
+    expect(modes("cd src && npm install", files())).toEqual([
+      "project /repo []",
+    ]);
+    expect(modes("cd src && npm install evil", files())).toEqual([
+      "project /repo [evil]",
+    ]);
+  });
+
+  it("checks npm update as an update", () => {
+    expect(modes("npm update debug", files())).toEqual([
+      "update /repo [debug]",
+    ]);
+  });
+
+  it.each([
+    [
+      "workspaces",
+      {
+        "/repo/package.json": '{"name":"repo","workspaces":["packages/*"]}',
+        "/repo/packages/a/package.json": '{"name":"a"}',
+      },
+      "cd packages/a && npm install",
+      "npm workspaces",
+    ],
+    [
+      "a shrinkwrap",
+      { "/repo/npm-shrinkwrap.json": "{}" },
+      "npm install",
+      "npm-shrinkwrap.json",
+    ],
+    [
+      "a project .npmrc registry",
+      { "/repo/.npmrc": "registry=https://attacker.invalid/" },
+      "npm i evil",
+      "registry croak does not check",
+    ],
+    [
+      "a scoped registry in ~/.npmrc",
+      { "/home/u/.npmrc": "@corp:registry=https://npm.corp.invalid/" },
+      "npx cowsay",
+      "registry croak does not check",
+    ],
+  ])("denies an install with %s (D34)", (_name, extra, command, reason) => {
+    const plan = hookPlan(event(command), files(extra));
+    expect(plan.checks).toEqual([]);
+    expect(plan.intents).toEqual([
+      expect.objectContaining({
+        kind: "unchecked",
+        reason: expect.stringContaining(reason),
+      }),
+    ]);
+  });
+
+  it("accepts the public registry and npm's own userconfig variable", () => {
+    const deps = {
+      ...files({
+        "/home/u/.npmrc":
+          "registry=https://registry.npmjs.org/\n//registry.npmjs.org/:_authToken=x",
+        "/cfg/npmrc": "fund=false",
+      }),
+      env: {
+        npm_config_userconfig: "/cfg/npmrc",
+        npm_config_registry: "https://registry.npmjs.org/",
+      },
+    };
+    expect(modes("npm i zod", deps)).toEqual(["project /repo [zod]"]);
+    const foreign = {
+      ...deps,
+      env: { NPM_CONFIG_REGISTRY: "https://attacker.invalid/" },
+    };
+    expect(hookPlan(event("npm i zod"), foreign).intents[0]).toMatchObject({
+      kind: "unchecked",
+    });
   });
 });
 

@@ -68,7 +68,7 @@ croak plan - WARN
 ### Two modes
 
 ```bash
-croak-install <pkg>   # plan an npm install, check it before anything executes
+croak-install [pkg]   # plan an npm install, check it before anything executes
 croak repo .          # scan an unfamiliar repo before you install or open it
 ```
 
@@ -77,8 +77,8 @@ install command an agent runs.
 
 **`croak-install`** has npm resolve the install with `--package-lock-only
 --ignore-scripts` in an isolated temp directory (your project's lockfile is
-not touched), then `croak plan` checks every new or changed version,
-transitive ones included: the lockfile (install scripts, sources, integrity),
+not touched), then `croak plan` checks every version that is not installed
+yet, transitive ones included (on a fresh clone, the whole lockfile): the lockfile (install scripts, sources, integrity),
 the registry (release age, provenance, publisher, look-alike names, brand-new
 packages and dependencies), and the package contents, downloaded and verified
 against the lockfile hash and read in memory, never extracted or run.

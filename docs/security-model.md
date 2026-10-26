@@ -96,13 +96,20 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
   auth tokens or cloud credentials are visible to it;
 - uses the public registry only, and sets `git` to `/usr/bin/false`, so git
   dependencies fail the plan instead of being cloned (fail closed);
-- runs `npm install --package-lock-only --ignore-scripts`.
+- runs `npm install --package-lock-only --ignore-scripts`;
+- compares the plan with what is installed now (`node_modules/.package-lock.json`,
+  which npm maintains), not with the project's lockfile: on a fresh clone npm
+  installs, and runs the scripts of, everything the lockfile lists, so all of
+  it is checked. `--ci` checks the lockfile as written (npm ci reinstalls
+  every package); `--empty` plans into an empty project (npx, `npm install -g`).
 
 `scripts/test-croak-install.sh` (in CI) proves the path runs no lifecycle
 script: a bait package whose `preinstall`/`postinstall`/`prepare` would create
 a marker file is planned from a local tarball, and the test fails if the
 marker exists or the project changed. A plain `npm install` of the same bait
-does run it.
+does run it. The same test covers a fresh clone, `--ci`, `--empty` and `--json`.
+The bait is packed with `tar`: npm 10's `npm pack` runs `prepare` even with
+`--ignore-scripts`.
 
 `croak plan` itself talks to one host, registry.npmjs.org over https, for
 two things: each new package's metadata (names validated against npm's rules

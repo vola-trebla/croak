@@ -247,9 +247,9 @@ describe("hookDecide", () => {
       result(
         2,
         "",
-        "croak-install: a requested package does not exist on npm. Check the name:",
+        "croak-install: a requested package does not exist on npm. Check the name:\nnpm error 404 Not Found\nnpm error 404\n  x: did you mean `y`?",
       ),
-      "does not exist on npm",
+      "does not exist on npm. Check the name: x: did you mean `y`?",
     ],
     [
       "an incomplete check",

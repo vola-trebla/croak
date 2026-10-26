@@ -287,8 +287,17 @@ interface Judged {
 
 /** One check's result as a verdict, with the findings worth showing. */
 function judge(result: CheckResult): Judged {
-  const tail = (text: string): string =>
-    text.trim().split("\n").slice(-4).join(" ").slice(0, 400);
+  // croak-install's own lines (and its did-you-mean hints) say more than npm's log.
+  const tail = (text: string): string => {
+    const lines = text.trim().split("\n");
+    const own = lines.filter((l) =>
+      /^croak-install:|did you mean/.test(l.trim()),
+    );
+    return (own.length > 0 ? own : lines.slice(-4))
+      .map((l) => l.trim())
+      .join(" ")
+      .slice(0, 400);
+  };
   if (result.code === 2 || result.code === undefined || result.code > 3)
     return {
       verdict: "block",

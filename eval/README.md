@@ -16,10 +16,27 @@ eval/cases/<id>/
   fixture/    # the repo croak scans — read, NEVER executed
 ```
 
+An **install** case (`"kind": "install"`) runs `croak plan` against a fake,
+in-memory registry instead (no network):
+
+```
+fixture/
+  package-lock.json          # the planned install
+  before.package-lock.json   # optional: the lockfile before
+  registry/<name>.json       # packuments
+  packages/<name>@<version>/ # files served as that version's tarball
+```
+
+Lockfile entries without `resolved`/`integrity` get the registry URL and the
+hash of the built tarball; an entry that states its own integrity keeps it.
+Dates are relative to a fixed clock (2026-10-25) and the platform is fixed
+(linux-x64). An incomplete plan scores as a block (`install/incomplete`): it
+blocks an agent (D20).
+
 ```jsonc
 {
   "id": "d-postinstall", // must equal the directory name
-  "kind": "repo", // "install" arrives in M3
+  "kind": "repo", // or "install"
   "threat": "D", // A–E (ROADMAP threat model) or "benign"
   "description": "…",
   "expect": {

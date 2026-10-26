@@ -15,17 +15,23 @@ describe("runEval on the real case set", () => {
     expect(cases.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("null baseline: nothing is flagged", () => {
-    const { metrics } = runEval(cases, []);
+  it("null baseline: nothing is flagged", async () => {
+    const { metrics } = await runEval(cases, {
+      repo: [],
+      install: async () => ({ verdict: "allow", rules: [] }),
+    });
     expect(metrics.blockRecall.hit).toBe(0);
     expect(metrics.flagRecall.hit).toBe(0);
   });
 
-  it("a block-everything detector catches every threat", () => {
+  it("a block-everything detector catches every threat", async () => {
     const paranoid: RepoDetector = () => [
       { ruleId: "test/all", severity: "block", file: ".", message: "x" },
     ];
-    const { metrics } = runEval(cases, [paranoid]);
+    const { metrics } = await runEval(cases, {
+      repo: [paranoid],
+      install: async () => ({ verdict: "block", rules: ["test/all"] }),
+    });
     expect(metrics.blockRecall.hit).toBe(metrics.blockRecall.total);
   });
 });
@@ -80,10 +86,10 @@ describe("regression guard", () => {
     return ids;
   }
 
-  it("every case that ever passed still passes with the registered detectors", () => {
+  it("every case that ever passed still passes with the registered detectors", async () => {
     const passed = everPassed();
-    const regressed = runEval(loadCases(CASES_DIR))
-      .results.filter((r) => passed.has(r.id) && r.outcome !== "pass")
+    const regressed = (await runEval(loadCases(CASES_DIR))).results
+      .filter((r) => passed.has(r.id) && r.outcome !== "pass")
       .map(
         (r) => `${r.id}: ${r.outcome} (expected ${r.expected}, got ${r.got})`,
       );

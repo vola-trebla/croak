@@ -5,9 +5,13 @@ import { isVerdict, type Verdict } from "../verdict.ts";
 export const THREATS = ["A", "B", "C", "D", "E", "benign"] as const;
 export type Threat = (typeof THREATS)[number];
 
+export const KINDS = ["repo", "install"] as const;
+export type CaseKind = (typeof KINDS)[number];
+
 export interface EvalCase {
   readonly id: string;
-  readonly kind: "repo";
+  /** repo: `croak repo` on fixture/; install: `croak plan` on a lockfile with a fake registry. */
+  readonly kind: CaseKind;
   readonly threat: Threat;
   readonly description: string;
   readonly expect: {
@@ -56,7 +60,8 @@ export function parseCase(
 
   if (id !== dirName)
     throw new CaseError(dirName, `"id" must equal the directory name`);
-  if (kind !== "repo") throw new CaseError(dirName, `"kind" must be "repo"`);
+  if (kind !== "repo" && kind !== "install")
+    throw new CaseError(dirName, `"kind" must be ${KINDS.join(" or ")}`);
   if (!isThreat(threat))
     throw new CaseError(
       dirName,

@@ -356,3 +356,18 @@ is a documented `.claude/settings.json` snippet; croak never edits the
 user's config.
 **Trade-off:** an install hidden inside a package.json script (`npm run
 setup`) is not seen by the hook; `croak repo` covers those scripts.
+
+## D33 — croak may write one thing: its content verdict cache (2026-10-27)
+
+Without a cache, every agent install on a fresh clone checks the whole tree
+again — minutes per `npm install`. The cache keeps content findings by
+tarball sha512 (npm verifies the download against the same hash) and croak's
+code fingerprint; registry facts are never cached (D32). Writing breaks the
+"croak never writes" rule the tripwire enforces, so it is allowed in one
+file only, into one directory, and `croak-install` now runs croak under
+Node's permission model with write access to that directory alone (keeping
+D23's promise for the hook). A failed write or read is a miss, never an
+error. Chosen over no cache (too slow for agents) and a shell-side cache
+(JSON handling in shell, harder to test).
+**Trade-off:** a user-writable cache can be forged by anything that can
+already write the user's files.

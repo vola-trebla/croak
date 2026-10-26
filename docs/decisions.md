@@ -387,10 +387,36 @@ Fixed, and decided with the maintainer:
 - The hook checks npm's local prefix (the nearest directory with a
   package.json or node_modules), not the agent's directory, and `npm update`
   as an update. "Installed" means a hidden-lockfile entry whose folder holds
-  that package; a committed or stale `.package-lock.json` hides nothing.
+  that package (and, since D35, matches the plan's source and hash).
 - Not supported yet, so denied (maintainer's choice): npm workspaces and
   `npm-shrinkwrap.json`; any npm config that points at a registry other than
   the public one (project or user `.npmrc`, `npm_config_*`, `--…registry`
   flags, `npm config set` or a write to `.npmrc` in the same command).
   **Trade-off:** monorepos with workspaces and teams with a private registry
   cannot use the hook yet; it denies rather than checks the wrong install.
+
+## D35 — Whole-project review: the project's own scripts, and seams between layers (2026-10-27)
+
+A review of all of croak, not one milestone's diff, found bypasses where the
+layers meet. Fixed:
+- A plain `npm install` and `npm ci` also run the project's own install
+  scripts (and node-gyp for a root binding.gyp); `croak plan --project`
+  judges them with the repo rules, on the manifest and the files they run.
+  This is the fake test-assignment attack, end to end through the hook.
+- Packages are compared and deduplicated on name, version, resolved URL and
+  integrity, so a second copy from another URL, or an installed copy whose
+  hash differs from the plan's, is checked; a registry tarball URL that
+  belongs to another package than the entry's name is an `install/source`
+  warning.
+- A project `.npmrc` is read the way npm reads it (quoted keys, `[sections]`
+  refused), and keys that load another config or change what npm runs
+  (`userconfig`, `globalconfig`, `script-shell`, `node-options`, `shell`,
+  `git`, `init-module`) are refused there; the user's own npmrc files are
+  checked for registries only.
+- The hijack pattern uses the registry's word on install scripts, not only
+  the lockfile's.
+- The hook denies when croak cannot run (Node below 24.2, or no plan line)
+  instead of passing everything; sandbox flags stay one argument each, so a
+  cache path with a space can never make node run a project file.
+  **Trade-off:** the global npmrc and npm's built-in config are not read; they
+  belong to the user, not the repo.

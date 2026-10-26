@@ -52,6 +52,11 @@ _content_ is not.
   checksum. With no disk writes, `../` entries and symlink entries cannot
   escape. Tarballs come only from `registry.npmjs.org` over https and must
   match the lockfile's integrity hash, or the package blocks (D27).
+- The tar reader must read an archive exactly as npm's tar (node-tar) does:
+  a file croak sees differently from what npm installs is a bypass. Where the
+  two could disagree (a zero block before more entries, duplicate or `../`
+  paths, unknown entry types, global pax paths) the archive is rejected and
+  the check is incomplete (D31).
 
 ### 3. Bound every resource
 
@@ -99,9 +104,14 @@ a marker file is planned from a local tarball, and the test fails if the
 marker exists or the project changed. A plain `npm install` of the same bait
 does run it.
 
-`croak plan` itself makes network requests in one place: it fetches each
-new package's metadata from registry.npmjs.org (names validated against npm's
-rules first, 15 s timeout, 200 MB cap per response). `--offline` skips them.
+`croak plan` itself talks to one host, registry.npmjs.org over https, for
+two things: each new package's metadata (names validated against npm's rules
+first, 15 s timeout, 200 MB cap per response) and each new version's tarball
+(only URLs that pass `registryTarball()`: https, that host, no port or
+credentials; 60 s timeout, 100 MB cap, 300 MB per plan; verified against the
+lockfile's integrity hash). `--metadata-only` skips the tarballs; `--offline`
+skips both. A lockfile entry that points anywhere else is reported as
+`install/source`, never silently skipped.
 
 This is isolation, not a sandbox: npm still talks to the network and parses
 untrusted registry metadata, and `--ignore-scripts` is not treated as one. A

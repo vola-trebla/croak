@@ -322,3 +322,19 @@ with an install script still blocks either way.
 **Trade-off:** a hijacker who keeps `node install.js` and edits `install.js`
 is left to the content checks; if the edit looks harmless there, it is a 🟡
 (the agent asks), not a 🔴.
+
+## D31 — M3 review: read like npm, compare with settled history (2026-10-26)
+
+The M3 toad review found ways around the install check, all fixed:
+- The tar reader disagreed with node-tar (a single zero block, pax sizes,
+  the ustar prefix, old GNU/pax types), so a tarball could show croak one
+  file and install another. It now follows node-tar or rejects the archive.
+- Bundled dependencies inside a tarball are judged like the package itself:
+  npm runs their install scripts.
+- One predicate (`registryTarball`) decides what is downloaded, checked
+  online, and reported as a non-registry source, so no entry falls between.
+- Comparisons with earlier versions use only versions at least 7 days older
+  (a fresh decoy release cannot become the baseline), and the previous
+  version is the semver predecessor.
+  **Trade-off:** a patient attacker who publishes a decoy more than 7 days
+  ahead still sets the baseline; the content checks remain.

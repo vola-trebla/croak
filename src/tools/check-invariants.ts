@@ -164,7 +164,25 @@ const violationsFor = (
  * pattern-data files (marker in the first lines, allowed directories only)
  * get statement-level rules, plus "source" rules when they are not tests.
  */
+/**
+ * The one file allowed to write (D33): the content verdict cache, into
+ * croak's own cache directory only. Every other rule still applies to it.
+ */
+export const WRITE_ALLOWED: ReadonlySet<string> = new Set([
+  "src/install/content-cache.ts",
+]);
+
 export function checkSource(
+  file: string,
+  text: string,
+  isTest: boolean,
+): Violation[] {
+  return checkSourceRules(file, text, isTest).filter(
+    (v) => v.rule !== "no-fs-write" || !WRITE_ALLOWED.has(file),
+  );
+}
+
+function checkSourceRules(
   file: string,
   text: string,
   isTest: boolean,

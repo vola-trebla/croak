@@ -1,0 +1,10 @@
+{
+  "id": "a-hijack-new-publisher",
+  "kind": "install",
+  "threat": "A",
+  "description": "Hijacked account: 3.4.1 is published by an account that never published colorlib before, and it runs a postinstall script (D26).",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/publisher"]
+  }
+}

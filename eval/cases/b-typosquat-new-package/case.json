@@ -1,0 +1,10 @@
+{
+  "id": "b-typosquat-new-package",
+  "kind": "install",
+  "threat": "B",
+  "description": "Typo-squat or a registered hallucinated name: expresss is one keystroke from express and was created three days ago.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/name"]
+  }
+}

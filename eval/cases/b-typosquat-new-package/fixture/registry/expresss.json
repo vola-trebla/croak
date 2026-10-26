@@ -1,0 +1,17 @@
+{
+  "name": "expresss",
+  "time": {
+    "created": "2026-10-22T00:00:00.000Z",
+    "5.1.0": "2026-10-22T00:00:00.000Z"
+  },
+  "versions": {
+    "5.1.0": {
+      "name": "expresss",
+      "version": "5.1.0",
+      "_npmUser": {
+        "name": "dougwilson"
+      },
+      "dist": {}
+    }
+  }
+}

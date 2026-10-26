@@ -1,0 +1,10 @@
+{
+  "id": "benign-popular-package",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: the real express, years old, same publisher; its tarball also verifies against the lockfile.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

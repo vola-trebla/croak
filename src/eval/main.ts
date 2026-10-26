@@ -16,7 +16,7 @@ const { values } = parseArgs({
 const casesDir = values.cases ?? join(import.meta.dirname, "../../eval/cases");
 
 try {
-  const report = runEval(loadCases(casesDir));
+  const report = await runEval(loadCases(casesDir));
   if (values.json === true) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } else {

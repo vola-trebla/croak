@@ -1,0 +1,10 @@
+{
+  "id": "benign-binary-installer",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: a postinstall that downloads and runs a prebuilt binary (esbuild, swc). Worth a look, not an attack.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

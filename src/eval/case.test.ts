@@ -28,7 +28,7 @@ describe("parseCase", () => {
   it.each([
     ["not an object", [], "JSON object"],
     ["id mismatch", { ...valid, id: "other" }, "directory name"],
-    ["unknown kind", { ...valid, kind: "install" }, `"kind"`],
+    ["unknown kind", { ...valid, kind: "pypi" }, `"kind"`],
     ["unknown threat", { ...valid, threat: "Z" }, `"threat"`],
     ["empty description", { ...valid, description: " " }, `"description"`],
     [

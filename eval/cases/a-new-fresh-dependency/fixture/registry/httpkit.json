@@ -1,0 +1,29 @@
+{
+  "name": "httpkit",
+  "time": {
+    "created": "2018-08-08T00:00:00.000Z",
+    "1.14.0": "2026-07-27T00:00:00.000Z",
+    "1.14.1": "2026-09-25T00:00:00.000Z"
+  },
+  "versions": {
+    "1.14.0": {
+      "name": "httpkit",
+      "version": "1.14.0",
+      "_npmUser": {
+        "name": "sam"
+      },
+      "dist": {}
+    },
+    "1.14.1": {
+      "name": "httpkit",
+      "version": "1.14.1",
+      "_npmUser": {
+        "name": "sam"
+      },
+      "dist": {},
+      "dependencies": {
+        "crypto-shim-x": "^4.2.1"
+      }
+    }
+  }
+}

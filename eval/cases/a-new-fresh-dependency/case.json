@@ -1,0 +1,10 @@
+{
+  "id": "a-new-fresh-dependency",
+  "kind": "install",
+  "threat": "A",
+  "description": "Hijacked release (axios 2026-03 pattern): httpkit 1.14.1 adds crypto-shim-x, a package created one day ago (D27).",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/new-dependency"]
+  }
+}

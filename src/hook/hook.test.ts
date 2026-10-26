@@ -154,6 +154,33 @@ describe("hookPlan: where npm really installs (M4 review)", () => {
     ]);
   });
 
+  it.each([
+    ["a quoted registry key", '"registry"=https://attacker.invalid/'],
+    ["a userconfig pointing elsewhere", "userconfig=./other.npmrc"],
+    ["an ini section", "[registry]\nx=1"],
+    ["a script-shell", "script-shell=./run.sh"],
+    ["node-options", "node-options=--require ./preload.js"],
+  ])(
+    "denies a project .npmrc with %s (whole-project review)",
+    (_name, npmrc) => {
+      const plan = hookPlan(
+        event("npm i zod"),
+        files({ "/repo/.npmrc": npmrc }),
+      );
+      expect(plan.checks).toEqual([]);
+      expect(plan.intents[0]).toMatchObject({ kind: "unchecked" });
+    },
+  );
+
+  it("does not hold the user's own node-options against them", () => {
+    expect(
+      modes(
+        "npm i zod",
+        files({ "/home/u/.npmrc": "node-options=--max-old-space-size=8192" }),
+      ),
+    ).toEqual(["project /repo [zod]"]);
+  });
+
   it("accepts the public registry and npm's own userconfig variable", () => {
     const deps = {
       ...files({

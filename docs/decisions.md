@@ -298,3 +298,15 @@ typescript and next blocked five of them. None was an attack. Changes:
   **Trade-off:** escapes decoded and run through a child process rather than
   eval are no longer an obfuscation block; the lifecycle rules still see the
   spawn at install time.
+
+## D29 — Verdict cache moves to M4; real malware stays references only (2026-10-26)
+
+The verdict cache (`name@version + integrity`) serves the agent hook, which
+checks the same installs again and again; `croak plan` runs once per install
+and does not need it, so it moves to M4. Real malicious packages are not
+used as eval fixtures: they are referenced by name, version, hash and source
+(`ossf/malicious-packages`, incident reports) in the docs, never committed,
+and npm removes most of them anyway. The eval stays synthetic, with the
+references showing which real attacks each synthetic case stands for.
+**Trade-off:** no measured recall on real samples until a gitignored local
+run is added; the numbers are for synthetic attacks only.

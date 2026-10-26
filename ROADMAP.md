@@ -86,12 +86,11 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 ### M3 — npm install plan + registry signals
 
 - [ ] Benign set: top-N npm packages (false-positive baseline) — moved from M1, install eval needs it
-- [ ] Malicious set: references + hashes from `ossf/malicious-packages` and other datasets (no tarballs in git) — moved from M1
+- [ ] Malicious set: references only — names, versions, hashes and sources from `ossf/malicious-packages` and incident reports, in the docs; no tarballs in git, and the eval stays synthetic (D29) — moved from M1
 - [x] Threat model for running npm on untrusted input: isolated wrapper (temp dir with only manifest + lockfile, empty env and npm config, git disabled), offline CI proof that no script runs (D24)
 - [x] Lockfile diff from a non-executing install plan: `croak plan` + `croak-install`, every new/changed version incl. transitive; lockfile signals (install scripts, non-registry sources, missing integrity)
 - [x] Registry signals: package exists (did-you-mean hint in `croak-install`), release age (🟡 only), provenance dropped, new publisher, typo-squat names, brand-new packages; blocking combinations (D26)
 - [x] Content signals: tarballs read in memory and verified against the lockfile; install-time vectors (scripts, `binding.gyp`, prebuilt binaries), hidden and obfuscated code; new deps and scripts vs the previous version (D27); recalibrated on eight popular packages (D28)
-- [ ] Verdict cache keyed by `name@version + integrity`
 
 ### M4 — Agent integration
 
@@ -99,6 +98,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [ ] Agent policy (D20): 🔴 and "scan incomplete" block; 🟡 does not block — the agent sees the warning and asks the user to confirm
 - [ ] A nested install (`cd client && npm install`) triggers a fresh check of that install
 - [ ] Actionable feedback for the agent ("did you mean `jscodeshift`?")
+- [ ] Verdict cache keyed by `name@version + integrity`, so repeated installs stay fast in the hook — moved from M3 (D29)
 
 ### M5 — LLM triage (BYOK, Haiku by default)
 

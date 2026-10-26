@@ -72,8 +72,36 @@ croak-install [pkg]   # plan an npm install, check it before anything executes
 croak repo .          # scan an unfamiliar repo before you install or open it
 ```
 
-Plus a **Claude Code hook** (🚧 planned, M4) that puts croak in front of every
-install command an agent runs.
+Plus a **Claude Code hook** (🧪 early, M4) that puts croak in front of every
+install command an agent runs. Add it to `.claude/settings.json` (croak never
+edits your config):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/croak/scripts/croak-hook.sh",
+            "timeout": 300,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+🔴, an incomplete check, or a command croak cannot vouch for (pnpm, a custom
+registry, `npm i $PKG`) → the command is denied and the agent is told why;
+🟡 → Claude Code asks you; 🟢 → the hook stays silent and your normal
+permissions apply. `onFailure: "block"` matters: without it, Claude Code lets
+a command through when a hook crashes or times out. It needs Claude Code
+2.1.295 or later.
 
 **`croak-install`** has npm resolve the install with `--package-lock-only
 --ignore-scripts` in an isolated temp directory (your project's lockfile is

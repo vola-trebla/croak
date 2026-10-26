@@ -6,6 +6,7 @@ import {
   IntegrityError,
   packageUrl,
   RegistryError,
+  registryTarball,
   verifyIntegrity,
   versionFacts,
 } from "./registry.ts";
@@ -129,6 +130,21 @@ describe("versionFacts", () => {
 
   it("returns undefined for a version the registry does not know", () => {
     expect(versionFacts(packument, "9.9.9", now)).toBeUndefined();
+  });
+});
+
+describe("registryTarball", () => {
+  it.each([
+    ["https://registry.npmjs.org/a/-/a-1.0.0.tgz", true],
+    ["HTTPS://REGISTRY.NPMJS.ORG/a/-/a-1.0.0.tgz", true],
+    ["https://registry.npmjs.org:443/a/-/a-1.0.0.tgz", true],
+    ["https://registry.npmjs.org:8443/a/-/a-1.0.0.tgz", false],
+    ["https://user:pw@registry.npmjs.org/a/-/a-1.0.0.tgz", false],
+    ["http://registry.npmjs.org/a/-/a-1.0.0.tgz", false],
+    ["https://registry.npmjs.org.evil.invalid/a.tgz", false],
+    ["not a url", false],
+  ])("%s → %s", (resolved, expected) => {
+    expect(registryTarball(resolved) !== undefined).toBe(expected);
   });
 });
 

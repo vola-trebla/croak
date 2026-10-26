@@ -191,6 +191,56 @@ describe("planInstallOnline", () => {
   });
 });
 
+describe("planInstallOnline: nothing falls between the checks", () => {
+  const now = new Date("2026-10-25T00:00:00Z");
+  const check = (resolved: string) =>
+    planInstallOnline(
+      undefined,
+      lock({
+        "node_modules/p": { version: "1.0.0", resolved, integrity: "sha512-x" },
+      }),
+      {
+        fetch: async () => new Response("", { status: 404 }),
+        now,
+        content: false,
+      },
+    );
+
+  it.each([
+    "https://user:pw@registry.npmjs.org/p/-/p-1.0.0.tgz",
+    "https://registry.npmjs.org:8443/p/-/p-1.0.0.tgz",
+  ])(
+    "warns on a lookalike registry URL instead of skipping it: %s",
+    async (resolved) => {
+      const outcome = await check(resolved);
+      expect(outcome.status === "complete" && outcome.findings).toEqual([
+        expect.objectContaining({ ruleId: "install/source", severity: "warn" }),
+      ]);
+    },
+  );
+
+  it("checks a registry URL written in capitals online", async () => {
+    const outcome = await check("HTTPS://REGISTRY.NPMJS.ORG/p/-/p-1.0.0.tgz");
+    expect(outcome.status === "complete" && outcome.findings).toEqual([
+      expect.objectContaining({ ruleId: "install/registry" }),
+    ]);
+  });
+
+  it("is incomplete for an entry without a version", async () => {
+    const outcome = await planInstallOnline(
+      undefined,
+      lock({
+        "node_modules/p": { resolved: "https://registry.npmjs.org/p/-/p.tgz" },
+      }),
+      { fetch: async () => new Response("", { status: 404 }), now },
+    );
+    expect(outcome).toMatchObject({
+      status: "incomplete",
+      reason: expect.stringContaining("no version"),
+    });
+  });
+});
+
 describe("planInstallOnline: package contents", () => {
   const now = new Date("2026-10-25T00:00:00Z");
   const packument = JSON.stringify({

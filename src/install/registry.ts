@@ -232,6 +232,24 @@ export function verifyIntegrity(data: Buffer, integrity: string): void {
 }
 
 /**
+ * The tarball URL if `resolved` points at the public registry over https,
+ * with no credentials or explicit port. One predicate for what croak
+ * downloads, checks online, and reports as a non-registry source, so a
+ * package can never fall between them unchecked.
+ */
+export function registryTarball(resolved: string | undefined): URL | undefined {
+  if (resolved === undefined || !URL.canParse(resolved)) return undefined;
+  const url = new URL(resolved);
+  return url.protocol === "https:" &&
+    url.hostname === new URL(REGISTRY).hostname &&
+    url.port === "" &&
+    url.username === "" &&
+    url.password === ""
+    ? url
+    : undefined;
+}
+
+/**
  * Downloads a tarball from the public registry (https only) with a timeout
  * and a 100 MB cap, and verifies it against the lockfile's integrity hash.
  */
@@ -240,14 +258,15 @@ export async function fetchTarball(
   integrity: string | undefined,
   options: FetchOptions = {},
 ): Promise<Buffer> {
-  if (!url.startsWith(`${REGISTRY}/`))
+  const tarball = registryTarball(url);
+  if (tarball === undefined)
     throw new RegistryError(
       `refusing to download a tarball from outside ${REGISTRY}: ${url}`,
     );
   const doFetch = options.fetch ?? fetch;
   let response: Response;
   try {
-    response = await doFetch(url, {
+    response = await doFetch(tarball.href, {
       signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS * 4),
     });
   } catch (error) {

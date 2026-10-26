@@ -82,6 +82,9 @@ export function parseLockfile(text: string): LockEntry[] {
     if (path === "") return [];
     if (!isRecord(raw))
       throw new LockfileError(`entry ${path} is not an object`);
+    // Without a version croak cannot look the package up; npm always writes one.
+    if (raw.link !== true && typeof raw.version !== "string")
+      throw new LockfileError(`entry ${path} has no version`);
     return [
       {
         path,

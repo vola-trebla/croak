@@ -14,8 +14,8 @@ import {
   fetchPackument,
   fetchTarball,
   IntegrityError,
-  REGISTRY,
   RegistryError,
+  registryTarball,
   versionFacts,
 } from "./registry.ts";
 import { snapshotTarball, TarballError } from "./tar.ts";
@@ -133,10 +133,7 @@ export async function planInstallOnline(
   const before =
     beforeText === undefined ? undefined : parseLockfile(beforeText);
   const fromRegistry = diffLockfiles(before, parseLockfile(afterText)).filter(
-    (c) =>
-      !c.entry.link &&
-      c.entry.version !== undefined &&
-      c.entry.resolved?.startsWith(`${REGISTRY}/`) === true,
+    (c) => !c.entry.link && registryTarball(c.entry.resolved) !== undefined,
   );
   // npm skips platform packages for other systems, so they are not checked.
   const platform = options.platform ?? {

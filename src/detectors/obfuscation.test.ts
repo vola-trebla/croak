@@ -99,6 +99,21 @@ describe("repo/obfuscation", () => {
     );
   });
 
+  it("does not join two kinds 10,000 lines apart in a browser bundle (mocha.js)", () => {
+    const bundle = `${escapes}\n${"x();\n".repeat(100)}${dynamic}`;
+    expect(scan({ "mocha.js": bundle })[0]?.severity).toBe("warn");
+  });
+
+  it("blocks a strong signal next to a second kind", () => {
+    expect(scan({ "a.js": `${escapes}\n${dynamic}` })[0]?.severity).toBe(
+      "block",
+    );
+  });
+
+  it("skips type declarations, which never run", () => {
+    expect(scan({ "types/test.d.ts": dynamic })).toEqual([]);
+  });
+
   it("still blocks a strong signal with decoding anywhere in the file", () => {
     expect(
       scan({ "a.js": `${names}\n${"x();\n".repeat(100)}atob(p);` })[0]

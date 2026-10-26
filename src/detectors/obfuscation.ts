@@ -16,6 +16,8 @@ const LEAD: Readonly<Record<Severity, string>> = {
   block: "obfuscated code",
 };
 const SCANNED = /\.[cm]?[jt]sx?$/;
+/** Type declarations are never executed (eslint and playwright types name `globalThis[key](…)`). */
+const DECLARATIONS = /\.d\.[cm]?ts$/;
 
 /** Legitimate code has these too: icon-font escape maps, embedded fonts or wasm. */
 const WEAK: ReadonlySet<ObfuscationKind> = new Set(["escapes", "encoded-blob"]);
@@ -101,7 +103,7 @@ function nearCall(
 
 /**
  * Weak signals alone are context; one strong signal warns. It blocks when
- * two kinds meet, when obfuscator output has eval or decoding anywhere, when
+ * two kinds meet in one construct, when obfuscator output has eval or decoding anywhere, when
  * a local strong signal (a computed global call, a rotated string array) sits
  * next to eval or decoding, or when a weak signal sits next to eval — a
  * Unicode regex beside String.fromCharCode in a parser is not one construct.
@@ -112,7 +114,29 @@ function assess(
 ): { raw: Severity; why: string } {
   const kinds = new Set(hits.map((hit) => hit.kind));
   const strong = [...kinds].filter((kind) => !WEAK.has(kind)).length;
-  if (strong >= 1 && kinds.size >= 2) return { raw: "block", why: "" };
+  // Two kinds are one construct when obfuscator output covers the file, or
+  // when a strong signal sits next to the other kind (not 10,000 lines away
+  // in a browser bundle, as in mocha.js).
+  const markedBy = (hit: ObfuscationHit): Span[] =>
+    spans(
+      lines,
+      OBFUSCATION_PATTERNS.filter((p) => p.kind === hit.kind).map(
+        (p) => p.pattern,
+      ),
+      new Set(hit.lines),
+    );
+  const together =
+    hits.some((hit) => FILE_WIDE.has(hit.kind)) ||
+    hits.some(
+      (hit) =>
+        !WEAK.has(hit.kind) &&
+        hits.some(
+          (other) =>
+            other.kind !== hit.kind && nearCall(lines, hit, markedBy(other)),
+        ),
+    );
+  if (strong >= 1 && kinds.size >= 2 && together)
+    return { raw: "block", why: "" };
   const executes = spans(lines, EXECUTES);
   const decodes = spans(lines, EXECUTES_OR_DECODES);
   const near = hits.some((hit) =>
@@ -146,7 +170,10 @@ function fileFinding(path: string, text: string): Finding | undefined {
 /** Code made deliberately unreadable — not merely minified. */
 export const obfuscation: RepoDetector = (repo) =>
   repo.entries
-    .filter((e) => e.kind === "file" && SCANNED.test(e.path))
+    .filter(
+      (e) =>
+        e.kind === "file" && SCANNED.test(e.path) && !DECLARATIONS.test(e.path),
+    )
     .flatMap((e) => {
       const finding = fileFinding(e.path, repo.read(e.path) ?? "");
       return finding === undefined ? [] : [finding];

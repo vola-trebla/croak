@@ -751,3 +751,49 @@ export function analyzeShell(command: string): ShellFacts {
     unparsable: false,
   };
 }
+
+// ---------------------------------------------------------------- command sequence
+
+export interface ShellWord {
+  readonly text: string;
+  /** Contains $VAR, $(…) or backticks: its value is only known when the shell runs. */
+  readonly dynamic: boolean;
+}
+
+export interface ShellCommand {
+  readonly words: readonly ShellWord[];
+  /** The commands of a ( … ) subshell or { …; } group, if this is one. */
+  readonly group?: readonly ShellCommand[];
+}
+
+/**
+ * Commands in the order the shell would run them (pipelines and lists
+ * flattened), for callers that need argument-level detail, such as the agent
+ * hook. Undefined when the text cannot be parsed or is longer than maxLength.
+ */
+export function shellCommands(
+  input: string,
+  maxLength = MAX_SCRIPT_LENGTH,
+): ShellCommand[] | undefined {
+  if (input.length > maxLength) return undefined;
+  let script: Script;
+  try {
+    script = parse(input, 0);
+  } catch (error) {
+    if (error instanceof ParseError) return undefined;
+    throw error;
+  }
+  const flatten = (s: Script): ShellCommand[] =>
+    s.flatMap((pipeline) =>
+      pipeline.map((command) => {
+        const words = command.words.map((w) => ({
+          text: w.text,
+          dynamic: w.subs.length > 0 || w.text.includes("$"),
+        }));
+        return command.subshell === undefined
+          ? { words }
+          : { words, group: flatten(command.subshell) };
+      }),
+    );
+  return flatten(script);
+}

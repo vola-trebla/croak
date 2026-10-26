@@ -338,3 +338,21 @@ The M3 toad review found ways around the install check, all fixed:
   version is the semver predecessor.
   **Trade-off:** a patient attacker who publishes a decoy more than 7 days
   ahead still sets the baseline; the content checks remain.
+
+## D32 — The agent hook: what it catches and how it answers (2026-10-26)
+
+A Claude Code `PreToolUse` hook on Bash commands finds install intents before
+they run: `npm install`/`add`/`update` (with or without packages, `-g`
+included), `npm ci`, and `npx` / `npm exec` / `npm create` (they download a
+package and run it at once). It follows `cd`, `--prefix` and `sh -c`, so a
+nested `cd client && npm install` is checked too (D20). Whatever croak
+cannot vouch for — pnpm, yarn and bun until M6, a custom registry or npm
+config, a package or directory only known when the shell runs, `eval`, text
+it cannot parse — is `unchecked`, never ignored. 🔴, incomplete and
+unchecked map to `deny`, 🟡 to `ask` (Claude Code asks the user), 🟢 to
+allow. The verdict cache keeps content checks only (a tarball never changes
+for its hash); registry facts such as release age are always fresh. Setup
+is a documented `.claude/settings.json` snippet; croak never edits the
+user's config.
+**Trade-off:** an install hidden inside a package.json script (`npm run
+setup`) is not seen by the hook; `croak repo` covers those scripts.

@@ -97,11 +97,16 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
 - uses the public registry only, and sets `git` to `/usr/bin/false`, so git
   dependencies fail the plan instead of being cloned (fail closed);
 - runs `npm install --package-lock-only --ignore-scripts`;
-- compares the plan with what is installed now (`node_modules/.package-lock.json`,
-  which npm maintains), not with the project's lockfile: on a fresh clone npm
-  installs, and runs the scripts of, everything the lockfile lists, so all of
-  it is checked. `--ci` checks the lockfile as written (npm ci reinstalls
-  every package); `--empty` plans into an empty project (npx, `npm install -g`).
+- compares the plan with what is really installed: entries of
+  `node_modules/.package-lock.json` whose folder holds that package and
+  version (`croak plan --installed`), not the project's lockfile. On a fresh
+  clone npm installs, and runs the scripts of, everything the lockfile lists,
+  so all of it is checked; a committed or stale hidden lockfile hides nothing
+  (D34). `--ci` checks the lockfile as written (npm ci reinstalls every
+  package), `--update` plans `npm update`, `--empty` plans into an empty
+  project (npx, `npm install -g`);
+- refuses (exit 2) what it does not check yet: npm workspaces and
+  `npm-shrinkwrap.json`.
 
 `scripts/test-croak-install.sh` (in CI) proves the path runs no lifecycle
 script: a bait package whose `preinstall`/`postinstall`/`prepare` would create

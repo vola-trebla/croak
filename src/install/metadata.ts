@@ -128,9 +128,12 @@ export function metadataFindings(
     previous !== undefined &&
     facts.installCommands !== "" &&
     previous.installCommands === facts.installCommands;
+  // The lockfile's hasInstallScript is the project's (or attacker's) word;
+  // the registry's manifest says it too, and either one counts.
+  const runsAtInstall =
+    entry.hasInstallScript || facts.installScripts.length > 0;
   const hijack =
-    entry.hasInstallScript &&
-    (provenanceDropped || (newPublisher && !sameScript));
+    runsAtInstall && (provenanceDropped || (newPublisher && !sameScript));
   const recentRelease =
     facts.ageDays !== undefined && facts.ageDays < RECENT_DAYS;
   const pattern = hijack
@@ -161,8 +164,8 @@ export function metadataFindings(
         "install/publisher",
         // Alone it is context: maintainers rotate and orgs publish from
         // service accounts (microsoft1es, GitHub Actions).
-        hijack ? "block" : entry.hasInstallScript ? "warn" : "info",
-        `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}${!hijack && entry.hasInstallScript && sameScript && previous !== undefined ? `; it runs the same install script as ${previous.version}` : ""}`,
+        hijack ? "block" : runsAtInstall ? "warn" : "info",
+        `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}${!hijack && runsAtInstall && sameScript && previous !== undefined ? `; it runs the same install script as ${previous.version}` : ""}`,
       ),
     );
   }

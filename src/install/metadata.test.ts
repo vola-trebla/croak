@@ -212,6 +212,17 @@ describe("metadataFindings", () => {
     ).not.toContain("block:install/new-install-script");
   });
 
+  it("does not need the lockfile's word that a version has an install script", () => {
+    const hijack = facts({
+      publisher: "mallory",
+      installScripts: ["postinstall"],
+      installCommands: "postinstall: node x.js",
+    });
+    expect(rules(metadataFindings(change("lib"), hijack))).toContain(
+      "block:install/publisher",
+    );
+  });
+
   it("blocks the hijacked-account pattern: install script plus dropped provenance or a new publisher", () => {
     const hijack = facts({
       publisher: "mallory",

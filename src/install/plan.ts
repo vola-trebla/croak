@@ -7,12 +7,17 @@ export interface PlanChange {
   readonly previousVersion?: string;
 }
 
+/**
+ * Same package only when it comes from the same place with the same hash: a
+ * second lodash@4.17.21 from another URL, or an installed copy whose hash
+ * differs from the plan's, is a different download and is checked.
+ */
 const key = (entry: LockEntry): string =>
-  `${entry.name}@${entry.version ?? "?"}`;
+  `${entry.name}@${entry.version ?? "?"} ${entry.resolved ?? ""} ${entry.integrity ?? ""}`;
 
 /**
  * Every package version the install would bring that the project did not
- * have — direct and transitive, each name@version once. A changed version of
+ * have — direct and transitive, each name@version, source and hash once. A changed version of
  * an existing package is reported with the previous version.
  */
 export function diffLockfiles(

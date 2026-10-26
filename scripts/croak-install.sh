@@ -67,23 +67,27 @@ cli="$root/dist/cli.js"
 # and this project, and write only its cache; spawning, workers and eval are
 # denied. The network is not covered by Node's permission model.
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/croak/content"
-write_cache=""
+# Each flag is one quoted word: a cache path with a space must never split
+# into a second argument that node would run as a script. Without a usable
+# cache, both repeat the croak read grant, which changes nothing.
+cache_read="--allow-fs-read=$root"
+cache_write="--allow-fs-read=$root"
 if mkdir -p "$cache" 2>/dev/null && chmod 700 "$cache" 2>/dev/null; then
   real_cache=$(cd "$cache" && pwd -P)
-  write_cache="--allow-fs-read=$real_cache --allow-fs-write=$real_cache"
+  cache_read="--allow-fs-read=$real_cache"
+  cache_write="--allow-fs-write=$real_cache"
 fi
 project=$(pwd -P)
 croak() { # croak <extra read path> <args...>
   extra=$1
   shift
-  # shellcheck disable=SC2086 # write_cache is two fixed flags or empty
   node --permission --allow-fs-read="$root" --allow-fs-read="$project" --allow-fs-read="$extra" \
-    $write_cache --disallow-code-generation-from-strings "$cli" "$@"
+    "$cache_read" "$cache_write" --disallow-code-generation-from-strings "$cli" "$@"
 }
 
 if [ "$mode" = ci ]; then
   # npm ci removes node_modules and installs the lockfile as is: nothing to plan.
-  croak "$project" plan --before none --after package-lock.json $json
+  croak "$project" plan --before none --after package-lock.json --project "$project" $json
   exit $?
 fi
 
@@ -114,6 +118,11 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
     echo "croak-install: a requested package does not exist on npm. Check the name:" >&2
     echo "AI agents often invent plausible package names, and attackers register them." >&2
     grep -E "404|is not in this registry" "$work/npm.log" | head -n 3 >&2
+    missing=$(sed -n 's#.*404 Not Found - GET https://registry.npmjs.org/\([^ ]*\).*#\1#p' "$work/npm.log" | sort -u)
+    # shellcheck disable=SC2086 # one registry path per word, from npm's own log
+    set -f
+    [ -z "$missing" ] || croak "$work" suggest $missing >&2
+    set +f
     exit 2
   fi
   echo "croak-install: npm could not plan this install, so it was not checked:" >&2
@@ -121,4 +130,9 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
   exit 3
 fi
 
-croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json
+# A plain npm install also runs the project's own install scripts (D35).
+if [ "$mode" = project ] && [ "$#" -eq 0 ]; then
+  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" --project "$project" $json
+else
+  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json
+fi

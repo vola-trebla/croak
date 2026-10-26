@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -10,6 +10,8 @@ import {
   fileContentCache,
 } from "./install/content-cache.ts";
 import { installedLockfile } from "./install/installed.ts";
+import { suggestNames } from "./install/metadata.ts";
+import { projectScriptFindings } from "./install/project.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   type PlanOutcome,
@@ -18,6 +20,7 @@ import {
 } from "./install/scan.ts";
 import { renderScan, scanToJson } from "./repo-report.ts";
 import { type ScanOutcome, ScanTargetError, scanRepoAt } from "./scan.ts";
+import { aggregate } from "./verdict.ts";
 
 export const VERSION = "0.0.0";
 
@@ -58,7 +61,7 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none> | --installed <project>]
+  croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>]
              [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
@@ -98,6 +101,7 @@ function parse(argv: readonly string[]) {
       "metadata-only": { type: "boolean" },
       "no-cache": { type: "boolean" },
       installed: { type: "string" },
+      project: { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -125,6 +129,7 @@ async function runPlan(
     readonly "metadata-only"?: boolean | undefined;
     readonly "no-cache"?: boolean | undefined;
     readonly installed?: string | undefined;
+    readonly project?: string | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -173,11 +178,46 @@ async function runPlan(
             : { cache: deps.cache }),
           content: values["metadata-only"] !== true,
         });
+  // A plain npm install or npm ci also runs the project's own install scripts (D35).
+  const project = values.project;
+  const judged: PlanOutcome =
+    project === undefined || outcome.status !== "complete"
+      ? outcome
+      : (() => {
+          const findings = [
+            ...projectScriptFindings(project, {
+              read: (path) => {
+                try {
+                  return read(path);
+                } catch {
+                  return undefined;
+                }
+              },
+              kind: (path) => {
+                try {
+                  const stats = lstatSync(path);
+                  return {
+                    kind: stats.isSymbolicLink()
+                      ? "symlink"
+                      : stats.isFile()
+                        ? "file"
+                        : "other",
+                    size: stats.size,
+                  };
+                } catch {
+                  return undefined;
+                }
+              },
+            }),
+            ...outcome.findings,
+          ];
+          return { ...outcome, findings, verdict: aggregate(findings) };
+        })();
   const stdout =
     values.json === true
-      ? planToJson(outcome)
-      : renderPlan(outcome, { emoji: deps.emoji && values.plain !== true });
-  return { code: exitCode(outcome), stdout, stderr: "" };
+      ? planToJson(judged)
+      : renderPlan(judged, { emoji: deps.emoji && values.plain !== true });
+  return { code: exitCode(judged), stdout, stderr: "" };
 }
 
 /** Pure entry point: all I/O goes through deps. */
@@ -185,6 +225,18 @@ export async function run(
   argv: readonly string[],
   deps: CliDeps = DEFAULT_DEPS,
 ): Promise<CliResult> {
+  // Suggestions for package names npm does not have (croak-install on E404).
+  if (argv[0] === "suggest") {
+    const lines = argv.slice(1).flatMap((spec) => {
+      const names = suggestNames(decodeURIComponent(spec));
+      return names.length === 0
+        ? []
+        : [
+            `  ${spec}: did you mean ${names.map((n) => `\`${n}\``).join(", ")}?\n`,
+          ];
+    });
+    return { code: EXIT.ok, stdout: lines.join(""), stderr: "" };
+  }
   // The agent hook's two steps (scripts/croak-hook.sh); they read files only.
   if (argv[0] === "hook")
     return runHook(argv.slice(1), {

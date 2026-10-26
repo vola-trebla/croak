@@ -7,10 +7,11 @@
 first: when an agent reaches for `npm install`, croak stops it, explains why,
 and lets the agent fix its own mistake.
 
-> 🚧 **Status: early development.** `croak repo` and the npm install check
-> (`croak-install`) work end to end; the agent hook, the LLM layer and an npm
-> release are not there yet. Use it, but don't rely on it as your only line of
-> defense. The [roadmap](ROADMAP.md) shows what's done.
+> 🚧 **Status: early development.** `croak repo`, the npm install check
+> (`croak-install`) and the Claude Code hook work end to end and have been
+> through four security reviews; the LLM layer and an npm release are not
+> there yet. Use it, but don't rely on it as your only line of defense. The
+> [roadmap](ROADMAP.md) shows what's done.
 
 ---
 
@@ -53,9 +54,10 @@ guarantee), 🟡 **warn** (needs your attention, never "safe"), or 🔴 **block*
 reasons a human _and_ an agent can act on:
 
 ```
-$ croak-install jscodeshift-react-transform
+$ croak-install reactt-domm
 croak-install: a requested package does not exist on npm. Check the name:
 AI agents often invent plausible package names, and attackers register them.
+  reactt-domm: did you mean `react-dom`?
 
 $ croak-install esbuild
 croak plan - WARN
@@ -147,9 +149,12 @@ Being honest about limits matters more than marketing:
 - Long-game maintainer takeovers (think xz-utils), or a decoy release published
   more than a week before the real attack
 - A compromised registry or signing infrastructure
-- An install the agent hides from the hook: inside a package.json script
-  (`npm run setup`), behind `eval "$VAR"`, or through another package manager
-  once you allow it
+- An install the agent hides from the hook: inside a package.json script it
+  runs by hand (`npm run setup`, `bash setup.sh`), behind `eval "$VAR"`, or
+  through another package manager once you allow it. (A plain `npm install`
+  or `npm ci` does check the project's own install scripts.)
+- npm settings croak does not read: the global npmrc and npm's built-in
+  config (both yours, not the repo's)
 - Malware that's already on your machine
 - Payloads that only wake up in one specific environment
 

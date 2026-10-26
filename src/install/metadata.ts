@@ -11,9 +11,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const normalize = (name: string): string =>
   name.toLowerCase().replace(/[-_.]/g, "");
 
-/** Optimal string alignment distance (Levenshtein plus adjacent transpositions), capped at 2. */
-function distance(a: string, b: string): number {
-  if (Math.abs(a.length - b.length) > 1) return 2;
+/** Optimal string alignment distance (Levenshtein plus adjacent transpositions), capped at `cap`. */
+function distance(a: string, b: string, cap = 2): number {
+  if (Math.abs(a.length - b.length) >= cap) return cap;
   const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [
     i,
     ...Array<number>(b.length).fill(0),
@@ -35,7 +35,27 @@ function distance(a: string, b: string): number {
       row[j] = best;
     }
   }
-  return Math.min((d[a.length] as number[])[b.length] ?? 2, 2);
+  return Math.min((d[a.length] as number[])[b.length] ?? cap, cap);
+}
+
+/**
+ * Popular packages a name that npm does not have might have meant (M4): up to
+ * three, nearest first, within two keystrokes or one separator. Only for
+ * names that do not exist, where a suggestion cannot be the attack itself;
+ * an existing look-alike is a finding instead (nearPopularName).
+ */
+export function suggestNames(spec: string): string[] {
+  const at = spec.indexOf("@", 1);
+  const name = (at === -1 ? spec : spec.slice(0, at)).toLowerCase();
+  if (name.startsWith("@") || name.length < 4 || POPULAR.has(name)) return [];
+  return POPULAR_PACKAGES.map((popular) => ({
+    popular,
+    d: normalize(popular) === normalize(name) ? 0 : distance(popular, name, 3),
+  }))
+    .filter(({ d }) => d <= 2)
+    .sort((x, y) => x.d - y.d)
+    .slice(0, 3)
+    .map(({ popular }) => popular);
 }
 
 /** The popular package this unscoped name is one keystroke (or one separator) away from. */
@@ -108,9 +128,12 @@ export function metadataFindings(
     previous !== undefined &&
     facts.installCommands !== "" &&
     previous.installCommands === facts.installCommands;
+  // The lockfile's hasInstallScript is the project's (or attacker's) word;
+  // the registry's manifest says it too, and either one counts.
+  const runsAtInstall =
+    entry.hasInstallScript || facts.installScripts.length > 0;
   const hijack =
-    entry.hasInstallScript &&
-    (provenanceDropped || (newPublisher && !sameScript));
+    runsAtInstall && (provenanceDropped || (newPublisher && !sameScript));
   const recentRelease =
     facts.ageDays !== undefined && facts.ageDays < RECENT_DAYS;
   const pattern = hijack
@@ -141,8 +164,8 @@ export function metadataFindings(
         "install/publisher",
         // Alone it is context: maintainers rotate and orgs publish from
         // service accounts (microsoft1es, GitHub Actions).
-        hijack ? "block" : entry.hasInstallScript ? "warn" : "info",
-        `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}${!hijack && entry.hasInstallScript && sameScript && previous !== undefined ? `; it runs the same install script as ${previous.version}` : ""}`,
+        hijack ? "block" : runsAtInstall ? "warn" : "info",
+        `was published by ${facts.publisher}, who did not publish the earlier versions${pattern}${!hijack && runsAtInstall && sameScript && previous !== undefined ? `; it runs the same install script as ${previous.version}` : ""}`,
       ),
     );
   }
@@ -152,7 +175,7 @@ export function metadataFindings(
       finding(
         "install/name",
         isNewPackage ? "block" : "warn",
-        `looks like the popular package ${lookalike}${isNewPackage ? ", and the package is brand new: a typo-squat or a hallucinated name" : "; check the name"}`,
+        `looks like the popular package ${lookalike}${isNewPackage ? ", and the package is brand new: a typo-squat or a hallucinated name" : "; check the name"} (did you mean \`${lookalike}\`?)`,
       ),
     );
   }

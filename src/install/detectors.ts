@@ -26,8 +26,21 @@ export const installScripts: InstallDetector = (changes) =>
     }));
 
 /** Why a package is not a registry download, or undefined when it is one (registryTarball). */
-function sourceProblem(resolved: string | undefined): string | undefined {
-  if (registryTarball(resolved) !== undefined) return undefined;
+function sourceProblem(
+  resolved: string | undefined,
+  name: string,
+  version: string | undefined,
+): string | undefined {
+  const tarball = registryTarball(resolved);
+  if (tarball !== undefined) {
+    // The lockfile's name decides which registry facts croak reads: the URL
+    // must be that package's own tarball, not another package's.
+    const base = name.slice(name.lastIndexOf("/") + 1);
+    return decodeURIComponent(tarball.pathname) ===
+      `/${name}/-/${base}-${version ?? ""}.tgz`
+      ? undefined
+      : `is named ${name}@${version ?? "?"} but its tarball URL is for another package: ${tarball.pathname}`;
+  }
   if (resolved === undefined) return "has no resolved source in the lockfile";
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/.test(resolved))
     return "comes from git, not the npm registry";
@@ -53,7 +66,11 @@ export const source: InstallDetector = (changes) =>
         },
       ];
     }
-    const problem = sourceProblem(c.entry.resolved);
+    const problem = sourceProblem(
+      c.entry.resolved,
+      c.entry.name,
+      c.entry.version,
+    );
     return problem === undefined
       ? []
       : [

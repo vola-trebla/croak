@@ -101,8 +101,8 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
   `node_modules/.package-lock.json` whose folder holds that package and
   version (`croak plan --installed`), not the project's lockfile. On a fresh
   clone npm installs, and runs the scripts of, everything the lockfile lists,
-  so all of it is checked; a committed or stale hidden lockfile hides nothing
-  (D34). `--ci` checks the lockfile as written (npm ci reinstalls every
+  so all of it is checked. An entry counts as installed only when its folder
+  holds that package and its source and hash match the plan (D34, D35). `--ci` checks the lockfile as written (npm ci reinstalls every
   package), `--update` plans `npm update`, `--empty` plans into an empty
   project (npx, `npm install -g`);
 - refuses (exit 2) what it does not check yet: npm workspaces and

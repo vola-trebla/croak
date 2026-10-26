@@ -4,6 +4,7 @@ import {
   addedDependencyFindings,
   metadataFindings,
   nearPopularName,
+  suggestNames,
 } from "./metadata.ts";
 import type { PlanChange } from "./plan.ts";
 import type { VersionFacts } from "./registry.ts";
@@ -211,6 +212,17 @@ describe("metadataFindings", () => {
     ).not.toContain("block:install/new-install-script");
   });
 
+  it("does not need the lockfile's word that a version has an install script", () => {
+    const hijack = facts({
+      publisher: "mallory",
+      installScripts: ["postinstall"],
+      installCommands: "postinstall: node x.js",
+    });
+    expect(rules(metadataFindings(change("lib"), hijack))).toContain(
+      "block:install/publisher",
+    );
+  });
+
   it("blocks the hijacked-account pattern: install script plus dropped provenance or a new publisher", () => {
     const hijack = facts({
       publisher: "mallory",
@@ -339,5 +351,28 @@ describe("version-to-version changes", () => {
     expect(
       addedDependencyFindings(change("axios"), axios, old, now)[0]?.severity,
     ).toBe("info");
+  });
+});
+
+describe("suggestNames", () => {
+  it.each([
+    ["lodahs", "lodash"],
+    ["expres", "express"],
+    ["axois@1.2.3", "axios"],
+    ["react_dom", "react-dom"],
+  ])("suggests a popular name for %s", (spec, expected) => {
+    expect(suggestNames(spec)).toContain(expected);
+  });
+
+  it("stays quiet for popular, scoped, short or far-off names", () => {
+    expect(suggestNames("lodash")).toEqual([]);
+    expect(suggestNames("@types/lodahs")).toEqual([]);
+    expect(suggestNames("abc")).toEqual([]);
+    expect(suggestNames("completely-unrelated-name")).toEqual([]);
+  });
+
+  it("suggests at most three, nearest first", () => {
+    expect(suggestNames("reacts").length).toBeLessThanOrEqual(3);
+    expect(suggestNames("reacts")[0]).toBe("react");
   });
 });

@@ -116,6 +116,13 @@ function workspaceRoot(prefix: string, deps: HookDeps): string | undefined {
 
 const PUBLIC_REGISTRY = /^https:\/\/registry\.npmjs\.org\/?$/;
 const REGISTRY_KEY = /(?:^|:)registry$|^replace-registry-host$/;
+/**
+ * Keys that load another config croak would not read, or change what npm runs
+ * scripts and git with: with them, a warning the user approves would still run
+ * the repo's own shell, preload or binary.
+ */
+const RUNNER_KEY =
+  /^(?:userconfig|globalconfig|script-shell|node-options|shell|git|init-module)$/;
 
 /** Where npm config sends npm somewhere croak does not check (D34), or undefined. */
 function foreignRegistry(prefix: string, deps: HookDeps): string | undefined {
@@ -125,11 +132,8 @@ function foreignRegistry(prefix: string, deps: HookDeps): string | undefined {
   const named = env
     .filter(([key]) => /^npm_config_(?:userconfig|globalconfig)$/i.test(key))
     .map(([, value]) => value ?? "");
-  for (const file of [
-    posix.join(prefix, ".npmrc"),
-    posix.join(deps.home, ".npmrc"),
-    ...named,
-  ]) {
+  const project = posix.join(prefix, ".npmrc");
+  for (const file of [project, posix.join(deps.home, ".npmrc"), ...named]) {
     if (file === "" || !deps.exists(file)) continue;
     let text: string;
     try {
@@ -137,16 +141,23 @@ function foreignRegistry(prefix: string, deps: HookDeps): string | undefined {
     } catch {
       return `${file} cannot be read`;
     }
-    for (const line of text.split("\n")) {
+    for (const raw of text.split("\n")) {
+      const line = raw.trim();
+      if (line === "" || /^[;#]/.test(line)) continue;
+      // ini sections group keys croak does not read: refuse rather than guess.
+      if (line.startsWith("[")) return `${file} uses [sections]`;
       const eq = line.indexOf("=");
-      if (/^\s*[;#]/.test(line) || eq === -1) continue;
-      const key = line.slice(0, eq).trim();
-      const value = line
-        .slice(eq + 1)
-        .trim()
-        .replace(/^["']|["']$/g, "");
+      if (eq === -1) continue;
+      // Quotes around a key or value are stripped, as npm's ini parser does.
+      const unquote = (part: string): string =>
+        part.trim().replace(/^(["'])(.*)\1$/, "$2");
+      const key = unquote(line.slice(0, eq));
+      const value = unquote(line.slice(eq + 1));
       if (REGISTRY_KEY.test(key) && !PUBLIC_REGISTRY.test(value))
         return `${file} sets ${key}`;
+      // The project's npmrc comes with the repo; the user's own files do not.
+      if (file === project && RUNNER_KEY.test(key))
+        return `${file} sets ${key}, which changes what npm runs`;
     }
   }
   for (const [key, value] of env) {
@@ -287,8 +298,17 @@ interface Judged {
 
 /** One check's result as a verdict, with the findings worth showing. */
 function judge(result: CheckResult): Judged {
-  const tail = (text: string): string =>
-    text.trim().split("\n").slice(-4).join(" ").slice(0, 400);
+  // croak-install's own lines (and its did-you-mean hints) say more than npm's log.
+  const tail = (text: string): string => {
+    const lines = text.trim().split("\n");
+    const own = lines.filter((l) =>
+      /^croak-install:|did you mean/.test(l.trim()),
+    );
+    return (own.length > 0 ? own : lines.slice(-4))
+      .map((l) => l.trim())
+      .join(" ")
+      .slice(0, 400);
+  };
   if (result.code === 2 || result.code === undefined || result.code > 3)
     return {
       verdict: "block",

@@ -84,3 +84,16 @@ for setup in workspaces shrinkwrap; do
 done
 echo "ok: forged hidden lockfile, workspaces and shrinkwrap handled"
 
+# A cache path with a space must not split into a script node would run
+# (whole-project review): a project file at the second half prints a forged
+# clean report if it ever runs.
+spaced="$work/x y"
+mkdir -p "$spaced" "$work/clone/y/croak"
+echo 'console.log(JSON.stringify({ status: "complete", verdict: "allow", findings: [] }))' >"$work/clone/y/croak/content"
+set +e
+out=$(cd "$work/clone" && XDG_CACHE_HOME="$spaced" sh "$root/scripts/croak-install.sh" --ci 2>&1)
+set -e
+echo "$out" | grep -q "install/install-script" || { echo "FAIL: a cache path with a space changed what ran:"; echo "$out"; exit 1; }
+[ -d "$spaced/croak/content" ] || { echo "FAIL: the spaced cache directory was not used"; exit 1; }
+echo "ok: a cache path with a space stays one argument"
+

@@ -1,12 +1,11 @@
 import type { Finding } from "../verdict.ts";
 import type { PlanChange } from "./plan.ts";
+import { REGISTRY, registryTarball } from "./registry.ts";
 
 /** A check over the packages an install would bring in. */
 export type InstallDetector = (
   changes: readonly PlanChange[],
 ) => readonly Finding[];
-
-const REGISTRY_HOST = "registry.npmjs.org";
 
 const label = (change: PlanChange): string =>
   `${change.entry.name}@${change.entry.version ?? "?"}`;
@@ -26,23 +25,19 @@ export const installScripts: InstallDetector = (changes) =>
       message: `${what(c)} and runs code at install time (preinstall/install/postinstall or a native build)`,
     }));
 
+/** Why a package is not a registry download, or undefined when it is one (registryTarball). */
 function sourceProblem(resolved: string | undefined): string | undefined {
+  if (registryTarball(resolved) !== undefined) return undefined;
   if (resolved === undefined) return "has no resolved source in the lockfile";
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/.test(resolved))
     return "comes from git, not the npm registry";
   if (resolved.startsWith("file:"))
     return "comes from a local path, not the npm registry";
-  try {
-    const url = new URL(resolved);
-    if (url.protocol !== "https:")
-      return `is downloaded over ${url.protocol.replace(":", "")}, not https`;
-    if (url.hostname !== REGISTRY_HOST)
-      return `comes from ${url.hostname}, not ${REGISTRY_HOST}`;
-  } catch {
-    // Not a URL at all: neither the registry nor a recognized source.
-    return `has an unrecognized source: ${resolved}`;
-  }
-  return undefined;
+  if (!URL.canParse(resolved)) return `has an unrecognized source: ${resolved}`;
+  const url = new URL(resolved);
+  if (url.protocol !== "https:")
+    return `is downloaded over ${url.protocol.replace(":", "")}, not https`;
+  return `comes from ${url.host}${url.username === "" ? "" : " with credentials in the URL"}, not ${REGISTRY}`;
 }
 
 /** Packages that do not come from the public npm registry over https. */

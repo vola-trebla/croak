@@ -54,7 +54,7 @@ export const CODE_PATTERNS: ReadonlyArray<{
     signal: "eval",
     label: "Function constructor",
     pattern:
-      /\bnew\s+Function\s*\(|\bFunction\s*\(\s*["'`](?!return this["'`])/,
+      /\bnew\s+Function\s*\(|\bFunction\s*\(\s*["'`](?!return this["'`]\s*\))/,
   },
   { signal: "eval", label: "vm", pattern: load("vm") },
   { signal: "decode", label: "atob", pattern: /\batob\s*\(/ },
@@ -83,8 +83,11 @@ export const CODE_PATTERNS: ReadonlyArray<{
   {
     signal: "secrets",
     label: "whole process.env",
-    // passed whole to a call (JSON.stringify, Object.entries, send) or walked with for…in
-    pattern: /\(\s*process\s*\.\s*env\s*[,)]|\bin\s+process\s*\.\s*env\b/,
+    // passed whole to a call as its first or last argument (JSON.stringify,
+    // Object.entries, post(url, process.env)), spread into JSON.stringify, or
+    // walked with for…in. A spread for a child's env stays quiet.
+    pattern:
+      /[(,]\s*process\s*\.\s*env\s*\)|\(\s*process\s*\.\s*env\s*,|\bstringify\s*\(\s*\{\s*\.\.\.\s*process\s*\.\s*env\b|\bin\s+process\s*\.\s*env\b/,
   },
   { signal: "secrets", label: "home directory", pattern: /\bhomedir\s*\(/ },
   {

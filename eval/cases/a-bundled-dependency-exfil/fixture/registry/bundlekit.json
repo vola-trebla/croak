@@ -1,0 +1,26 @@
+{
+  "name": "bundlekit",
+  "time": {
+    "created": "2021-08-12T00:00:00.000Z",
+    "1.1.0": "2026-04-08T00:00:00.000Z",
+    "1.2.0": "2026-09-05T00:00:00.000Z"
+  },
+  "versions": {
+    "1.1.0": {
+      "name": "bundlekit",
+      "version": "1.1.0",
+      "_npmUser": {
+        "name": "ivy"
+      },
+      "dist": {}
+    },
+    "1.2.0": {
+      "name": "bundlekit",
+      "version": "1.2.0",
+      "_npmUser": {
+        "name": "ivy"
+      },
+      "dist": {}
+    }
+  }
+}

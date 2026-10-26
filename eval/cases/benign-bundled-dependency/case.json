@@ -1,0 +1,10 @@
+{
+  "id": "benign-bundled-dependency",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: a package that bundles a plain library dependency, with no install scripts.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

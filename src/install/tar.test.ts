@@ -45,19 +45,63 @@ describe("snapshotTarball", () => {
     ]);
   });
 
+  it("reads like npm: pax size, old GNU and pax types, ./ paths", () => {
+    const payload = "/* payload */ x();";
+    const raw = Buffer.concat([
+      // A pax size overrides the header size, as in node-tar.
+      header("PaxHeader", Buffer.byteLength(paxRecord("size", "18")), "x"),
+      pad(Buffer.from(paxRecord("size", "18"))),
+      header("package/install.js", 0),
+      pad(Buffer.from(payload)),
+      // "N" is an old GNU long name, "X" an old pax header.
+      header("././@LongLink", 18, "N"),
+      pad(Buffer.from("package/hidden.js\0")),
+      header("package/README.txt", 1),
+      pad(Buffer.from("h")),
+      header(
+        "X",
+        Buffer.byteLength(paxRecord("path", "package/old-pax.js")),
+        "X",
+      ),
+      pad(Buffer.from(paxRecord("path", "package/old-pax.js"))),
+      header("ignored", 1),
+      pad(Buffer.from("p")),
+      header("package/./package.json", 2),
+      pad(Buffer.from("{}")),
+      Buffer.alloc(1024),
+    ]);
+    const snap = snapshotTarball(gzipSync(raw));
+    expect(snap.entries.map((e) => e.path)).toEqual([
+      "hidden.js",
+      "install.js",
+      "old-pax.js",
+      "package.json",
+    ]);
+    expect(snap.read("install.js")).toBe(payload);
+  });
+
+  it("ignores the name prefix of a non-ustar header, as npm does", () => {
+    const block = header("package.json", 2, "0", { prefix: "package" });
+    block.write("\0\0\0\0\0\0\0\0", 257, "latin1"); // no ustar magic
+    let sum = 0;
+    block.write("        ", 148);
+    for (const byte of block) sum += byte;
+    block.write(`${sum.toString(8).padStart(6, "0")}\0 `, 148);
+    const snap = snapshotTarball(
+      gzipSync(
+        Buffer.concat([block, pad(Buffer.from("{}")), Buffer.alloc(1024)]),
+      ),
+    );
+    // Without the prefix the name is "package.json" itself, and npm strips it as the top directory.
+    expect(snap.entries).toEqual([]);
+  });
+
   it("records links but never reads through them", () => {
     const snap = snapshotTarball(
       tar([{ name: "package/link", type: "2", linkname: "/etc/passwd" }]),
     );
     expect(snap.entries).toEqual([{ path: "link", kind: "symlink", size: 0 }]);
     expect(snap.read("link")).toBeUndefined();
-  });
-
-  it("keeps traversal paths as plain names (nothing is written to disk)", () => {
-    const snap = snapshotTarball(
-      tar([{ name: "package/../../evil.js", content: "x" }]),
-    );
-    expect(snap.entries.map((e) => e.path)).toEqual(["../../evil.js"]);
   });
 
   it("marks files over the read limit as oversized", () => {
@@ -99,6 +143,61 @@ describe("snapshotTarball", () => {
         return snapshotTarball(gzipSync(raw));
       },
       /checksum/,
+    ],
+    [
+      "a traversal path",
+      () =>
+        snapshotTarball(tar([{ name: "package/../../evil.js", content: "x" }])),
+      /escapes/,
+    ],
+    [
+      // npm reads past a single zero block; croak must not stop there and miss the payload.
+      "a zero block hiding a later copy",
+      () =>
+        snapshotTarball(
+          gzipSync(
+            Buffer.concat([
+              header("package/index.js", 2),
+              pad(Buffer.from("ok")),
+              Buffer.alloc(512),
+              header("package/index.js", 3),
+              pad(Buffer.from("bad")),
+              Buffer.alloc(1024),
+            ]),
+          ),
+        ),
+      /zero block/,
+    ],
+    [
+      "the same path twice",
+      () =>
+        snapshotTarball(
+          tar([
+            { name: "package/index.js", content: "ok" },
+            { name: "package/index.js", content: "bad" },
+          ]),
+        ),
+      /twice/,
+    ],
+    [
+      "an unknown entry type",
+      () => snapshotTarball(tar([{ name: "package/a.js", type: "S" }])),
+      /unknown entry type/,
+    ],
+    [
+      "a global pax header that sets a path",
+      () =>
+        snapshotTarball(
+          tar([
+            {
+              name: "g",
+              type: "g",
+              content: paxRecord("path", "package/x.js"),
+            },
+            { name: "package/a.js", content: "a" },
+          ]),
+        ),
+      /global pax/,
     ],
     [
       "a file running past the end",

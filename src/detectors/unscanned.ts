@@ -13,13 +13,18 @@ export interface UnscannedPolicy {
    * (loading it only parses it). In a repo, JSON configs can drive IDE tasks.
    */
   readonly jsonIsData: boolean;
+  /** In a repo, node_modules is flagged on its own; in a package it is bundled code npm runs. */
+  readonly downgradeInstalled: boolean;
 }
 
 /**
  * Safety floor: a code file too large to read was not scanned, so the repo is
  * not clean. Padding a config past the read limit must not hide a payload.
  */
-export function unscannedWith({ jsonIsData }: UnscannedPolicy): RepoDetector {
+export function unscannedWith({
+  jsonIsData,
+  downgradeInstalled,
+}: UnscannedPolicy): RepoDetector {
   return (repo) =>
     repo.entries
       .filter((entry) => entry.kind === "oversized")
@@ -37,7 +42,7 @@ export function unscannedWith({ jsonIsData }: UnscannedPolicy): RepoDetector {
           jsonIsData && name.endsWith(".json") && name !== "package.json";
         // Bundles over the limit are normal in installed dependencies; the
         // presence of node_modules itself is flagged by repo/node-modules-present.
-        const installed = isInNodeModules(entry.path);
+        const installed = downgradeInstalled && isInNodeModules(entry.path);
         return {
           ruleId: "repo/unscanned",
           severity: installed || data ? "info" : "warn",
@@ -51,4 +56,7 @@ export function unscannedWith({ jsonIsData }: UnscannedPolicy): RepoDetector {
       });
 }
 
-export const unscanned: RepoDetector = unscannedWith({ jsonIsData: false });
+export const unscanned: RepoDetector = unscannedWith({
+  jsonIsData: false,
+  downgradeInstalled: true,
+});

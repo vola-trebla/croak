@@ -6,6 +6,7 @@ import {
   IntegrityError,
   packageUrl,
   RegistryError,
+  registryTarball,
   verifyIntegrity,
   versionFacts,
 } from "./registry.ts";
@@ -95,6 +96,33 @@ describe("fetchPackument", () => {
   });
 });
 
+describe("reading a response that breaks off", () => {
+  const broken = (): typeof fetch => async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"name":'));
+          controller.error(new TypeError("terminated"));
+        },
+      }),
+    );
+
+  it("turns a reset after the headers into a RegistryError", async () => {
+    await expect(fetchPackument("lib", { fetch: broken() })).rejects.toThrow(
+      RegistryError,
+    );
+    await expect(
+      fetchTarball(
+        "https://registry.npmjs.org/lib/-/lib-1.0.0.tgz",
+        undefined,
+        {
+          fetch: broken(),
+        },
+      ),
+    ).rejects.toThrow(/reading the response/);
+  });
+});
+
 describe("versionFacts", () => {
   it("reads publish time, provenance, publisher, and history before the version", () => {
     expect(versionFacts(packument, "1.2.0", now)).toEqual({
@@ -124,11 +152,56 @@ describe("versionFacts", () => {
           dependencies: [],
         },
       ],
+      previous: expect.objectContaining({ version: "1.1.0" }),
     });
+  });
+
+  it("leaves fresh versions out of the history, so a decoy cannot become the baseline", () => {
+    const decoy = {
+      ...packument,
+      time: { ...packument.time, "1.2.0-rc.0": ago(3) },
+      versions: {
+        ...packument.versions,
+        "1.2.0-rc.0": packument.versions["1.2.0"],
+      },
+    };
+    const facts = versionFacts(decoy, "1.2.0", now);
+    expect(facts?.earlier.map((v) => v.version)).toEqual(["1.1.0", "1.0.0"]);
+    expect(facts?.previous?.version).toBe("1.1.0");
+  });
+
+  it("compares a backport with its own release line, not the newest release", () => {
+    const lines = {
+      name: "lib",
+      time: {
+        created: ago(900),
+        "1.4.0": ago(400),
+        "2.0.0": ago(200),
+        "1.4.1": ago(100),
+      },
+      versions: { "1.4.0": {}, "2.0.0": {}, "1.4.1": {} },
+    };
+    expect(versionFacts(lines, "1.4.1", now)?.previous?.version).toBe("1.4.0");
+    expect(versionFacts(lines, "2.0.0", now)?.previous?.version).toBe("1.4.0");
   });
 
   it("returns undefined for a version the registry does not know", () => {
     expect(versionFacts(packument, "9.9.9", now)).toBeUndefined();
+  });
+});
+
+describe("registryTarball", () => {
+  it.each([
+    ["https://registry.npmjs.org/a/-/a-1.0.0.tgz", true],
+    ["HTTPS://REGISTRY.NPMJS.ORG/a/-/a-1.0.0.tgz", true],
+    ["https://registry.npmjs.org:443/a/-/a-1.0.0.tgz", true],
+    ["https://registry.npmjs.org:8443/a/-/a-1.0.0.tgz", false],
+    ["https://user:pw@registry.npmjs.org/a/-/a-1.0.0.tgz", false],
+    ["http://registry.npmjs.org/a/-/a-1.0.0.tgz", false],
+    ["https://registry.npmjs.org.evil.invalid/a.tgz", false],
+    ["not a url", false],
+  ])("%s → %s", (resolved, expected) => {
+    expect(registryTarball(resolved) !== undefined).toBe(expected);
   });
 });
 

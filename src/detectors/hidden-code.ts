@@ -32,13 +32,20 @@ function severityOf(hit: HiddenHit, path: string): Severity {
   return codeSignals(hit.hidden).length > 0 ? "block" : "warn";
 }
 
-function finding(hit: HiddenHit, path: string): Finding {
+function finding(
+  hit: HiddenHit,
+  path: string,
+  downgradeInstalled: boolean,
+): Finding {
   const signals = [...new Set(codeSignals(hit.hidden).map((s) => s.signal))];
   const raw = severityOf(hit, path);
-  // Installed and committed dependencies look the same; repo/node-modules-present
-  // already flags the directory, so content inside it is at most a warning.
+  // In a repo, installed and committed dependencies look the same and
+  // repo/node-modules-present already flags the directory, so content inside
+  // it is at most a warning. In a package, node_modules is bundled code npm runs.
   const severity: Severity =
-    isInNodeModules(path) && raw === "block" ? "warn" : raw;
+    downgradeInstalled && isInNodeModules(path) && raw === "block"
+      ? "warn"
+      : raw;
   const detail = hit.kind === "bidi" ? "" : `: \`${truncate(hit.hidden)}\``;
   const using = signals.length > 0 ? ` (uses ${signals.join(", ")})` : "";
   return {
@@ -51,13 +58,23 @@ function finding(hit: HiddenHit, path: string): Finding {
 }
 
 /** Code placed where a human reviewing the file will not see it. */
-export const hiddenCodeDetector: RepoDetector = (repo) =>
-  repo.entries
-    .filter((e) => e.kind === "file" && SCANNED.test(e.path))
-    .flatMap((e) =>
-      hiddenCode(repo.read(e.path) ?? "")
-        .map((hit) => finding(hit, e.path))
-        // Most severe first, so harmless decoys cannot push the payload past the cap.
-        .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
-        .slice(0, MAX_HITS_PER_FILE),
-    );
+export function hiddenCodeWith({
+  downgradeInstalled,
+}: {
+  readonly downgradeInstalled: boolean;
+}): RepoDetector {
+  return (repo) =>
+    repo.entries
+      .filter((e) => e.kind === "file" && SCANNED.test(e.path))
+      .flatMap((e) =>
+        hiddenCode(repo.read(e.path) ?? "")
+          .map((hit) => finding(hit, e.path, downgradeInstalled))
+          // Most severe first, so harmless decoys cannot push the payload past the cap.
+          .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
+          .slice(0, MAX_HITS_PER_FILE),
+      );
+}
+
+export const hiddenCodeDetector: RepoDetector = hiddenCodeWith({
+  downgradeInstalled: true,
+});

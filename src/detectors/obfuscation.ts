@@ -148,15 +148,22 @@ function assess(
   return { raw: strong >= 1 ? "warn" : "info", why: "" };
 }
 
-function fileFinding(path: string, text: string): Finding | undefined {
+function fileFinding(
+  path: string,
+  text: string,
+  downgradeInstalled: boolean,
+): Finding | undefined {
   const hits = obfuscationSignals(text);
   const first = hits[0];
   if (first === undefined) return undefined;
   const { raw, why } = assess(text.split("\n"), hits);
   // As with other content detectors: installed and committed dependencies look
   // the same, and repo/node-modules-present already flags the directory.
+  // (In a package, node_modules is bundled code npm runs: no downgrade.)
   const severity: Severity =
-    isInNodeModules(path) && raw === "block" ? "warn" : raw;
+    downgradeInstalled && isInNodeModules(path) && raw === "block"
+      ? "warn"
+      : raw;
   const seen = hits.map((hit) => `${hit.kind} (line ${hit.line})`).join(", ");
   return {
     ruleId: RULE,
@@ -168,13 +175,29 @@ function fileFinding(path: string, text: string): Finding | undefined {
 }
 
 /** Code made deliberately unreadable — not merely minified. */
-export const obfuscation: RepoDetector = (repo) =>
-  repo.entries
-    .filter(
-      (e) =>
-        e.kind === "file" && SCANNED.test(e.path) && !DECLARATIONS.test(e.path),
-    )
-    .flatMap((e) => {
-      const finding = fileFinding(e.path, repo.read(e.path) ?? "");
-      return finding === undefined ? [] : [finding];
-    });
+export function obfuscationWith({
+  downgradeInstalled,
+}: {
+  readonly downgradeInstalled: boolean;
+}): RepoDetector {
+  return (repo) =>
+    repo.entries
+      .filter(
+        (e) =>
+          e.kind === "file" &&
+          SCANNED.test(e.path) &&
+          !DECLARATIONS.test(e.path),
+      )
+      .flatMap((e) => {
+        const finding = fileFinding(
+          e.path,
+          repo.read(e.path) ?? "",
+          downgradeInstalled,
+        );
+        return finding === undefined ? [] : [finding];
+      });
+}
+
+export const obfuscation: RepoDetector = obfuscationWith({
+  downgradeInstalled: true,
+});

@@ -1,0 +1,10 @@
+{
+  "id": "a-bundled-dependency-exfil",
+  "kind": "install",
+  "threat": "A",
+  "description": "The package bundles node_modules/helper, whose postinstall posts process.env. npm runs bundled dependencies' install scripts, so they are judged like the package itself.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

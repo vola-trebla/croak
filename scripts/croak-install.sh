@@ -67,18 +67,22 @@ cli="$root/dist/cli.js"
 # and this project, and write only its cache; spawning, workers and eval are
 # denied. The network is not covered by Node's permission model.
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/croak/content"
-write_cache=""
+# Each flag is one quoted word: a cache path with a space must never split
+# into a second argument that node would run as a script. Without a usable
+# cache, both repeat the croak read grant, which changes nothing.
+cache_read="--allow-fs-read=$root"
+cache_write="--allow-fs-read=$root"
 if mkdir -p "$cache" 2>/dev/null && chmod 700 "$cache" 2>/dev/null; then
   real_cache=$(cd "$cache" && pwd -P)
-  write_cache="--allow-fs-read=$real_cache --allow-fs-write=$real_cache"
+  cache_read="--allow-fs-read=$real_cache"
+  cache_write="--allow-fs-write=$real_cache"
 fi
 project=$(pwd -P)
 croak() { # croak <extra read path> <args...>
   extra=$1
   shift
-  # shellcheck disable=SC2086 # write_cache is two fixed flags or empty
   node --permission --allow-fs-read="$root" --allow-fs-read="$project" --allow-fs-read="$extra" \
-    $write_cache --disallow-code-generation-from-strings "$cli" "$@"
+    "$cache_read" "$cache_write" --disallow-code-generation-from-strings "$cli" "$@"
 }
 
 if [ "$mode" = ci ]; then

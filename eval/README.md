@@ -109,6 +109,22 @@ It fetches one commit, no submodules, with hooks and Git LFS filters
 disabled. On legitimate projects a block is almost certainly a false alarm,
 and every warning should be explainable. Not run in CI (needs the network).
 
+## Agent commands (the hook, M4)
+
+`eval/agent-commands.json` lists shell commands an AI agent runs and what the
+hook must do before they run: **check** (croak-install checks the install),
+**deny** (croak cannot vouch for it: pnpm, a custom registry, a package only
+known at run time) or **ignore** (it installs nothing: `npm test`, a commit
+message that mentions `npm install`). `pnpm eval` scores the hook's plan step
+offline on a fake project and prints:
+- **caught** — risky commands the hook did not ignore
+- **untouched** — ordinary commands it left alone (its false alarms)
+- **exact** — the expected answer exactly
+
+`knownGap` marks honest misses that are scored but allowed to fail, such as
+`eval "$INSTALL_CMD"`: what it runs is only known when the shell runs, and
+treating every `eval` as an install would deny common shell setup lines.
+
 ## Package corpus (false-alarm check for installs)
 
 `eval/packages.json` pins 61 popular npm packages by version: frameworks,

@@ -47,9 +47,10 @@ export interface LifecyclePolicy {
    * repo: every package.json outside node_modules (workspaces run theirs).
    * package: the package's own package.json and those of its bundled
    * dependencies (node_modules/<name>/, at any depth), whose install scripts
-   * npm runs too.
+   * npm runs too. root: only the top-level package.json (the project an
+   * install runs in).
    */
-  readonly manifests: "repo" | "package";
+  readonly manifests: "repo" | "package" | "root";
 }
 
 /**
@@ -406,10 +407,12 @@ export function lifecycleScriptWith(policy: LifecyclePolicy): RepoDetector {
       .filter(
         (e) =>
           e.kind === "file" &&
-          (policy.manifests === "package"
-            ? e.path === "package.json" || BUNDLED_MANIFEST.test(e.path)
-            : posix.basename(e.path) === "package.json" &&
-              !isInNodeModules(e.path)),
+          (policy.manifests === "root"
+            ? e.path === "package.json"
+            : policy.manifests === "package"
+              ? e.path === "package.json" || BUNDLED_MANIFEST.test(e.path)
+              : posix.basename(e.path) === "package.json" &&
+                !isInNodeModules(e.path)),
       )
       .flatMap((e) => manifestFindings(repo, e.path, policy));
 }

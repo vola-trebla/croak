@@ -83,7 +83,7 @@ croak() { # croak <extra read path> <args...>
 
 if [ "$mode" = ci ]; then
   # npm ci removes node_modules and installs the lockfile as is: nothing to plan.
-  croak "$project" plan --before none --after package-lock.json $json
+  croak "$project" plan --before none --after package-lock.json --project "$project" $json
   exit $?
 fi
 
@@ -126,4 +126,9 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
   exit 3
 fi
 
-croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json
+# A plain npm install also runs the project's own install scripts (D35).
+if [ "$mode" = project ] && [ "$#" -eq 0 ]; then
+  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" --project "$project" $json
+else
+  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json
+fi

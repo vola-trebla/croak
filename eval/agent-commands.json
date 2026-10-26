@@ -1,0 +1,156 @@
+{
+  "description": "Shell commands an AI agent runs, and what croak's hook must do before they run (D32). check: croak-install checks it; deny: croak cannot vouch for it; ignore: it installs nothing. Run in /repo, a project with package.json, frontend/ and server/ subprojects, and a local tsc bin. knownGap marks honest misses that are scored but allowed to fail.",
+  "commands": [
+    {
+      "command": "npm install axios",
+      "expect": "check",
+      "why": "the most common agent install"
+    },
+    {
+      "command": "npm i -D @types/node typescript",
+      "expect": "check",
+      "why": "dev dependencies install the same way"
+    },
+    {
+      "command": "cd frontend && npm install",
+      "expect": "check",
+      "why": "a nested install (D20)"
+    },
+    {
+      "command": "npx create-next-app@latest my-app",
+      "expect": "check",
+      "why": "npx downloads and runs at once"
+    },
+    {
+      "command": "npm create vite@latest web -- --template react-ts",
+      "expect": "check",
+      "why": "npm create runs create-vite"
+    },
+    {
+      "command": "npm ci",
+      "expect": "check",
+      "why": "reinstalls every locked package"
+    },
+    {
+      "command": "npx -y @modelcontextprotocol/server-filesystem /tmp",
+      "expect": "check",
+      "why": "agents start MCP servers with npx"
+    },
+    {
+      "command": "sudo npm install -g pnpm",
+      "expect": "check",
+      "why": "global installs run scripts too"
+    },
+    {
+      "command": "bash -c \"npm install express\"",
+      "expect": "check",
+      "why": "an install inside sh -c"
+    },
+    {
+      "command": "npm --prefix server install",
+      "expect": "check",
+      "why": "--prefix moves the install"
+    },
+    {
+      "command": "npm exec --yes prettier -- --write .",
+      "expect": "check",
+      "why": "npm exec downloads a missing package"
+    },
+    {
+      "command": "npm update",
+      "expect": "check",
+      "why": "updates bring in new versions"
+    },
+    {
+      "command": "npm install $(cat deps.txt)",
+      "expect": "deny",
+      "why": "packages only known at run time"
+    },
+    {
+      "command": "pnpm add zod",
+      "expect": "deny",
+      "why": "pnpm is not checked yet (M6)"
+    },
+    {
+      "command": "yarn add react",
+      "expect": "deny",
+      "why": "yarn is not checked yet (M6)"
+    },
+    {
+      "command": "npm i --registry https://npm.internal.invalid pkg",
+      "expect": "deny",
+      "why": "a registry croak does not check"
+    },
+    {
+      "command": "cd \"$WORKDIR\" && npm install",
+      "expect": "deny",
+      "why": "a directory only known at run time"
+    },
+    {
+      "command": "eval \"$INSTALL_CMD\"",
+      "expect": "deny",
+      "why": "eval of a variable could be an install",
+      "knownGap": true
+    },
+    {
+      "command": "npm test",
+      "expect": "ignore",
+      "why": "runs project scripts, installs nothing"
+    },
+    {
+      "command": "npm run build",
+      "expect": "ignore",
+      "why": "runs project scripts, installs nothing"
+    },
+    {
+      "command": "npm run lint -- --fix",
+      "expect": "ignore",
+      "why": "runs project scripts, installs nothing"
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "expect": "ignore",
+      "why": "a bin the project already has"
+    },
+    {
+      "command": "git commit -m \"fix: npm install step\"",
+      "expect": "ignore",
+      "why": "npm install is only text in a message"
+    },
+    {
+      "command": "echo \"run npm install first\"",
+      "expect": "ignore",
+      "why": "npm install is only text"
+    },
+    {
+      "command": "grep -rn \"npm i\" docs/",
+      "expect": "ignore",
+      "why": "npm i is only a search pattern"
+    },
+    {
+      "command": "npm ls --depth=0",
+      "expect": "ignore",
+      "why": "reads the tree"
+    },
+    {
+      "command": "npm view react version",
+      "expect": "ignore",
+      "why": "reads registry metadata"
+    },
+    {
+      "command": "npm outdated",
+      "expect": "ignore",
+      "why": "reads registry metadata"
+    },
+    {
+      "command": "npm init -y",
+      "expect": "ignore",
+      "why": "writes package.json, installs nothing"
+    },
+    {
+      "command": "node -e \"console.log(process.version)\"",
+      "expect": "ignore",
+      "why": "not a package manager"
+    }
+  ]
+}

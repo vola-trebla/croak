@@ -6,7 +6,8 @@ import { createHash } from "node:crypto";
  */
 
 export const REGISTRY = "https://registry.npmjs.org";
-const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
+// @prisma/client's package document alone is 68 MB (2026-10).
+const DEFAULT_MAX_BYTES = 200 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 15_000;
 // Legacy packages may contain capitals (JSONStream); new ones may not.
 const NAME =

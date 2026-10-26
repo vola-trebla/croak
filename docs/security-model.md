@@ -101,7 +101,7 @@ does run it.
 
 `croak plan` itself makes network requests in one place: it fetches each
 new package's metadata from registry.npmjs.org (names validated against npm's
-rules first, 15 s timeout, 50 MB cap per response). `--offline` skips them.
+rules first, 15 s timeout, 200 MB cap per response). `--offline` skips them.
 
 This is isolation, not a sandbox: npm still talks to the network and parses
 untrusted registry metadata, and `--ignore-scripts` is not treated as one. A

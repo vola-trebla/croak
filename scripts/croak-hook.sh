@@ -34,6 +34,7 @@ while IFS= read -r line; do
   shift 4
   case "$mode" in
     project) flags="--json" ;;
+    update) flags="--json --update" ;;
     ci) flags="--json --ci" ;;
     empty) flags="--json --empty" ;;
     *) deny "unknown check mode: $mode" ;;

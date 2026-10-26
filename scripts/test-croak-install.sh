@@ -55,3 +55,32 @@ echo "$out" | grep -q "install/install-script" || { echo "FAIL: --empty missed t
 [ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
 echo "ok: fresh clone, --ci, --empty and --json checked; no script ran"
 
+# A forged hidden lockfile: the repo commits node_modules/.package-lock.json
+# (a copy of the lockfile) without the package folders. npm still installs
+# everything, so croak must not treat the tree as installed (M4 review).
+mkdir -p "$clone/node_modules"
+cp "$clone/package-lock.json" "$clone/node_modules/.package-lock.json"
+set +e
+out=$(cd "$clone" && sh "$root/scripts/croak-install.sh" 2>&1)
+set -e
+echo "$out" | grep -q "install/install-script" || { echo "FAIL: a forged hidden lockfile hid the bait:"; echo "$out"; exit 1; }
+
+# Workspaces and npm-shrinkwrap.json are not checked yet: refuse (D34).
+for setup in workspaces shrinkwrap; do
+  proj="$work/$setup"
+  mkdir -p "$proj"
+  if [ "$setup" = workspaces ]; then
+    echo '{ "name": "ws", "version": "1.0.0", "private": true, "workspaces": ["packages/*"] }' >"$proj/package.json"
+  else
+    echo '{ "name": "sw", "version": "1.0.0", "private": true }' >"$proj/package.json"
+    echo '{}' >"$proj/npm-shrinkwrap.json"
+  fi
+  set +e
+  out=$(cd "$proj" && sh "$root/scripts/croak-install.sh" left-pad 2>&1)
+  code=$?
+  set -e
+  [ "$code" -eq 2 ] && echo "$out" | grep -q "not supported yet\|does not check yet" ||
+    { echo "FAIL: $setup was not refused (exit $code):"; echo "$out"; exit 1; }
+done
+echo "ok: forged hidden lockfile, workspaces and shrinkwrap handled"
+

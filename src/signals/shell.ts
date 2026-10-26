@@ -783,16 +783,25 @@ export function shellCommands(
     if (error instanceof ParseError) return undefined;
     throw error;
   }
+  // $(…) and backticks run before their command, in a subshell: each comes
+  // first as a group of its own, so an install inside one is seen.
   const flatten = (s: Script): ShellCommand[] =>
     s.flatMap((pipeline) =>
-      pipeline.map((command) => {
+      pipeline.flatMap((command) => {
+        const subs = [
+          ...command.words.flatMap((w) => w.subs),
+          ...command.redirects.flatMap((r) => r.target.subs),
+        ].map((sub) => ({ words: [], group: flatten(sub) }));
         const words = command.words.map((w) => ({
           text: w.text,
           dynamic: w.subs.length > 0 || w.text.includes("$"),
         }));
-        return command.subshell === undefined
-          ? { words }
-          : { words, group: flatten(command.subshell) };
+        return [
+          ...subs,
+          command.subshell === undefined
+            ? { words }
+            : { words, group: flatten(command.subshell) },
+        ];
       }),
     );
   return flatten(script);

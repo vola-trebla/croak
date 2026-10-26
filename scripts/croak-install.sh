@@ -11,14 +11,16 @@
 # isolation, not a sandbox.
 set -eu
 
-usage() { echo "usage: croak-install [--json] [--ci | --empty] [package...]" >&2; exit 2; }
+usage() { echo "usage: croak-install [--json] [--ci | --update | --empty] [package...]" >&2; exit 2; }
 # Modes, for people and for the agent hook (D32):
 #   (default)  npm install [package...] in this project; no packages = what
 #              package.json lists
 #   --ci       npm ci: the lockfile exactly as written, every package fresh
+#   --update   npm update [package...]: the newest versions in range
 #   --empty    an install into an empty project (npx, npm install -g)
-# "Before" is what is installed now (node_modules/.package-lock.json, which
-# npm maintains), not the project's lockfile: on a fresh clone npm installs,
+# "Before" is what is installed now: node_modules/.package-lock.json, keeping
+# only entries whose folder really holds that package (croak plan
+# --installed), not the project's lockfile. On a fresh clone npm installs,
 # and runs the scripts of, everything the lockfile lists.
 json=""
 mode=project
@@ -26,6 +28,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --json) json=--json; shift ;;
     --ci) mode=ci; shift ;;
+    --update) mode=update; shift ;;
     --empty) mode=empty; shift ;;
     --) shift; break ;;
     *) break ;;
@@ -38,8 +41,22 @@ case "$mode" in
   ci) [ "$#" -eq 0 ] || usage
       [ -f package-lock.json ] || { echo "croak-install: npm ci needs a package-lock.json here" >&2; exit 2; } ;;
   empty) [ "$#" -gt 0 ] || usage ;;
-  project) [ -f package.json ] || { echo "croak-install: no package.json here; run it in a project directory" >&2; exit 2; } ;;
+  project | update) [ -f package.json ] || { echo "croak-install: no package.json here; run it in a project directory" >&2; exit 2; } ;;
 esac
+
+# Not checked yet (D34): fail closed instead of checking a different install.
+if [ "$mode" != empty ]; then
+  [ ! -f npm-shrinkwrap.json ] || { echo "croak-install: npm-shrinkwrap.json is not supported yet, so this install was not checked" >&2; exit 2; }
+  dir=$(pwd -P)
+  while :; do
+    if [ -f "$dir/package.json" ] && grep -q '"workspaces"[[:space:]]*:' "$dir/package.json"; then
+      echo "croak-install: $dir uses npm workspaces, which croak does not check yet" >&2
+      exit 2
+    fi
+    [ "$dir" != / ] || break
+    dir=$(dirname "$dir")
+  done
+fi
 
 self=$(realpath "$0" 2>/dev/null || echo "$0")
 root=$(cd "$(dirname "$self")/.." && pwd -P)
@@ -73,17 +90,16 @@ fi
 # The real path: Node's permission model checks resolved paths (/var → /private/var).
 work=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/croak-install.XXXXXX")" && pwd -P)
 trap 'rm -rf "$work"' EXIT INT TERM
-before=none
 if [ "$mode" = empty ]; then
   echo '{ "name": "croak-empty", "version": "0.0.0", "private": true }' >"$work/package.json"
+  baseline=--before baseline_value=none
 else
   cp package.json "$work/package.json"
   [ ! -f package-lock.json ] || cp package-lock.json "$work/package-lock.json"
-  if [ -f node_modules/.package-lock.json ]; then
-    cp node_modules/.package-lock.json "$work/before.json"
-    before="$work/before.json"
-  fi
+  baseline=--installed baseline_value=$project
 fi
+npm_command=install
+[ "$mode" != update ] || npm_command=update
 mkdir "$work/home"
 : >"$work/user.npmrc"
 : >"$work/global.npmrc"
@@ -92,7 +108,7 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
   npm_config_userconfig="$work/user.npmrc" npm_config_globalconfig="$work/global.npmrc" \
   npm_config_cache="$work/cache" npm_config_registry="https://registry.npmjs.org/" \
   npm_config_git=/usr/bin/false npm_config_ignore_scripts=true \
-  npm install --package-lock-only --ignore-scripts --no-audit --no-fund -- "$@" >"$work/npm.log" 2>&1); then
+  npm "$npm_command" --package-lock-only --ignore-scripts --no-audit --no-fund -- "$@" >"$work/npm.log" 2>&1); then
   if grep -q "E404" "$work/npm.log"; then
     # Most often a mistyped or AI-invented name; an attacker may register it later.
     echo "croak-install: a requested package does not exist on npm. Check the name:" >&2
@@ -105,4 +121,4 @@ if ! (cd "$work" && env -i PATH="$PATH" HOME="$work/home" \
   exit 3
 fi
 
-croak "$work" plan --before "$before" --after "$work/package-lock.json" $json
+croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json

@@ -97,7 +97,8 @@ edits your config):
 ```
 
 🔴, an incomplete check, or a command croak cannot vouch for (pnpm, a custom
-registry, `npm i $PKG`) → the command is denied and the agent is told why;
+registry, `npm i $PKG`, npm workspaces, an `.npmrc` that points at a private
+registry) → the command is denied and the agent is told why;
 🟡 → Claude Code asks you; 🟢 → the hook stays silent and your normal
 permissions apply. `onFailure: "block"` matters: without it, Claude Code lets
 a command through when a hook crashes or times out. It needs Claude Code

@@ -350,7 +350,7 @@ cannot vouch for — pnpm, yarn and bun until M6, a custom registry or npm
 config, a package or directory only known when the shell runs, `eval`, text
 it cannot parse — is `unchecked`, never ignored. 🔴, incomplete and
 unchecked map to `deny`, 🟡 to `ask` (Claude Code asks the user), 🟢 to
-allow. The verdict cache keeps content checks only (a tarball never changes
+silence (the normal permission flow; croak never grants a permission). The verdict cache keeps content checks only (a tarball never changes
 for its hash); registry facts such as release age are always fresh. Setup
 is a documented `.claude/settings.json` snippet; croak never edits the
 user's config.
@@ -371,3 +371,26 @@ error. Chosen over no cache (too slow for agents) and a shell-side cache
 (JSON handling in shell, harder to test).
 **Trade-off:** a user-writable cache can be forged by anything that can
 already write the user's files.
+
+## D34 — M4 review: read commands like the shell and npm, check where npm installs (2026-10-27)
+
+The M4 toad review found many ordinary install commands the hook let through.
+Fixed, and decided with the maintainer:
+- The command reader follows shell keywords (`if`/`then`, loops, functions,
+  `!`), wrappers with values (`timeout 300`, `sudo -u root`), `$(…)`,
+  combined shell flags (`bash -lc`), and npm's own argument rules: `-C` and
+  `-L` take values, `-p` is `--parseable` (only npx reads it as `--package`),
+  npx stops at its command, subcommands match by unique prefix and camelCase
+  (`npm upd`). An unknown option followed by a word, a script piped into a
+  shell, a shell heredoc that mentions npm, and a package manager run through
+  another command (`xargs npm i`) are unchecked.
+- The hook checks npm's local prefix (the nearest directory with a
+  package.json or node_modules), not the agent's directory, and `npm update`
+  as an update. "Installed" means a hidden-lockfile entry whose folder holds
+  that package; a committed or stale `.package-lock.json` hides nothing.
+- Not supported yet, so denied (maintainer's choice): npm workspaces and
+  `npm-shrinkwrap.json`; any npm config that points at a registry other than
+  the public one (project or user `.npmrc`, `npm_config_*`, `--…registry`
+  flags, `npm config set` or a write to `.npmrc` in the same command).
+  **Trade-off:** monorepos with workspaces and teams with a private registry
+  cannot use the hook yet; it denies rather than checks the wrong install.

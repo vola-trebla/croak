@@ -146,6 +146,9 @@ Being honest about limits matters more than marketing:
 - Long-game maintainer takeovers (think xz-utils), or a decoy release published
   more than a week before the real attack
 - A compromised registry or signing infrastructure
+- An install the agent hides from the hook: inside a package.json script
+  (`npm run setup`), behind `eval "$VAR"`, or through another package manager
+  once you allow it
 - Malware that's already on your machine
 - Payloads that only wake up in one specific environment
 

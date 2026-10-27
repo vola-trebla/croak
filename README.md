@@ -113,8 +113,9 @@ rules only warned about, showing it what changed since the previous
 version. Its answer can only add a 🟡 or a 🔴, never remove one; without a
 key, or when the model fails, the rules decide alone. Only the diffs of
 public npm packages are sent, never your project's files. On croak's eval
-it lifted blocked attacks from 7/10 to 10/10 with no false alarms, and on
-61 popular packages it added no blocks, for about $0.001 a package
+it turned four red-team variants of one decode-and-run payload from 🟡 into
+🔴 (none of their tricks fooled it) with no false alarms, and on 61 popular
+packages it added no blocks, for about $0.001 a package
 ([eval/README.md](eval/README.md#llm-ablation-m5)).
 
 **`croak-install`** has npm resolve the install with `--package-lock-only

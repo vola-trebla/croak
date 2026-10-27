@@ -455,7 +455,7 @@ the ablation's caveat asked for.
 cache stores findings, not tarballs) and adds a few seconds per warned
 package; answers are not cached yet.
 
-## D38 — pnpm: lockfile v9, its own script rules, workspaces for both managers (2026-10-28)
+## D38 — pnpm: lockfile v9, its own script rules, workspaces for both managers (2026-10-27)
 
 M6 makes croak check pnpm installs, with three choices by the maintainer:
 - **A strict reader for pnpm-lock.yaml, no new dependency.** Only the YAML
@@ -474,7 +474,7 @@ M6 makes croak check pnpm installs, with three choices by the maintainer:
   **Trade-off:** pnpm records no install-script flag, so install scripts are
   known from the registry manifest and the tarball, not from the lockfile.
 
-## D39 — pnpm can run code while planning; the wrapper sanitizes what it copies (2026-10-28)
+## D39 — pnpm can run code while planning; the wrapper sanitizes what it copies (2026-10-27)
 
 Checked in practice: in a project whose package.json says
 `"packageManager": "pnpm@9.15.0"`, `pnpm install --lockfile-only
@@ -494,7 +494,7 @@ pnpmfile and config dependencies and checks that nothing ran.
 hooks, so a plan can differ from the real install where those change
 resolution; it is then a plan of the unpatched tree, still checked.
 
-## D40 — The hook checks pnpm, and the pnpmfile is install-time code (2026-10-28)
+## D40 — The hook checks pnpm, and the pnpmfile is install-time code (2026-10-27)
 
 The hook now reads `pnpm add/install/update/dlx/create` and `pnpx` like npm
 (with pnpm's flags: `-C`/`--dir`, `--filter`, `--frozen-lockfile` as a ci,
@@ -509,3 +509,35 @@ config dependencies are a warning. yarn and bun stay denied.
 **Trade-off:** `pnpm approve-builds` and `pnpm rebuild` run scripts of
 packages already installed; the hook does not re-check those, since the
 install showed what they do.
+
+## D41 — M6 review: workspaces and pnpm installs croak could miss (2026-10-27)
+
+The M6 toad review found nine ways a pnpm or workspace install could reach
+🟢 while running code croak never checked, or warn on nothing. Fixed:
+- **Members' scripts.** A plain install runs every workspace member's
+  install scripts, not only the root's; the members come from the planned
+  lockfile (npm's `packages` keys outside node_modules, pnpm's `importers`).
+  pnpm's `pnpm:devPreinstall` counts too. An npm member's own lockfile entry
+  is a local folder, not a package with "no resolved source".
+- **Where the install runs.** The workspace root is read as JSON by
+  `croak workspace-root` (shared with the hook), not grepped; the hook hands
+  over the folder npm stands in, the plan runs from that member's folder,
+  and a folder the planned lockfile does not list as a member is incomplete.
+  A linked manifest or folder, and for pnpm a `package.yaml` or
+  `package.json5`, is refused: the copy would leave a member out.
+- **pnpm flags and settings.** pnpm flags come from allowlists (an unknown
+  flag leaves the command unchecked) and every installing subcommand is
+  mapped. Settings that run the repo's code or trust another server
+  (`scriptShell`, `nodeOptions`, `shellEmulator`, `globalPnpmfile`, proxies,
+  `ca`/`strictSsl`, `namedRegistries`, and their `.npmrc` forms) are
+  refused. `pnpmfile` may be a list; `patchedDependencies` is a warning.
+- **The pnpm that really runs.** pnpm's build rule applies only when the
+  project pins nothing or exactly the measured pnpm; the pnpmfile is checked
+  even when the version is unknown. YAML comments are dropped and every
+  boolean spelling is read.
+
+**Trade-off:** a project inside a workspace folder that the workspace does
+not list is refused rather than planned on its own; checking it as its own
+project is a follow-up. Eval cases for pnpm and workspaces need install-case
+support for pnpm lockfiles and project scripts; until then, unit tests and
+`scripts/test-croak-install.sh` cover these shapes.

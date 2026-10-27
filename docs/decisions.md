@@ -437,3 +437,18 @@ content is untrusted input inside a random boundary, and any failure falls
 back to the deterministic verdict.
 **Trade-off:** croak now has a dependency tree (the SDK and three packages
 of its own) that must be kept pinned and checked on every update.
+
+## D37 — The LLM step is wired in, opt-in, and checked on real packages (2026-10-27)
+
+`croak plan --llm`, and `CROAK_LLM=1` for `croak-install` and the hook, run
+the LLM step after the rules: for each package with a warning and no block,
+both tarballs (this version and the previous one) are downloaded and
+hash-checked, the diff goes to Claude Haiku 5.5, and the answer is merged by
+`escalate()`. Without a key, or on any failure (download, refusal, malformed
+answer), the rules decide and the report says the model did not judge. The
+report shows the calls and their cost. On the 61-package corpus the model
+added no blocks (20 benign, 1 suspicious, $0.02 in all), which is the check
+the ablation's caveat asked for.
+**Trade-off:** the step re-downloads the tarballs it judges (the content
+cache stores findings, not tarballs) and adds a few seconds per warned
+package; answers are not cached yet.

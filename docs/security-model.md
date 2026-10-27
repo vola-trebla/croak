@@ -173,6 +173,21 @@ directory can forge verdicts, but they can already change your files.
 Known gap: a target outside the read allowlist crashes croak with a raw
 `ERR_ACCESS_DENIED` stack instead of a clean error.
 
+### 6b. The LLM layer (M5, D36)
+
+Opt-in only: `croak plan --llm` (or `CROAK_LLM=1` for `croak-install` and the
+hook) with `ANTHROPIC_API_KEY` set. What leaves the machine: for each package
+the rules warned about, the diff between its previous version and this one
+(public registry tarballs, downloaded and hash-checked like the rest), sent to
+Anthropic's API through the official SDK, the one runtime dependency
+(pinned). Never the project's own files, lockfile or environment. The model's
+answer can only add a finding (`escalate()`, tested exhaustively); package
+content is untrusted input inside a per-call random boundary, and the prompt
+says text addressed to the reviewer is no evidence. A missing key, a refusal,
+a malformed answer or a network error leaves the rules' verdict with an info
+line. The SDK runs inside croak's sandbox (Node permission model); network is
+not covered by it, as for the registry.
+
 ### 7. Verdict semantics
 
 - **🟢 allow** means nothing suspicious was found — not a guarantee.

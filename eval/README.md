@@ -140,7 +140,7 @@ asking to be flagged. Needs `ANTHROPIC_API_KEY`; costs under a cent.
 ANTHROPIC_API_KEY=… pnpm eval:llm --repeats 3
 ```
 
-Results (18 install cases, 3 repeats, 2026-10-27; `eval/history/m5-llm-ablation.json`):
+Results (18 install cases, 3 repeats, 2026-10-27; `eval/ablation/m5-haiku-5-5.json`):
 
 |                                | rules | rules + Haiku 5.5                    |
 | ------------------------------ | ----- | ------------------------------------ |

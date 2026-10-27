@@ -282,3 +282,21 @@ describe("the write allowlist (D33)", () => {
     ).toBeGreaterThan(0);
   });
 });
+
+describe("the SDK import allowance (D36)", () => {
+  const line =
+    '    const { default: Anthropic } = await import("@anthropic-ai/sdk");';
+  it("allows exactly the SDK's literal dynamic import, in exactly one file", () => {
+    expect(checkSource("src/llm/client.ts", line, false)).toEqual([]);
+    expect(checkSource("src/cli.ts", line, false).map((v) => v.rule)).toEqual([
+      "no-dynamic-import",
+    ]);
+    expect(
+      checkSource(
+        "src/llm/client.ts",
+        "const m = await import(name);",
+        false,
+      ).map((v) => v.rule),
+    ).toEqual(["no-dynamic-import"]);
+  });
+});

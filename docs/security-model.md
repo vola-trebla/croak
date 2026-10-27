@@ -108,7 +108,12 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
 - plans a workspace from its root, where the package manager installs, with
   every manifest of the project copied (never `node_modules` or `.git`; a
   file name with a control character, or more than 5,000 manifests, is
-  refused); refuses (exit 2) `npm-shrinkwrap.json`, not checked yet;
+  refused). The root is found by `croak workspace-root`, which reads
+  package.json as JSON, the hook's reading; the plan runs from the member's
+  folder, and a folder the planned lockfile does not list as a member is
+  incomplete (exit 3), since npm would install it on its own. A plain
+  install also checks every member's install scripts, not just the root's
+  (M6 review); refuses (exit 2) `npm-shrinkwrap.json`, not checked yet;
 - with `--pnpm`, runs pnpm the same way, plus what pnpm needs that npm does
   not (D39): pnpm can run code before it resolves anything. corepack fetches
   and runs the pnpm version a project's `packageManager` names, so the root

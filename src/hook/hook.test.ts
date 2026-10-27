@@ -24,7 +24,7 @@ const fs = (paths: string[], files: Record<string, string> = {}) => ({
   exists: (path: string) => paths.includes(path) || path in files,
   home: "/home/u",
 });
-const project = fs(["/repo", "/repo/package.json"]);
+const project = fs(["/repo"], { "/repo/package.json": "{}" });
 const modes = (command: string, deps = project) =>
   hookPlan(event(command), deps).checks.map(
     (c) => `${c.mode} ${c.dir} [${c.packages.join(" ")}]`,
@@ -172,20 +172,21 @@ describe("hookPlan: where npm really installs (M4 review)", () => {
     ).toEqual(["project /repo [zod]"]);
   });
 
-  it("checks a workspace member's install at the workspace root (D38)", () => {
+  it("hands a workspace member's install to croak-install where npm stands (D38, M6 review)", () => {
+    // croak-install finds the root and checks the folder is a member.
     const npmWs = files({
       "/repo/package.json": '{"name":"repo","workspaces":["packages/*"]}',
       "/repo/packages/a/package.json": '{"name":"a"}',
     });
     expect(modes("cd packages/a && npm install zod", npmWs)).toEqual([
-      "project /repo [zod]",
+      "project /repo/packages/a [zod]",
     ]);
     const pnpmWs = files({
       "/repo/pnpm-workspace.yaml": "packages:\n  - packages/*\n",
       "/repo/packages/a/package.json": '{"name":"a"}',
     });
     expect(modes("cd packages/a && pnpm add zod", pnpmWs)).toEqual([
-      "project /repo [zod]",
+      "project /repo/packages/a [zod]",
     ]);
     expect(
       hookPlan(event("cd packages/a && pnpm add zod"), pnpmWs).checks[0]
@@ -347,7 +348,8 @@ describe("hookDecide", () => {
 
 describe("runHook", () => {
   it("plans from the input file and decides from the work directory", () => {
-    const deps = fs(["/repo", "/repo/package.json"], {
+    const deps = fs(["/repo"], {
+      "/repo/package.json": "{}",
       "/w/input.json": event("npm i x"),
     });
     const planned = runHook(["plan", "/w/input.json"], deps).stdout;

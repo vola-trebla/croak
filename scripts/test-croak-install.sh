@@ -77,17 +77,29 @@ set -e
 [ "$code" -eq 2 ] && echo "$out" | grep -q "not supported yet" || { echo "FAIL: shrinkwrap was not refused (exit $code):"; echo "$out"; exit 1; }
 
 # An npm workspace: a member's dependency is planned from the root (D38),
-# even when croak-install runs inside the member.
+# even when croak-install runs inside the member, and the member's own
+# install scripts are checked. The workspaces key is written with an escape,
+# which npm reads as the key (M6 review).
 ws="$work/workspace"
-mkdir -p "$ws/packages/a"
-echo '{ "name": "ws", "version": "1.0.0", "private": true, "workspaces": ["packages/*"] }' >"$ws/package.json"
-printf '{ "name": "a", "version": "1.0.0", "dependencies": { "croak-bait": "file:%s" } }\n' "$work/bait/croak-bait-1.0.0.tgz" >"$ws/packages/a/package.json"
+mkdir -p "$ws/packages/a" "$ws/examples/demo"
+echo '{ "name": "ws", "version": "1.0.0", "private": true, "work\u0073paces": ["packages/*"] }' >"$ws/package.json"
+printf '{ "name": "a", "version": "1.0.0", "scripts": { "postinstall": "node setup.js" }, "dependencies": { "croak-bait": "file:%s" } }\n' "$work/bait/croak-bait-1.0.0.tgz" >"$ws/packages/a/package.json"
+echo "require('fs').writeFileSync('$marker', '')" >"$ws/packages/a/setup.js"
 set +e
 out=$(cd "$ws/packages/a" && sh "$root/scripts/croak-install.sh" 2>&1)
 set -e
 echo "$out" | grep -q "install/install-script" || { echo "FAIL: the workspace member's dependency was not planned:"; echo "$out"; exit 1; }
+echo "$out" | grep -q "packages/a/package.json" || { echo "FAIL: the member's postinstall was not checked:"; echo "$out"; exit 1; }
 [ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
-echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root"
+# A project inside the workspace folder that is not a member: npm installs it
+# on its own, not where croak would plan, so the check is incomplete.
+echo '{ "name": "demo", "version": "1.0.0" }' >"$ws/examples/demo/package.json"
+set +e
+out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
+code=$?
+set -e
+[ "$code" -eq 3 ] && echo "$out" | grep -q "does not list it as a member" || { echo "FAIL: a non-member was planned at the root (exit $code):"; echo "$out"; exit 1; }
+echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root, non-member refused"
 
 # A cache path with a space must not split into a script node would run
 # (whole-project review): a project file at the second half prints a forged
@@ -128,6 +140,12 @@ if command -v pnpm >/dev/null; then
   set -e
   echo "$out" | grep -q "install/source" || { echo "FAIL: the pnpm workspace was not planned:"; echo "$out"; exit 1; }
   [ ! -e "$marker" ] || { echo "FAIL: the pnpmfile or a script ran during planning"; exit 1; }
+  # pnpm add from a member's folder plans there: pnpm refuses to add to the root.
+  set +e
+  out=$(cd "$pw/packages/b" && sh "$root/scripts/croak-install.sh" --pnpm "$work/bait/croak-bait-1.0.0.tgz" 2>&1)
+  set -e
+  echo "$out" | grep -q "install/source" || { echo "FAIL: pnpm add in a member was not planned:"; echo "$out"; exit 1; }
+  [ ! -e "$marker" ] || { echo "FAIL: a script ran during pnpm planning"; exit 1; }
   echo "ok: pnpm planned the bait and a workspace whose settings would load code; nothing ran"
 else
   echo "skip: pnpm is not installed"

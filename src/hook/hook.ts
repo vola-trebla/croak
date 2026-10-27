@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { workspaceRoot } from "../install/workspace.ts";
 import { parseYamlDocuments } from "../install/yaml.ts";
 import { type InstallIntent, installIntents } from "./install-commands.ts";
 
@@ -95,32 +96,6 @@ export function npmPrefix(
     )
       return at;
     if (at === "/") return dir;
-  }
-}
-
-function readJson(path: string, deps: HookDeps): unknown {
-  if (!deps.exists(path)) return undefined;
-  try {
-    return JSON.parse(deps.readFile(path));
-  } catch {
-    return undefined; // npm would fail on it too; it hides no install
-  }
-}
-
-/** The directory of a package.json with workspaces, from `prefix` up (D34: not supported yet). */
-function workspaceRoot(
-  prefix: string,
-  manager: "npm" | "pnpm",
-  deps: HookDeps,
-): string | undefined {
-  for (let at = prefix; ; at = posix.dirname(at)) {
-    if (manager === "pnpm") {
-      if (deps.exists(posix.join(at, "pnpm-workspace.yaml"))) return at;
-    } else {
-      const manifest = readJson(posix.join(at, "package.json"), deps);
-      if (isRecord(manifest) && manifest.workspaces !== undefined) return at;
-    }
-    if (at === "/") return undefined;
   }
 }
 
@@ -297,7 +272,9 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
       id: checks.length + 1,
       manager,
       mode,
-      dir: mode === "empty" ? intent.dir : prefix,
+      // Where npm stands: croak-install finds the root itself, and checks
+      // that this folder is one of its members (M6 review).
+      dir: mode === "empty" ? intent.dir : local,
       packages: specs,
       label,
     });

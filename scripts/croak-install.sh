@@ -49,18 +49,22 @@ done
 lockname=package-lock.json
 [ "$manager" = npm ] || lockname=pnpm-lock.yaml
 
-# The workspace root, if this directory is inside a workspace.
+self=$(realpath "$0" 2>/dev/null || echo "$0")
+root=$(cd "$(dirname "$self")/.." && pwd -P)
+cli="$root/dist/cli.js"
+[ -f "$cli" ] || { echo "croak-install: $cli not found (run pnpm build in the croak repo)" >&2; exit 2; }
+
+# The workspace root, if this directory is inside one, read as JSON by croak
+# (the hook's reading, D38). croak may read anything here but writes and
+# spawns nothing. The plan then checks this folder is one of its members.
+member="" ws=""
 if [ "$mode" != empty ]; then
-  dir=$(pwd -P)
-  while :; do
-    if { [ "$manager" = npm ] && [ -f "$dir/package.json" ] && grep -q '"workspaces"[[:space:]]*:' "$dir/package.json"; } ||
-      { [ "$manager" = pnpm ] && [ -f "$dir/pnpm-workspace.yaml" ]; }; then
-      cd "$dir"
-      break
-    fi
-    [ "$dir" != / ] || break
-    dir=$(dirname "$dir")
-  done
+  start=$(pwd -P)
+  ws=$(node --permission "--allow-fs-read=*" --disallow-code-generation-from-strings "$cli" workspace-root "$manager" "$start") || exit 3
+  if [ -n "$ws" ] && [ "$ws" != "$start" ]; then
+    member=${start#"$ws"/}
+    cd "$ws"
+  fi
 fi
 case "$mode" in
   ci) [ "$#" -eq 0 ] || usage
@@ -74,10 +78,6 @@ if [ "$mode" != empty ] && [ "$manager" = npm ] && [ -f npm-shrinkwrap.json ]; t
 fi
 command -v "$manager" >/dev/null || { echo "croak-install: $manager is not installed" >&2; exit 3; }
 
-self=$(realpath "$0" 2>/dev/null || echo "$0")
-root=$(cd "$(dirname "$self")/.." && pwd -P)
-cli="$root/dist/cli.js"
-[ -f "$cli" ] || { echo "croak-install: $cli not found (run pnpm build in the croak repo)" >&2; exit 2; }
 
 # croak runs sandboxed (D23, D33): it may read croak itself, the plan's files
 # and this project, and write only its cache; spawning, workers and eval are
@@ -117,8 +117,9 @@ chmod +x "$work/bin/git"
 # corepack cache: its network is off, so no project can make it fetch one.
 corepack_home="${COREPACK_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/node/corepack}"
 # Both package managers, isolated the same way.
-isolated() { # isolated <command...>, run in $work/plan
-  (cd "$work/plan" && env -i PATH="$work/bin:$PATH" HOME="$work/home" \
+plan_at="$work/plan"
+isolated() { # isolated <command...>, run in $plan_at
+  (cd "$plan_at" && env -i PATH="$work/bin:$PATH" HOME="$work/home" \
     XDG_CONFIG_HOME="$work/home/.config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/home/.local/share" \
     COREPACK_HOME="$corepack_home" COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_AUTO_PIN=0 \
     npm_config_userconfig="$work/user.npmrc" npm_config_globalconfig="$work/global.npmrc" \
@@ -135,6 +136,7 @@ fi
 plan() { # plan <extra read path> <croak plan args...>: adds the pnpm policy, one quoted word each
   extra=$1
   shift
+  [ -z "$member" ] || set -- "$@" --member "$member"
   if [ -n "$pnpm_version" ]; then
     croak "$extra" plan "$@" --pnpm-builds "$project" --pnpm-version "$pnpm_version"
   elif [ "$manager" = pnpm ]; then
@@ -158,7 +160,7 @@ if [ "$mode" = empty ]; then
 else
   # Every manifest of a workspace, never node_modules or .git; a name with a
   # control character could break the copy, so it is refused instead.
-  if [ -f pnpm-workspace.yaml ] || grep -q '"workspaces"[[:space:]]*:' package.json; then
+  if [ -n "$ws" ]; then
     if find . \( -name node_modules -o -name .git \) -prune -o -name '*[[:cntrl:]]*' -print | grep -q .; then
       echo "croak-install: a file name in this workspace has a control character, so it was not checked" >&2
       exit 3
@@ -193,6 +195,8 @@ else
   set -- pnpm "$pnpm_command" --lockfile-only --ignore-scripts --registry=https://registry.npmjs.org/ \
     --config.manage-package-manager-versions=false "$@"
 fi
+# From a member's folder, as the agent ran it: pnpm add refuses the root.
+[ -z "$member" ] || plan_at="$work/plan/$member"
 if ! isolated "$@" >"$work/plan.log" 2>&1; then
   if grep -qE "E404|ERR_PNPM_FETCH_404|404 Not Found" "$work/plan.log"; then
     # Most often a mistyped or AI-invented name; an attacker may register it later.
@@ -208,6 +212,11 @@ if ! isolated "$@" >"$work/plan.log" 2>&1; then
   fi
   echo "croak-install: $manager could not plan this install, so it was not checked:" >&2
   tail -n 15 "$work/plan.log" >&2
+  exit 3
+fi
+if [ ! -f "$work/plan/$lockname" ] && [ -n "$member" ] && [ -f "$work/plan/$member/$lockname" ]; then
+  # The package manager planned the folder as its own project (M6 review).
+  echo "croak-install: $member is inside a workspace that does not list it as a member, so the install would not run where croak planned it" >&2
   exit 3
 fi
 [ -f "$work/plan/$lockname" ] || { echo "croak-install: $manager wrote no $lockname, so this install was not checked" >&2; exit 3; }

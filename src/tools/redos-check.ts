@@ -8,6 +8,7 @@
  * gives that step a hard timeout so a hung regex kills only this step.
  */
 import { performance } from "node:perf_hooks";
+import { parseYamlDocuments, YamlError } from "../install/yaml.ts";
 import { CODE_PATTERNS } from "../signals/code.ts";
 import { hiddenCode } from "../signals/hidden.ts";
 import { parseJsonc } from "../signals/jsonc.ts";
@@ -139,6 +140,27 @@ const SCANNERS: ReadonlyArray<{
       ",".repeat(LENGTH),
       "/*".repeat(LENGTH / 2),
       `[${", ".repeat(LENGTH / 2)}]`,
+    ],
+    budgetMs: 250,
+  },
+  {
+    // pnpm-lock.yaml comes from untrusted repos; errors are fine, slowness is not.
+    what: "yaml/parseYamlDocuments",
+    scan: (input) => {
+      try {
+        return parseYamlDocuments(input);
+      } catch (error) {
+        if (error instanceof YamlError) return undefined;
+        throw error;
+      }
+    },
+    inputs: () => [
+      ...pathological(LENGTH),
+      `a: ${"{".repeat(LENGTH / 2)}`,
+      `a:\n${"  b:\n".repeat(LENGTH / 8)}`,
+      `a: [${"'x', ".repeat(LENGTH / 5)}]`,
+      `${"k: v\n".repeat(LENGTH / 5)}`,
+      `a: '${"''".repeat(LENGTH / 2)}'`,
     ],
     budgetMs: 250,
   },

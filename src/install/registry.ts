@@ -259,6 +259,21 @@ export function versionFacts(
   };
 }
 
+/** A version's tarball URL and integrity, from its packument (the LLM diff's "before"). */
+export function tarballOf(
+  packument: unknown,
+  version: string,
+): { url: string; integrity: string | undefined } | undefined {
+  if (!isRecord(packument) || !isRecord(packument.versions)) return undefined;
+  const meta = packument.versions[version];
+  const dist = isRecord(meta) && isRecord(meta.dist) ? meta.dist : undefined;
+  if (dist === undefined || typeof dist.tarball !== "string") return undefined;
+  return {
+    url: dist.tarball,
+    integrity: typeof dist.integrity === "string" ? dist.integrity : undefined,
+  };
+}
+
 /** The downloaded tarball does not match the lockfile's integrity hash. */
 export class IntegrityError extends Error {
   constructor(message: string) {

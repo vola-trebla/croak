@@ -7,6 +7,7 @@ import {
   packageUrl,
   RegistryError,
   registryTarball,
+  tarballOf,
   verifyIntegrity,
   versionFacts,
 } from "./registry.ts";
@@ -231,5 +232,26 @@ describe("tarball download and integrity", () => {
     await expect(
       fetchTarball("https://evil.invalid/x.tgz", sri, { fetch: serve(data) }),
     ).rejects.toThrow(RegistryError);
+  });
+});
+
+describe("tarballOf", () => {
+  it("reads a version's tarball URL and integrity", () => {
+    const doc = {
+      versions: {
+        "1.0.0": {
+          dist: {
+            tarball: "https://registry.npmjs.org/x/-/x-1.0.0.tgz",
+            integrity: "sha512-x",
+          },
+        },
+      },
+    };
+    expect(tarballOf(doc, "1.0.0")).toEqual({
+      url: "https://registry.npmjs.org/x/-/x-1.0.0.tgz",
+      integrity: "sha512-x",
+    });
+    expect(tarballOf(doc, "2.0.0")).toBeUndefined();
+    expect(tarballOf("not a packument", "1.0.0")).toBeUndefined();
   });
 });

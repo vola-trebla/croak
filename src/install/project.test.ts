@@ -149,6 +149,30 @@ describe("pnpmfileFindings (D39)", () => {
     ]);
   });
 
+  it("reads a list of pnpmfiles and warns on patched dependencies (M6 review)", () => {
+    expect(
+      found({
+        "pnpm-workspace.yaml":
+          "pnpmfile:\n  - hooks/a.cjs\n  - hooks/b.cjs\npatchedDependencies:\n  lodash: patches/lodash.patch\n",
+        "hooks/a.cjs": "module.exports = {};",
+        "hooks/b.cjs": "module.exports = {};",
+      }),
+    ).toEqual([
+      "warn:hooks/a.cjs:pnpm runs hooks/a.cjs on every install",
+      "warn:hooks/b.cjs:pnpm runs hooks/b.cjs on every install",
+      "warn:pnpm-workspace.yaml:pnpm patches dependencies after download, past what croak checked",
+    ]);
+    expect(
+      found({
+        "package.json": JSON.stringify({
+          pnpm: { patchedDependencies: { "x@1.0.0": "p.patch" } },
+        }),
+      }),
+    ).toEqual([
+      "warn:package.json:pnpm patches dependencies after download, past what croak checked",
+    ]);
+  });
+
   it("finds nothing in a project without either", () => {
     expect(found({ "package.json": "{}" })).toEqual([]);
   });

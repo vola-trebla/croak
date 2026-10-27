@@ -208,6 +208,41 @@ describe("hookPlan: where npm really installs (M4 review)", () => {
     });
   });
 
+  it.each([
+    ["scriptShell: ./run.sh"],
+    ["nodeOptions: --require ./preload.js"],
+    ["strictSsl: false"],
+    ["httpsProxy: http://proxy.invalid:8080"],
+    ["namedRegistries:\n  corp: https://npm.corp.invalid/"],
+  ])(
+    "denies a pnpm install when pnpm-workspace.yaml sets %s (M6 review)",
+    (setting) => {
+      const plan = hookPlan(
+        event("cd packages/a && pnpm add zod"),
+        files({
+          "/repo/pnpm-workspace.yaml": `packages:\n  - packages/*\n${setting}\n`,
+          "/repo/packages/a/package.json": '{"name":"a"}',
+        }),
+      );
+      expect(plan.checks).toEqual([]);
+      expect(plan.intents[0]).toMatchObject({ kind: "unchecked" });
+    },
+  );
+
+  it("denies a project .npmrc that lets a proxy answer for the registry (M6 review)", () => {
+    for (const npmrc of [
+      "strict-ssl=false",
+      "https-proxy=http://p.invalid",
+      "shell-emulator=true",
+    ]) {
+      const plan = hookPlan(
+        event("pnpm add zod"),
+        files({ "/repo/.npmrc": npmrc }),
+      );
+      expect(plan.intents[0]).toMatchObject({ kind: "unchecked" });
+    }
+  });
+
   it("accepts the public registry and npm's own userconfig variable", () => {
     const deps = {
       ...files({

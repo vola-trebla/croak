@@ -182,10 +182,13 @@ export function pnpmfileFindings(dir: string, fs: ProjectFs): Finding[] {
       });
     }
   }
-  const named =
-    typeof settings.pnpmfile === "string"
-      ? [posix.normalize(settings.pnpmfile)]
-      : [];
+  // One file or a list of them (M6 review).
+  const listed: unknown[] = Array.isArray(settings.pnpmfile)
+    ? settings.pnpmfile
+    : settings.pnpmfile === undefined
+      ? []
+      : [settings.pnpmfile];
+  const named = listed.map((file) => posix.normalize(String(file)));
   for (const file of [...new Set([...PNPMFILES, ...named])]) {
     if (file === ".." || file.startsWith("../") || file.startsWith("/")) {
       findings.push({
@@ -219,6 +222,30 @@ export function pnpmfileFindings(dir: string, fs: ProjectFs): Finding[] {
       file,
       message: `pnpm runs ${file} on every install${hits.length > 0 ? `: ${describeSignals(hits, file)}` : ""}`,
     });
+  }
+  // Patches change a dependency's files after croak checked its tarball, its
+  // package.json and install scripts included (M6 review).
+  let manifestSettings: unknown;
+  const manifest = fs.read(posix.join(dir, "package.json"));
+  if (manifest !== undefined)
+    try {
+      const data: unknown = JSON.parse(stripBom(manifest));
+      if (isRecord(data)) manifestSettings = data.pnpm;
+    } catch {
+      // The install itself fails on it; the plan reports the lockfile.
+    }
+  for (const [where, from] of [
+    ["pnpm-workspace.yaml", settings],
+    ["package.json", manifestSettings],
+  ] as const) {
+    const patched = isRecord(from) ? from.patchedDependencies : undefined;
+    if (isRecord(patched) && Object.keys(patched).length > 0)
+      findings.push({
+        ruleId: PNPM_RULE,
+        severity: "warn",
+        file: where,
+        message: `pnpm patches dependencies after download, past what croak checked: ${Object.keys(patched).slice(0, 5).join(", ")}`,
+      });
   }
   if (
     isRecord(settings.configDependencies) &&

@@ -5,7 +5,6 @@ import {
   IntegrityError,
   RegistryError,
   tarballOf,
-  versionFacts,
 } from "../install/registry.ts";
 import { snapshotTarball, TarballError } from "../install/tar.ts";
 import type { Finding } from "../verdict.ts";
@@ -41,7 +40,6 @@ export async function llmStep(
   docs: ReadonlyMap<string, unknown>,
   llm: LlmOptions,
   fetchOptions: FetchOptions,
-  now: Date,
 ): Promise<LlmStep> {
   const judgements: LlmJudgement[] = [];
   const notes: Finding[] = [];
@@ -55,21 +53,23 @@ export async function llmStep(
       message: `${llm.model} did not judge it: ${why}`,
     });
   };
-  for (const label of warnedPackages(findings)) {
-    const change = changes.find(
-      (c) => `${c.entry.name}@${c.entry.version ?? "?"}` === label,
-    );
-    if (change === undefined) continue;
+  const warned = new Set(warnedPackages(findings));
+  // Every copy with a warning: D35 keeps same name@version from different
+  // sources apart, and the warned one may not be the first (M5 review).
+  for (const change of changes.filter((c) =>
+    warned.has(`${c.entry.name}@${c.entry.version ?? "?"}`),
+  )) {
     const { entry } = change;
+    const label = `${entry.name}@${entry.version ?? "?"}`;
     const doc = docs.get(entry.name);
     try {
       const after = snapshotTarball(
         await fetchTarball(entry.resolved ?? "", entry.integrity, fetchOptions),
       );
+      // The baseline is what the project had: a new dependency is shown whole,
+      // not as a delta from the registry's previous release (M5 review).
       const previous =
-        doc === undefined || doc === "not-found"
-          ? undefined
-          : versionFacts(doc, entry.version ?? "", now)?.previous?.version;
+        change.kind === "changed" ? change.previousVersion : undefined;
       const prevTarball =
         previous === undefined ? undefined : tarballOf(doc, previous);
       const before =

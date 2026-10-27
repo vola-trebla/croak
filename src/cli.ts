@@ -284,9 +284,8 @@ async function runPlan(
   const project = values.project;
   const extra: Finding[] = [
     ...llmMissing,
-    ...(buildsDir === undefined || values["pnpm-version"] === undefined
-      ? []
-      : pnpmfileFindings(buildsDir, projectFs)),
+    // The pnpmfile check needs only the project; the version is for the build rule.
+    ...(buildsDir === undefined ? [] : pnpmfileFindings(buildsDir, projectFs)),
     ...(project === undefined ? [] : projectScriptFindings(project, projectFs)),
   ];
   const judged: PlanOutcome =

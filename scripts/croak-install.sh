@@ -137,6 +137,9 @@ plan() { # plan <extra read path> <croak plan args...>: adds the pnpm policy, on
   shift
   if [ -n "$pnpm_version" ]; then
     croak "$extra" plan "$@" --pnpm-builds "$project" --pnpm-version "$pnpm_version"
+  elif [ "$manager" = pnpm ]; then
+    # Without a version, no build rule; the pnpmfile is still checked.
+    croak "$extra" plan "$@" --pnpm-builds "$project"
   else
     croak "$extra" plan "$@"
   fi

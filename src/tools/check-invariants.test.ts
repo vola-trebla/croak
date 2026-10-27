@@ -222,6 +222,27 @@ describe("checkPackageJson", () => {
     ).toEqual(["no-runtime-deps"]);
   });
 
+  it("allows only the official Anthropic SDK, pinned exactly (D36)", () => {
+    expect(
+      checkPackageJson({ dependencies: { "@anthropic-ai/sdk": "0.133.0" } }),
+    ).toEqual([]);
+    expect(
+      checkPackageJson({
+        dependencies: { "@anthropic-ai/sdk": "^0.133.0" },
+      }).map((v) => v.rule),
+    ).toEqual(["no-runtime-deps"]);
+    expect(
+      checkPackageJson({
+        optionalDependencies: { "@anthropic-ai/sdk": "0.133.0" },
+      }).map((v) => v.rule),
+    ).toEqual(["no-runtime-deps"]);
+    expect(
+      checkPackageJson({
+        dependencies: { "@anthropic-ai/sdk": "0.133.0", left_pad: "1.0.0" },
+      }).map((v) => v.text),
+    ).toEqual(["dependencies: left_pad"]);
+  });
+
   it("ignores empty dependency objects", () => {
     expect(checkPackageJson({ dependencies: {} })).toEqual([]);
   });

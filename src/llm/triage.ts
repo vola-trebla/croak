@@ -42,6 +42,9 @@ export interface MessagesClient {
   };
 }
 
+/** triage() bound to a client and model: what callers pass around. */
+export type TriageFn = (input: TriageInput) => Promise<TriageResult>;
+
 export class LlmError extends Error {
   constructor(message: string) {
     super(message);

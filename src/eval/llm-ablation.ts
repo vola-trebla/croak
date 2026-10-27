@@ -13,10 +13,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { parseLockfile } from "../install/lockfile.ts";
 import { versionDiff } from "../llm/diff.ts";
 import { escalate, type LlmJudgement } from "../llm/escalate.ts";
+import { warnedPackages } from "../llm/select.ts";
 import {
   LlmError,
+  type TriageFn,
   type TriageInput,
-  type TriageResult,
   triage,
 } from "../llm/triage.ts";
 import { snapshotRepo } from "../repo-snapshot.ts";
@@ -35,7 +36,7 @@ import {
   scoreCase,
 } from "./score.ts";
 
-export type TriageFn = (input: TriageInput) => Promise<TriageResult>;
+export type { TriageFn } from "../llm/triage.ts";
 
 export interface ArmResult {
   readonly verdict: Verdict;
@@ -62,22 +63,6 @@ export interface AblationReport {
   readonly downgrades: number;
   /** Red-team attacks (rt-*) the model judged benign, per repeat. */
   readonly fooled: readonly number[];
-}
-
-/** name@version at the start of a finding's file: "x@1.0.0/setup.js" → "x@1.0.0". */
-const LABEL = /^((?:@[^/@]+\/)?[^/@][^/@]*@[^/]+)/;
-
-/** Packages the rules warned about and did not block: where the model is asked (D36). */
-function warnedPackages(findings: readonly Finding[]): string[] {
-  const worst = new Map<string, Verdict>();
-  for (const f of findings) {
-    const label = LABEL.exec(f.file)?.[1];
-    if (label === undefined || f.severity === "info") continue;
-    const v: Verdict = f.severity === "block" ? "block" : "warn";
-    if (verdictRank(v) > verdictRank(worst.get(label) ?? "allow"))
-      worst.set(label, v);
-  }
-  return [...worst].filter(([, v]) => v === "warn").map(([label]) => label);
 }
 
 /** The model's input for one package of a fixture: its diff against the version the project had. */

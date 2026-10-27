@@ -454,3 +454,22 @@ the ablation's caveat asked for.
 **Trade-off:** the step re-downloads the tarballs it judges (the content
 cache stores findings, not tarballs) and adds a few seconds per warned
 package; answers are not cached yet.
+
+## D38 — pnpm: lockfile v9, its own script rules, workspaces for both managers (2026-10-28)
+
+M6 makes croak check pnpm installs, with three choices by the maintainer:
+- **A strict reader for pnpm-lock.yaml, no new dependency.** Only the YAML
+  pnpm writes (block mappings, quoted keys, flow collections, scalar lists,
+  several documents) plus flow collections spread over lines by formatters
+  such as Biome; anything else is a LockfileError, so the check is
+  incomplete, never guessed at. Lockfile v9 only (pnpm 9 and later).
+- **pnpm's own script rules.** pnpm 10 does not run dependencies' install
+  scripts unless they are allowed (`onlyBuiltDependencies`); an install
+  script pnpm will not run is info, not a warning. With "allow all" or a
+  pnpm older than 10, scripts count as for npm.
+- **Workspaces, for npm and pnpm alike.** The planning wrapper copies every
+  package.json of the project (not node_modules) and pnpm-workspace.yaml, so
+  monorepos are checked instead of refused; this lifts D34's workspace
+  refusal once the wrapper does it.
+  **Trade-off:** pnpm records no install-script flag, so install scripts are
+  known from the registry manifest and the tarball, not from the lockfile.

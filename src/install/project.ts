@@ -12,6 +12,7 @@ import { codeSignals, describeSignals, isSuspicious } from "../signals/code.ts";
 import { analyzeShell } from "../signals/shell.ts";
 import { stripBom } from "../signals/text.ts";
 import type { Finding } from "../verdict.ts";
+import { isPnpmLockfile } from "./pnpm-lockfile.ts";
 import { parseYamlDocuments, YamlError } from "./yaml.ts";
 
 const PNPM_RULE = "repo/pnpmfile";
@@ -20,7 +21,8 @@ const PNPM_RULE = "repo/pnpmfile";
  * The project's own install scripts (whole-project review, D35). A plain
  * `npm install` and `npm ci` run the root package.json's preinstall, install,
  * postinstall and prepare (and node-gyp for a binding.gyp) — the fake
- * test-assignment attack. croak judges them with the repo rules, on a small
+ * test-assignment attack — and the same scripts of every workspace member;
+ * pnpm also runs the root's pnpm:devPreinstall (M6 review). croak judges them with the repo rules, on a small
  * snapshot: the manifest, binding.gyp, and the local files its scripts run.
  * Not all of `croak repo`: a committed node_modules would make every install
  * in an existing project a warning.
@@ -35,43 +37,76 @@ export interface ProjectFs {
   ) => { kind: "file" | "symlink" | "other"; size: number } | undefined;
 }
 
-const policy = lifecycleScriptWith({
-  suspicious: isSuspicious,
-  scripts: INSTALL_SCRIPTS,
-  manifests: "root",
-});
+/** pnpm also runs the root project's pnpm:devPreinstall before it installs anything. */
+const PNPM_ROOT_SCRIPT = "pnpm:devPreinstall";
+
+const policies = {
+  npm: lifecycleScriptWith({
+    suspicious: isSuspicious,
+    scripts: INSTALL_SCRIPTS,
+    manifests: "repo",
+  }),
+  pnpm: lifecycleScriptWith({
+    suspicious: isSuspicious,
+    scripts: [...INSTALL_SCRIPTS, PNPM_ROOT_SCRIPT],
+    manifests: "repo",
+  }),
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function projectScriptFindings(dir: string, fs: ProjectFs): Finding[] {
-  const manifest = fs.read(posix.join(dir, "package.json"));
-  if (manifest === undefined) return [];
-  let scripts: Record<string, unknown> = {};
-  try {
-    const data: unknown = JSON.parse(stripBom(manifest));
-    if (isRecord(data) && isRecord(data.scripts)) scripts = data.scripts;
-  } catch {
-    // The detector reports an unreadable package.json itself.
+const outside = (path: string): boolean =>
+  path === ".." || path.startsWith("../") || path.startsWith("/");
+
+/**
+ * The workspace members a lockfile installs, as folders relative to the
+ * project (M6 review): npm's `packages` keys outside node_modules, pnpm's
+ * `importers` other than the root. Both package managers run a member's
+ * install scripts on a plain install, as they do the root's.
+ */
+export function workspaceMembers(lockfile: string): string[] {
+  let keys: string[] = [];
+  if (isPnpmLockfile(lockfile)) {
+    const [doc] = parseYamlDocuments(lockfile);
+    if (isRecord(doc) && isRecord(doc.importers))
+      keys = Object.keys(doc.importers);
+  } else {
+    const data: unknown = JSON.parse(stripBom(lockfile));
+    if (isRecord(data) && isRecord(data.packages))
+      keys = Object.entries(data.packages)
+        .filter(
+          ([key, raw]) =>
+            !key.startsWith("node_modules/") &&
+            !key.includes("/node_modules/") &&
+            isRecord(raw) &&
+            raw.resolved === undefined,
+        )
+        .map(([key]) => key);
   }
-  // Every local file any script runs (install scripts call others via npm run).
-  const files = new Set(["package.json", "binding.gyp"]);
-  for (const command of Object.values(scripts))
-    if (typeof command === "string")
-      for (const file of analyzeShell(command).localFiles) {
-        const path = posix.normalize(file);
-        if (path !== ".." && !path.startsWith("../") && !path.startsWith("/"))
-          files.add(path);
-      }
+  return [
+    ...new Set(keys.map((k) => posix.normalize(k)).filter((k) => k !== ".")),
+  ];
+}
+
+export function projectScriptFindings(
+  dir: string,
+  fs: ProjectFs,
+  options: {
+    readonly members?: readonly string[];
+    readonly pnpm?: boolean;
+  } = {},
+): Finding[] {
+  const findings: Finding[] = [];
   const entries: RepoEntry[] = [];
   const texts = new Map<string, string>();
-  for (const path of files) {
+  const add = (path: string): void => {
     const at = fs.kind(posix.join(dir, path));
-    if (at === undefined || at.kind === "other") continue;
+    if (at === undefined || at.kind === "other") return;
     if (at.kind === "symlink") {
       entries.push({ path, kind: "symlink", size: 0 });
-      continue;
+      return;
     }
     const oversized = at.size > MAX_FILE_BYTES;
     entries.push({
@@ -81,9 +116,42 @@ export function projectScriptFindings(dir: string, fs: ProjectFs): Finding[] {
     });
     const text = oversized ? undefined : fs.read(posix.join(dir, path));
     if (text !== undefined) texts.set(path, text);
+  };
+  for (const member of ["", ...(options.members ?? [])]) {
+    if (outside(member)) {
+      findings.push({
+        ruleId: "repo/lifecycle-script",
+        severity: "warn",
+        file: "package.json",
+        message: `the install also runs the install scripts of ${member}, a folder outside the project croak cannot read`,
+      });
+      continue;
+    }
+    const manifestPath = posix.join(member, "package.json");
+    const manifest = fs.read(posix.join(dir, manifestPath));
+    if (manifest === undefined) continue;
+    let scripts: Record<string, unknown> = {};
+    try {
+      const data: unknown = JSON.parse(stripBom(manifest));
+      if (isRecord(data) && isRecord(data.scripts)) scripts = data.scripts;
+    } catch {
+      // The detector reports an unreadable package.json itself.
+    }
+    // Every local file any script runs (install scripts call others via npm run).
+    const files = new Set(["package.json", "binding.gyp"]);
+    for (const command of Object.values(scripts))
+      if (typeof command === "string")
+        for (const file of analyzeShell(command).localFiles) {
+          const path = posix.normalize(file);
+          if (!outside(path)) files.add(path);
+        }
+    for (const file of files) add(posix.join(member, file));
   }
   const snapshot: RepoSnapshot = { entries, read: (path) => texts.get(path) };
-  return [...policy(snapshot)];
+  return [
+    ...findings,
+    ...policies[options.pnpm === true ? "pnpm" : "npm"](snapshot),
+  ];
 }
 
 const PNPMFILES = [".pnpmfile.cjs", ".pnpmfile.mjs"];

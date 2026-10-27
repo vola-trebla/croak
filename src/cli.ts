@@ -16,7 +16,11 @@ import {
 import { suggestNames } from "./install/metadata.ts";
 import { pnpmBuildPolicy } from "./install/pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
-import { pnpmfileFindings, projectScriptFindings } from "./install/project.ts";
+import {
+  pnpmfileFindings,
+  projectScriptFindings,
+  workspaceMembers,
+} from "./install/project.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   SanitizeError,
@@ -76,7 +80,7 @@ const HELP = `croak 🐸 — croak before you install
 
 Usage:
   croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>] [--llm]
-             [--pnpm-builds <dir> --pnpm-version <v>]
+             [--pnpm-builds <dir> [--pnpm-version <v>]]
              [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
@@ -286,7 +290,13 @@ async function runPlan(
     ...llmMissing,
     // The pnpmfile check needs only the project; the version is for the build rule.
     ...(buildsDir === undefined ? [] : pnpmfileFindings(buildsDir, projectFs)),
-    ...(project === undefined ? [] : projectScriptFindings(project, projectFs)),
+    ...(project === undefined || outcome.status !== "complete"
+      ? []
+      : projectScriptFindings(project, projectFs, {
+          // The plan's lockfile parsed, so its members can be read (M6 review).
+          members: workspaceMembers(after),
+          pnpm: buildsDir !== undefined,
+        })),
   ];
   const judged: PlanOutcome =
     outcome.status !== "complete" || extra.length === 0

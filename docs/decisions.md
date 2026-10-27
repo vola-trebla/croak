@@ -388,8 +388,8 @@ Fixed, and decided with the maintainer:
   package.json or node_modules), not the agent's directory, and `npm update`
   as an update. "Installed" means a hidden-lockfile entry whose folder holds
   that package (and, since D35, matches the plan's source and hash).
-- Not supported yet, so denied (maintainer's choice): npm workspaces and
-  `npm-shrinkwrap.json`; any npm config that points at a registry other than
+- Not supported yet, so denied (maintainer's choice): npm workspaces (since
+  D38 checked from their root instead) and `npm-shrinkwrap.json`; any npm config that points at a registry other than
   the public one (project or user `.npmrc`, `npm_config_*`, `--…registry`
   flags, `npm config set` or a write to `.npmrc` in the same command).
   **Trade-off:** monorepos with workspaces and teams with a private registry
@@ -493,3 +493,19 @@ pnpmfile and config dependencies and checks that nothing ran.
 **Trade-off:** pnpm resolves without the project's patches and pnpmfile
 hooks, so a plan can differ from the real install where those change
 resolution; it is then a plan of the unpatched tree, still checked.
+
+## D40 — The hook checks pnpm, and the pnpmfile is install-time code (2026-10-28)
+
+The hook now reads `pnpm add/install/update/dlx/create` and `pnpx` like npm
+(with pnpm's flags: `-C`/`--dir`, `--filter`, `--frozen-lockfile` as a ci,
+`--registry` and `pnpm_config_*` as foreign config) and checks them with
+`croak-install --pnpm`; a workspace member's install is checked at the
+workspace root (`pnpm-workspace.yaml` or npm `workspaces`), and
+`pnpm-workspace.yaml` is checked for other registries. Like the project's
+own install scripts for npm (D35), pnpm runs the project's pnpmfile on every
+install, scripts or not: `.pnpmfile.cjs` (or the file `pnpmfile:` names) is a
+warning, a block when its code reaches the network with secrets or eval;
+config dependencies are a warning. yarn and bun stay denied.
+**Trade-off:** `pnpm approve-builds` and `pnpm rebuild` run scripts of
+packages already installed; the hook does not re-check those, since the
+install showed what they do.

@@ -99,8 +99,8 @@ edits your config):
 }
 ```
 
-🔴, an incomplete check, or a command croak cannot vouch for (pnpm, a custom
-registry, `npm i $PKG`, npm workspaces, an `.npmrc` that points at a private
+🔴, an incomplete check, or a command croak cannot vouch for (yarn or bun, a
+custom registry, `npm i $PKG`, an `.npmrc` that points at a private
 registry) → the command is denied and the agent is told why;
 🟡 → Claude Code asks you; 🟢 → the hook stays silent and your normal
 permissions apply. `onFailure: "block"` matters: without it, Claude Code lets
@@ -126,6 +126,15 @@ yet, transitive ones included (on a fresh clone, the whole lockfile): the lockfi
 the registry (release age, provenance, publisher, look-alike names, brand-new
 packages and dependencies), and the package contents, downloaded and verified
 against the lockfile hash and read in memory, never extracted or run.
+
+**pnpm** (`croak-install --pnpm`, and `pnpm add/install/update/dlx`, `pnpx`
+in the hook) gets the same checks, plus what pnpm does differently:
+pnpm-lock.yaml is read by a strict parser of croak's own; an install script
+that pnpm 10+ will not run (the project does not allow its builds) is noted,
+not warned about; the project's `.pnpmfile.cjs` and config dependencies,
+which pnpm runs on every install, are checked; and planning never lets a
+project pick the pnpm binary (`packageManager`) or load a pnpmfile.
+Workspaces, npm and pnpm, are checked from their root.
 
 **`croak repo`** runs seven detectors: install scripts, VS Code autorun tasks,
 hidden code, obfuscation, dangerous git config, committed `node_modules`, and
@@ -213,7 +222,7 @@ allowed to fail again. Format, metrics and the real attacks behind each case:
 | ✅  | **M3** — npm install plans, registry and package-content signals            |
 | ✅  | **M4** — Claude Code hook, agent-friendly verdicts                          |
 | ✅  | **M5** — LLM triage of version diffs (Haiku by default)                     |
-| ⏳  | **M6** — pnpm                                                               |
+| ✅  | **M6** — pnpm                                                               |
 | ⏳  | **M7** — provenance verification + tarball-vs-source diff                   |
 | ⏳  | **M8** — public release                                                     |
 | 💭  | Later: Python, shared signed verdicts                                       |

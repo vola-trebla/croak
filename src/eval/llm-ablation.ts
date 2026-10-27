@@ -21,12 +21,7 @@ import {
   triage,
 } from "../llm/triage.ts";
 import { snapshotRepo } from "../repo-snapshot.ts";
-import {
-  aggregate,
-  type Finding,
-  type Verdict,
-  verdictRank,
-} from "../verdict.ts";
+import { aggregate, type Verdict, verdictRank } from "../verdict.ts";
 import { type EvalCase, loadCases } from "./case.ts";
 import { checkInstallFixture } from "./install-case.ts";
 import {

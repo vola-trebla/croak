@@ -35,7 +35,9 @@ Note: pnpm 12 does not accept `-s`.
 3. **Fail-closed for agents, warn for humans.** 🔴 and "incomplete" block an
    agent; 🟡 makes it ask the user (D20). An LLM failure alone falls back to
    deterministic checks.
-4. **Zero runtime dependencies** (D4). Use Node built-ins. Any exception needs a
+4. **No runtime dependencies but one** (D4, D36). Use Node built-ins. The only
+   exception is `@anthropic-ai/sdk` for the opt-in LLM layer, pinned exactly
+   (the invariant tripwire enforces both). Any other exception needs a
    decision record.
 5. **Never commit real malware.** Eval references real samples by name/hash
    only; `eval/samples/` is gitignored. Synthetic fixtures use harmless payloads

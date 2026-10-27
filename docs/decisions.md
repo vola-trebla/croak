@@ -420,3 +420,20 @@ layers meet. Fixed:
   cache path with a space can never make node run a project file.
   **Trade-off:** the global npmrc and npm's built-in config are not read; they
   belong to the user, not the repo.
+
+## D36 — The LLM layer: Claude Haiku 5.5 through the official SDK (2026-10-27)
+
+M5 adds an opt-in LLM triage of a package's version diff. The maintainer
+chose the cheapest model, Claude Haiku 5.5 ($0.10 / $0.50 per million input
+/ output tokens), and the official SDK over a hand-written `fetch` client,
+as simpler and the supported path. That is the one exception to D4: the
+tripwire allows `@anthropic-ai/sdk` in `dependencies` only, pinned to an
+exact version. 0.133.0 was chosen as the newest release over two weeks old
+(the 1.x line was days old, D25), and croak checked it: one false
+`dynamic-call` warning (`self[Symbol.asyncIterator]()`), since fixed. The
+model runs only on 🟡 packages, only with a key and an explicit opt-in;
+its answer can only add a finding (escalate-only, invariant 2), package
+content is untrusted input inside a random boundary, and any failure falls
+back to the deterministic verdict.
+**Trade-off:** croak now has a dependency tree (the SDK and three packages
+of its own) that must be kept pinned and checked on every update.

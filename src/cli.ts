@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -9,8 +9,13 @@ import {
   codeFingerprint,
   fileContentCache,
 } from "./install/content-cache.ts";
-import { installedLockfile } from "./install/installed.ts";
+import {
+  installedLockfile,
+  installedPnpmLockfile,
+} from "./install/installed.ts";
 import { suggestNames } from "./install/metadata.ts";
+import { pnpmBuildPolicy } from "./install/pnpm-builds.ts";
+import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
 import { projectScriptFindings } from "./install/project.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
@@ -66,6 +71,7 @@ const HELP = `croak 🐸 — croak before you install
 
 Usage:
   croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>] [--llm]
+             [--pnpm-builds <dir> --pnpm-version <v>]
              [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
@@ -107,6 +113,8 @@ function parse(argv: readonly string[]) {
       installed: { type: "string" },
       project: { type: "string" },
       llm: { type: "boolean" },
+      "pnpm-builds": { type: "string" },
+      "pnpm-version": { type: "string" },
     },
     allowPositionals: true,
     strict: true,
@@ -136,6 +144,8 @@ async function runPlan(
     readonly installed?: string | undefined;
     readonly project?: string | undefined;
     readonly llm?: boolean | undefined;
+    readonly "pnpm-builds"?: string | undefined;
+    readonly "pnpm-version"?: string | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -161,18 +171,57 @@ async function runPlan(
     return usageError("plan takes --before or --installed, not both");
   if (values.installed !== undefined) {
     // What is really in node_modules, verified folder by folder (D34).
-    before = installedLockfile(values.installed, (path) => {
+    const tryRead = (path: string): string | undefined => {
       try {
         return read(path);
       } catch {
         return undefined;
       }
-    });
+    };
+    // The installed tree of the manager that wrote the plan (D38).
+    before = isPnpmLockfile(after)
+      ? installedPnpmLockfile(
+          values.installed,
+          tryRead,
+          (dir) => {
+            try {
+              return readdirSync(dir);
+            } catch {
+              return [];
+            }
+          },
+          parsePnpmLockfile,
+        )
+      : installedLockfile(values.installed, tryRead);
   } else if (values.before !== undefined && values.before !== "none") {
     const text = load(values.before);
     if (typeof text !== "string") return text;
     before = text;
   }
+  // pnpm's own rule for whose install scripts run, from the project's settings (D38).
+  const buildsDir = values["pnpm-builds"];
+  const builds =
+    buildsDir === undefined || values["pnpm-version"] === undefined
+      ? undefined
+      : pnpmBuildPolicy(
+          {
+            packageJson: (() => {
+              try {
+                return read(`${buildsDir}/package.json`);
+              } catch {
+                return undefined;
+              }
+            })(),
+            workspaceYaml: (() => {
+              try {
+                return read(`${buildsDir}/pnpm-workspace.yaml`);
+              } catch {
+                return undefined;
+              }
+            })(),
+          },
+          values["pnpm-version"],
+        );
   // --offline: lockfile signals only, no registry requests (tests, air-gapped CI).
   const outcome =
     values.offline === true
@@ -183,6 +232,7 @@ async function runPlan(
             ? {}
             : { cache: deps.cache }),
           content: values["metadata-only"] !== true,
+          ...(builds === undefined ? {} : { builds }),
           ...(values.llm === true && deps.llm !== undefined
             ? { llm: deps.llm }
             : {}),

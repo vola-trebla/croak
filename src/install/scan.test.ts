@@ -527,6 +527,39 @@ describe("planInstallOnline: package contents", () => {
       expect(seen).toEqual([undefined, "0.9.0"]);
     });
 
+    it("stays within its limits and says what it skipped (M5 review)", async () => {
+      const { asked, options } = llm("malicious");
+      const outcome = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        {
+          fetch: serve(installer),
+          now,
+          llm: { ...options, maxPackages: 0 },
+        },
+      );
+      expect(asked).toEqual([]);
+      expect(outcome).toMatchObject({ status: "complete", verdict: "warn" });
+      expect(outcome.status === "complete" && outcome.findings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            ruleId: "llm/triage",
+            message: expect.stringContaining("limit of 0 packages"),
+          }),
+        ]),
+      );
+      const tiny = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        {
+          fetch: serve(installer),
+          now,
+          llm: { ...llm("malicious").options, maxDownloadBytes: 10 },
+        },
+      );
+      expect(tiny).toMatchObject({ status: "complete", verdict: "warn" });
+    });
+
     it("never lowers the verdict: a benign answer keeps the warning", async () => {
       const outcome = await planInstallOnline(
         undefined,

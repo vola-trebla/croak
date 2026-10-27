@@ -43,7 +43,7 @@ describe("runAblation (fake model, no network)", () => {
         return answer("benign")(input);
       },
     );
-    expect(diff).toContain("=== setup.js (changed:");
+    expect(diff).toContain("=== setup.js (run at install, shown in full)");
     expect(diff).toContain('Buffer.from(b, "base64")');
   });
 

@@ -107,8 +107,9 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
   project (npx, `npm install -g`);
 - plans a workspace from its root, where the package manager installs, with
   every manifest of the project copied (never `node_modules` or `.git`; a
-  file name with a control character, or more than 5,000 manifests, is
-  refused). The root is found by `croak workspace-root`, which reads
+  file name with a control character, more than 5,000 manifests, a linked
+  manifest or folder, or, for pnpm, a package.yaml or package.json5, is
+  refused: the copy would leave a member out). The root is found by `croak workspace-root`, which reads
   package.json as JSON, the hook's reading; the plan runs from the member's
   folder, and a folder the planned lockfile does not list as a member is
   incomplete (exit 3), since npm would install it on its own. A plain

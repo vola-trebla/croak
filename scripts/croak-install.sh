@@ -165,6 +165,21 @@ else
       echo "croak-install: a file name in this workspace has a control character, so it was not checked" >&2
       exit 3
     fi
+    # find copies regular files only and does not enter linked folders, but
+    # the package manager follows links, and pnpm also reads package.yaml and
+    # package.json5: any of them would leave a member out of the plan (M6 review).
+    find . \( -name node_modules -o -name .git \) -prune -o -type l -print >"$work/links"
+    while IFS= read -r f; do
+      case "$f" in */package.json | */package.yaml | */package.json5) linked=1 ;; *) linked=0 ;; esac
+      if [ "$linked" = 1 ] || [ -d "$f" ]; then
+        echo "croak-install: $f is a symbolic link in this workspace, so it was not checked" >&2
+        exit 3
+      fi
+    done <"$work/links"
+    if [ "$manager" = pnpm ] && find . \( -name node_modules -o -name .git \) -prune -o \( -name package.yaml -o -name package.json5 \) -print | grep -q .; then
+      echo "croak-install: this workspace has a package.yaml or package.json5, which croak does not read, so it was not checked" >&2
+      exit 3
+    fi
     find . \( -name node_modules -o -name .git \) -prune -o -type f -name package.json -print | head -n 5001 >"$work/manifests"
     if [ "$(wc -l <"$work/manifests")" -gt 5000 ]; then
       echo "croak-install: more than 5000 package.json files in this workspace, so it was not checked" >&2

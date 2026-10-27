@@ -99,7 +99,17 @@ out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
 code=$?
 set -e
 [ "$code" -eq 3 ] && echo "$out" | grep -q "does not list it as a member" || { echo "FAIL: a non-member was planned at the root (exit $code):"; echo "$out"; exit 1; }
-echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root, non-member refused"
+# A member behind a linked folder would be left out of the copy: refused.
+mkdir -p "$work/elsewhere/c"
+echo '{ "name": "c", "version": "1.0.0", "scripts": { "postinstall": "node x.js" } }' >"$work/elsewhere/c/package.json"
+ln -s "$work/elsewhere/c" "$ws/packages/c"
+set +e
+out=$(cd "$ws" && sh "$root/scripts/croak-install.sh" 2>&1)
+code=$?
+set -e
+rm "$ws/packages/c"
+[ "$code" -eq 3 ] && echo "$out" | grep -q "symbolic link" || { echo "FAIL: a linked member was not refused (exit $code):"; echo "$out"; exit 1; }
+echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root, non-member and linked member refused"
 
 # A cache path with a space must not split into a script node would run
 # (whole-project review): a project file at the second half prints a forged
@@ -146,6 +156,15 @@ if command -v pnpm >/dev/null; then
   set -e
   echo "$out" | grep -q "install/source" || { echo "FAIL: pnpm add in a member was not planned:"; echo "$out"; exit 1; }
   [ ! -e "$marker" ] || { echo "FAIL: a script ran during pnpm planning"; exit 1; }
+  # pnpm reads package.yaml too; croak does not, so it refuses.
+  mkdir -p "$pw/packages/d"
+  printf 'name: d\nversion: 1.0.0\n' >"$pw/packages/d/package.yaml"
+  set +e
+  out=$(cd "$pw" && sh "$root/scripts/croak-install.sh" --pnpm 2>&1)
+  code=$?
+  set -e
+  rm -r "$pw/packages/d"
+  [ "$code" -eq 3 ] && echo "$out" | grep -q "package.yaml" || { echo "FAIL: a package.yaml member was not refused (exit $code):"; echo "$out"; exit 1; }
   echo "ok: pnpm planned the bait and a workspace whose settings would load code; nothing ran"
 else
   echo "skip: pnpm is not installed"

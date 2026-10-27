@@ -78,6 +78,10 @@ if mkdir -p "$cache" 2>/dev/null && chmod 700 "$cache" 2>/dev/null; then
   cache_write="--allow-fs-write=$real_cache"
 fi
 project=$(pwd -P)
+# CROAK_LLM=1 adds the opt-in LLM step (D36): Claude Haiku 5.5 on packages
+# the rules only warned about. It needs ANTHROPIC_API_KEY in the environment.
+llm=""
+[ "${CROAK_LLM:-}" != 1 ] || llm=--llm
 croak() { # croak <extra read path> <args...>
   extra=$1
   shift
@@ -87,7 +91,7 @@ croak() { # croak <extra read path> <args...>
 
 if [ "$mode" = ci ]; then
   # npm ci removes node_modules and installs the lockfile as is: nothing to plan.
-  croak "$project" plan --before none --after package-lock.json --project "$project" $json
+  croak "$project" plan --before none --after package-lock.json --project "$project" $json $llm
   exit $?
 fi
 
@@ -132,7 +136,7 @@ fi
 
 # A plain npm install also runs the project's own install scripts (D35).
 if [ "$mode" = project ] && [ "$#" -eq 0 ]; then
-  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" --project "$project" $json
+  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" --project "$project" $json $llm
 else
-  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json
+  croak "$work" plan "$baseline" "$baseline_value" --after "$work/package-lock.json" $json $llm
 fi

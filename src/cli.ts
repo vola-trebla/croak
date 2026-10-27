@@ -3,6 +3,7 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import Anthropic from "@anthropic-ai/sdk";
 import { runHook } from "./hook/hook.ts";
 import {
   type ContentCache,
@@ -18,9 +19,11 @@ import {
   planInstall,
   planInstallOnline,
 } from "./install/scan.ts";
+import type { LlmOptions } from "./llm/plan-step.ts";
+import { DEFAULT_MODEL, triage } from "./llm/triage.ts";
 import { renderScan, scanToJson } from "./repo-report.ts";
 import { type ScanOutcome, ScanTargetError, scanRepoAt } from "./scan.ts";
-import { aggregate } from "./verdict.ts";
+import { aggregate, type Finding } from "./verdict.ts";
 
 export const VERSION = "0.0.0";
 
@@ -51,6 +54,8 @@ export interface CliDeps {
   readonly fetch?: typeof globalThis.fetch;
   /** Content findings cache for `croak plan` (none in tests). */
   readonly cache?: ContentCache;
+  /** The model for `croak plan --llm`; undefined when no API key is set. */
+  readonly llm?: LlmOptions;
 }
 
 const DEFAULT_DEPS: CliDeps = {
@@ -61,7 +66,7 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>]
+  croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>] [--llm]
              [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
@@ -102,6 +107,7 @@ function parse(argv: readonly string[]) {
       "no-cache": { type: "boolean" },
       installed: { type: "string" },
       project: { type: "string" },
+      llm: { type: "boolean" },
     },
     allowPositionals: true,
     strict: true,
@@ -130,6 +136,7 @@ async function runPlan(
     readonly "no-cache"?: boolean | undefined;
     readonly installed?: string | undefined;
     readonly project?: string | undefined;
+    readonly llm?: boolean | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -177,42 +184,63 @@ async function runPlan(
             ? {}
             : { cache: deps.cache }),
           content: values["metadata-only"] !== true,
+          ...(values.llm === true && deps.llm !== undefined
+            ? { llm: deps.llm }
+            : {}),
         });
+  // --llm without a key: the rules decide, and the report says the model did not run.
+  const llmMissing: Finding[] =
+    values.llm === true && deps.llm === undefined && values.offline !== true
+      ? [
+          {
+            ruleId: "llm/triage",
+            severity: "info",
+            file: "croak",
+            message:
+              "--llm was asked for, but ANTHROPIC_API_KEY is not set: rules only",
+          },
+        ]
+      : [];
   // A plain npm install or npm ci also runs the project's own install scripts (D35).
   const project = values.project;
   const judged: PlanOutcome =
-    project === undefined || outcome.status !== "complete"
+    outcome.status !== "complete"
       ? outcome
-      : (() => {
-          const findings = [
-            ...projectScriptFindings(project, {
-              read: (path) => {
-                try {
-                  return read(path);
-                } catch {
-                  return undefined;
-                }
-              },
-              kind: (path) => {
-                try {
-                  const stats = lstatSync(path);
-                  return {
-                    kind: stats.isSymbolicLink()
-                      ? "symlink"
-                      : stats.isFile()
-                        ? "file"
-                        : "other",
-                    size: stats.size,
-                  };
-                } catch {
-                  return undefined;
-                }
-              },
-            }),
-            ...outcome.findings,
-          ];
-          return { ...outcome, findings, verdict: aggregate(findings) };
-        })();
+      : project === undefined
+        ? llmMissing.length === 0
+          ? outcome
+          : { ...outcome, findings: [...llmMissing, ...outcome.findings] }
+        : (() => {
+            const findings = [
+              ...llmMissing,
+              ...projectScriptFindings(project, {
+                read: (path) => {
+                  try {
+                    return read(path);
+                  } catch {
+                    return undefined;
+                  }
+                },
+                kind: (path) => {
+                  try {
+                    const stats = lstatSync(path);
+                    return {
+                      kind: stats.isSymbolicLink()
+                        ? "symlink"
+                        : stats.isFile()
+                          ? "file"
+                          : "other",
+                      size: stats.size,
+                    };
+                  } catch {
+                    return undefined;
+                  }
+                },
+              }),
+              ...outcome.findings,
+            ];
+            return { ...outcome, findings, verdict: aggregate(findings) };
+          })();
   const stdout =
     values.json === true
       ? planToJson(judged)
@@ -296,9 +324,22 @@ if (import.meta.main) {
     );
     return cache;
   };
+  const key = process.env.ANTHROPIC_API_KEY;
+  let client: Anthropic | undefined;
   const result = await run(process.argv.slice(2), {
     scan: (root) => scanRepoAt(root),
     emoji: process.stdout.isTTY === true,
+    ...(key === undefined || key === ""
+      ? {}
+      : {
+          llm: {
+            model: DEFAULT_MODEL,
+            triage: (input) => {
+              client ??= new Anthropic({ apiKey: key });
+              return triage(input, client);
+            },
+          },
+        }),
     cache: {
       get: (integrity, label) => contentCache().get(integrity, label),
       set: (integrity, label, findings) =>

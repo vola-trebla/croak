@@ -1,0 +1,8 @@
+{
+  "name": "fastlog-native",
+  "version": "2.0.1",
+  "description": "SYNTHETIC croak eval fixture",
+  "scripts": {
+    "postinstall": "node setup.js"
+  }
+}

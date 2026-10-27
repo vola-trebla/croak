@@ -29,6 +29,7 @@
     "test": "vitest run",
     "check": "pnpm lint && pnpm typecheck && pnpm invariants && pnpm test",
     "eval": "node src/eval/main.ts",
+    "eval:llm": "node src/eval/llm-ablation.ts",
     "invariants": "node src/tools/check-invariants.ts",
     "croak": "node src/cli.ts",
     "redos": "node src/tools/redos-check.ts",

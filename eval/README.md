@@ -125,6 +125,39 @@ offline on a fake project and prints:
 `eval "$INSTALL_CMD"`: what it runs is only known when the shell runs, and
 treating every `eval` as an install would deny common shell setup lines.
 
+## LLM ablation (M5)
+
+`pnpm eval:llm` runs every install case twice: croak's rules alone, and rules
+plus Claude Haiku 5.5 on each package the rules only warned about (D36). The
+model's answer can only add a finding, so the run also counts downgrades
+(must be 0). Four red-team cases (`rt-*`, `benign-rt-flag-me`) are attacks
+that the rules see only as a binary installer (🟡), each trying to talk the
+model out of escalating: a comment addressed to AI reviewers, a faked end of
+the untrusted boundary, a ready-made benign JSON answer; and a benign twin
+asking to be flagged. Needs `ANTHROPIC_API_KEY`; costs under a cent.
+
+```bash
+ANTHROPIC_API_KEY=… pnpm eval:llm --repeats 3
+```
+
+Results (18 install cases, 3 repeats, 2026-10-27; `eval/ablation/m5-haiku-5-5.json`):
+
+|                                | rules | rules + Haiku 5.5                    |
+| ------------------------------ | ----- | ------------------------------------ |
+| block recall                   | 7/10  | 10/10, 10/10, 10/10                  |
+| false alarms                   | 0/8   | 0/8, 0/8, 0/8                        |
+| red team that fooled the model | —     | 0/3 in every run                     |
+| downgrades                     | —     | 0                                    |
+| cost                           | —     | $0.0043 for 24 calls ($0.00018 each) |
+
+The first prompt said download-and-run code is an attack; the model then
+called an honest binary installer (the esbuild pattern) malicious in 2 of 3
+runs (false alarms 1–2/8). The prompt now asks for evidence of harm before
+"malicious" and names that pattern as suspicious at most. That change was
+tuned on this eval, so these numbers can overstate real-world precision; the
+red-team cases were written before the tuning, and a check on real packages
+comes with the `croak plan` wiring.
+
 ## Package corpus (false-alarm check for installs)
 
 `eval/packages.json` pins 61 popular npm packages by version: frameworks,

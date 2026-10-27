@@ -203,3 +203,32 @@ describe("croak suggest", () => {
     });
   });
 });
+
+describe("croak plan --llm without a key", () => {
+  it("runs the rules and says the model did not run", async () => {
+    const lock = JSON.stringify({ lockfileVersion: 3, packages: { "": {} } });
+    const result = await run(
+      ["plan", "--after", "after.json", "--offline", "--json", "--llm"],
+      {
+        ...deps(outcome("allow")),
+        readFile: () => lock,
+      },
+    );
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout).findings).toEqual([]);
+    const online = await run(
+      ["plan", "--after", "after.json", "--json", "--llm", "--metadata-only"],
+      {
+        ...deps(outcome("allow")),
+        readFile: () => lock,
+        fetch: async () => new Response("{}"),
+      },
+    );
+    expect(JSON.parse(online.stdout).findings).toEqual([
+      expect.objectContaining({
+        ruleId: "llm/triage",
+        message: expect.stringContaining("ANTHROPIC_API_KEY"),
+      }),
+    ]);
+  });
+});

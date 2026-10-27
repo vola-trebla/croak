@@ -106,6 +106,17 @@ permissions apply. `onFailure: "block"` matters: without it, Claude Code lets
 a command through when a hook crashes or times out. It needs Claude Code
 2.1.295 or later.
 
+**The AI layer (optional).** With `CROAK_LLM=1` and `ANTHROPIC_API_KEY` set
+(for the hook: in the environment Claude Code runs it with; for
+`croak plan`: `--llm`), croak asks Claude Haiku 5.5 about each package the
+rules only warned about, showing it what changed since the previous
+version. Its answer can only add a 🟡 or a 🔴, never remove one; without a
+key, or when the model fails, the rules decide alone. Only the diffs of
+public npm packages are sent, never your project's files. On croak's eval
+it lifted blocked attacks from 7/10 to 10/10 with no false alarms, and on
+61 popular packages it added no blocks, for about $0.001 a package
+([eval/README.md](eval/README.md#llm-ablation-m5)).
+
 **`croak-install`** has npm resolve the install with `--package-lock-only
 --ignore-scripts` in an isolated temp directory (your project's lockfile is
 not touched), then `croak plan` checks every version that is not installed
@@ -198,8 +209,8 @@ allowed to fail again. Format, metrics and the real attacks behind each case:
 | ✅  | **M1** — eval first: case format, runner, metrics, regression guard         |
 | ✅  | **M2** — `croak repo`: autorun configs, hidden code, obfuscation            |
 | ✅  | **M3** — npm install plans, registry and package-content signals            |
-| ⏳  | **M4** — Claude Code hook, agent-friendly verdicts                          |
-| ⏳  | **M5** — LLM triage of version diffs (Haiku by default)                     |
+| ✅  | **M4** — Claude Code hook, agent-friendly verdicts                          |
+| ✅  | **M5** — LLM triage of version diffs (Haiku by default)                     |
 | ⏳  | **M6** — pnpm                                                               |
 | ⏳  | **M7** — provenance verification + tarball-vs-source diff                   |
 | ⏳  | **M8** — public release                                                     |

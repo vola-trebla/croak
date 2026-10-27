@@ -155,8 +155,12 @@ called an honest binary installer (the esbuild pattern) malicious in 2 of 3
 runs (false alarms 1–2/8). The prompt now asks for evidence of harm before
 "malicious" and names that pattern as suspicious at most. That change was
 tuned on this eval, so these numbers can overstate real-world precision; the
-red-team cases were written before the tuning, and a check on real packages
-comes with the `croak plan` wiring.
+red-team cases were written before the tuning.
+
+On real packages (`pnpm corpus:packages --llm`, the 61 pinned packages,
+2026-10-27): the model was asked about the 21 packages the rules warned about
+and answered benign 20 times and suspicious once (next, already a warning),
+malicious never: 0 new blocks, 0 failures, $0.02 for the whole corpus.
 
 ## Package corpus (false-alarm check for installs)
 

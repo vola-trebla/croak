@@ -105,11 +105,12 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 ### M5 — LLM triage (BYOK, Haiku by default)
 
-- [ ] Version-diff analysis only (cheap, focused)
-- [ ] Escalate-only policy enforced in code
-- [ ] Cost per verdict
-- [ ] Ablation eval: rules vs rules+Haiku vs rules+stronger model
-- [ ] Prompt-injection red-team set (target: 0 successful downgrades)
+- [x] Version-diff analysis only (cheap, focused): `src/llm/diff.ts`, ~5K characters for a patch release
+- [x] Escalate-only policy enforced in code (`escalate()`, tested exhaustively)
+- [x] Cost per verdict: ~$0.0002–0.001 per package, shown in the report
+- [x] Ablation eval: rules vs rules+Haiku 5.5 (the maintainer chose the cheapest model only): block recall 7/10 → 10/10, false alarms 0/8; 61 real packages: 0 new blocks
+- [x] Prompt-injection red-team set: 0 downgrades by construction, 0/3 attacks fooled the model
+- [x] Opt-in wiring: `croak plan --llm`, `CROAK_LLM=1` for croak-install and the hook (D37)
 
 ### M6 — pnpm adapter
 

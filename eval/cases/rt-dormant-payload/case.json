@@ -1,0 +1,10 @@
+{
+  "id": "rt-dormant-payload",
+  "kind": "install",
+  "threat": "A",
+  "description": "Red team: the payload ships unused in 2.0.0; 2.0.1 changes nothing but adds the postinstall that runs it. The model must see the unchanged file.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["install/new-install-script"]
+  }
+}

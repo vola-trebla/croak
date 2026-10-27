@@ -24,7 +24,9 @@ describe("runAblation (fake model, no network)", () => {
     expect(seen.length).toBeGreaterThan(0);
     expect(report.downgrades).toBe(0);
     expect(report.llm[0]?.blockRecall).toEqual(report.rules.blockRecall);
-    expect(report.fooled[0]).toBe(3);
+    expect(report.fooled[0]).toBe(
+      cases.filter((c) => c.id.startsWith("rt-")).length,
+    );
   });
 
   it("raises every warned malicious case to a block when the model says malicious", async () => {

@@ -30,7 +30,7 @@ export interface CommandMetrics {
   readonly exact: { readonly hit: number; readonly total: number };
 }
 
-/** A project at /repo with package.json and a local tsc, under a home at /home/u. */
+/** A project at /repo with package.json files and a local tsc, under a home at /home/u. */
 const FAKE_FS = new Set([
   "/repo",
   "/repo/package.json",
@@ -51,8 +51,10 @@ export function answer(command: string): CommandAnswer {
       tool_input: { command },
     }),
     {
-      readFile: () => {
-        throw new Error("the command eval reads no files");
+      // Plain manifests, no workspaces; nothing else is read.
+      readFile: (path) => {
+        if (path.endsWith("/package.json") && FAKE_FS.has(path)) return "{}";
+        throw new Error(`the command eval reads no other files: ${path}`);
       },
       exists: (path) => FAKE_FS.has(path),
       home: "/home/u",

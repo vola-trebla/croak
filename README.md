@@ -127,12 +127,6 @@ the registry (release age, provenance, publisher, look-alike names, brand-new
 packages and dependencies), and the package contents, downloaded and verified
 against the lockfile hash and read in memory, never extracted or run.
 
-> ⚠️ **pnpm support is under review.** The M6 review found ways a pnpm (or
-> npm workspace) install could get 🟢 while running code croak did not check:
-> workspace members' own scripts, pnpm flags and settings croak ignores, and
-> the pnpm version a project pins. Fixes are in progress; until this note is
-> gone, don't rely on croak for pnpm or for workspaces.
-
 **pnpm** (`croak-install --pnpm`, and `pnpm add/install/update/dlx`, `pnpx`
 in the hook) gets the same checks, plus what pnpm does differently:
 pnpm-lock.yaml is read by a strict parser of croak's own; an install script
@@ -140,7 +134,9 @@ that pnpm 10+ will not run (the project does not allow its builds) is noted,
 not warned about; the project's `.pnpmfile.cjs` and config dependencies,
 which pnpm runs on every install, are checked; and planning never lets a
 project pick the pnpm binary (`packageManager`) or load a pnpmfile.
-Workspaces, npm and pnpm, are checked from their root.
+Workspaces, npm and pnpm, are checked from their root, with every member's
+own install scripts; a folder the workspace does not list as a member is
+refused.
 
 **`croak repo`** runs seven detectors: install scripts, VS Code autorun tasks,
 hidden code, obfuscation, dangerous git config, committed `node_modules`, and
@@ -228,7 +224,7 @@ allowed to fail again. Format, metrics and the real attacks behind each case:
 | ✅  | **M3** — npm install plans, registry and package-content signals            |
 | ✅  | **M4** — Claude Code hook, agent-friendly verdicts                          |
 | ✅  | **M5** — LLM triage of version diffs (Haiku by default)                     |
-| 🧪  | **M6** — pnpm (under review)                                                |
+| ✅  | **M6** — pnpm and workspaces                                                |
 | ⏳  | **M7** — provenance verification + tarball-vs-source diff                   |
 | ⏳  | **M8** — public release                                                     |
 | 💭  | Later: Python, shared signed verdicts                                       |

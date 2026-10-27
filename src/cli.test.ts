@@ -180,6 +180,29 @@ describe("croak plan", () => {
     expect(report).toMatchObject({ schema: 1, kind: "install-plan", added: 2 });
   });
 
+  it("is incomplete when the folder is not a member of the workspace it planned at (M6 review)", async () => {
+    const ws = {
+      ...planDeps,
+      readFile: (path: string) =>
+        path === "ws.json"
+          ? lock({ "packages/a": { name: "a", version: "1.0.0" } })
+          : (planDeps.readFile?.(path) ?? ""),
+    };
+    const plan = (member: string) =>
+      run(
+        [
+          ...["plan", "--before", "none", "--after", "ws.json", "--offline"],
+          ...["--member", member],
+        ],
+        ws,
+      );
+    expect((await plan("packages/a")).code).toBe(EXIT.ok);
+    expect(await plan("examples/demo")).toMatchObject({
+      code: EXIT.incomplete,
+      stdout: expect.stringContaining("does not list it as a member"),
+    });
+  });
+
   it("requires --after and readable files", async () => {
     expect((await run(["plan"], planDeps)).code).toBe(EXIT_USAGE);
     expect(

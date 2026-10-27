@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { parseArgs } from "node:util";
 import { runHook } from "./hook/hook.ts";
 import {
@@ -16,7 +16,11 @@ import {
 import { suggestNames } from "./install/metadata.ts";
 import { pnpmBuildPolicy } from "./install/pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
-import { pnpmfileFindings, projectScriptFindings } from "./install/project.ts";
+import {
+  pnpmfileFindings,
+  projectScriptFindings,
+  workspaceMembers,
+} from "./install/project.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   SanitizeError,
@@ -28,6 +32,7 @@ import {
   planInstall,
   planInstallOnline,
 } from "./install/scan.ts";
+import { workspaceRoot } from "./install/workspace.ts";
 import { anthropicTriage, DEFAULT_MODEL } from "./llm/client.ts";
 import type { LlmOptions } from "./llm/plan-step.ts";
 import { renderScan, scanToJson } from "./repo-report.ts";
@@ -75,8 +80,8 @@ const DEFAULT_DEPS: CliDeps = {
 const HELP = `croak 🐸 — croak before you install
 
 Usage:
-  croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>] [--llm]
-             [--pnpm-builds <dir> --pnpm-version <v>]
+  croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>] [--member <dir>] [--llm]
+             [--pnpm-builds <dir> [--pnpm-version <v>]]
              [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
@@ -117,6 +122,7 @@ function parse(argv: readonly string[]) {
       "no-cache": { type: "boolean" },
       installed: { type: "string" },
       project: { type: "string" },
+      member: { type: "string" },
       llm: { type: "boolean" },
       "pnpm-builds": { type: "string" },
       "pnpm-version": { type: "string" },
@@ -148,6 +154,7 @@ async function runPlan(
     readonly "no-cache"?: boolean | undefined;
     readonly installed?: string | undefined;
     readonly project?: string | undefined;
+    readonly member?: string | undefined;
     readonly llm?: boolean | undefined;
     readonly "pnpm-builds"?: string | undefined;
     readonly "pnpm-version"?: string | undefined;
@@ -284,13 +291,30 @@ async function runPlan(
   const project = values.project;
   const extra: Finding[] = [
     ...llmMissing,
-    ...(buildsDir === undefined || values["pnpm-version"] === undefined
+    // The pnpmfile check needs only the project; the version is for the build rule.
+    ...(buildsDir === undefined ? [] : pnpmfileFindings(buildsDir, projectFs)),
+    ...(project === undefined || outcome.status !== "complete"
       ? []
-      : pnpmfileFindings(buildsDir, projectFs)),
-    ...(project === undefined ? [] : projectScriptFindings(project, projectFs)),
+      : projectScriptFindings(project, projectFs, {
+          // The plan's lockfile parsed, so its members can be read (M6 review).
+          members: workspaceMembers(after),
+          pnpm: buildsDir !== undefined,
+        })),
   ];
-  const judged: PlanOutcome =
-    outcome.status !== "complete" || extra.length === 0
+  // The folder the install ran in must be a member of the workspace the plan
+  // was made at; otherwise the package manager installs elsewhere (M6 review).
+  const member = values.member;
+  const notMember =
+    member !== undefined &&
+    outcome.status === "complete" &&
+    !workspaceMembers(after).includes(posix.normalize(member));
+  const judged: PlanOutcome = notMember
+    ? {
+        status: "incomplete",
+        reason: `${member} is inside a workspace that does not list it as a member, so the install would not run where croak planned it`,
+        durationMs: outcome.durationMs,
+      }
+    : outcome.status !== "complete" || extra.length === 0
       ? outcome
       : (() => {
           const findings = [...extra, ...outcome.findings];
@@ -334,6 +358,21 @@ export async function run(
       if (error instanceof SanitizeError) return usageError(error.message);
       throw error;
     }
+  }
+  // The workspace root croak-install plans at (D38): the same reading as the hook's.
+  if (argv[0] === "workspace-root") {
+    const [, manager, dir] = argv;
+    if (dir === undefined || (manager !== "npm" && manager !== "pnpm"))
+      return usageError("usage: croak workspace-root npm|pnpm <dir>");
+    const root = workspaceRoot(dir, manager, {
+      exists: existsSync,
+      readFile: deps.readFile ?? ((path) => readFileSync(path, "utf8")),
+    });
+    return {
+      code: EXIT.ok,
+      stdout: root === undefined ? "" : `${root}\n`,
+      stderr: "",
+    };
   }
   // Suggestions for package names npm does not have (croak-install on E404).
   if (argv[0] === "suggest") {

@@ -45,6 +45,23 @@ describe("parseLockfile", () => {
     ]);
   });
 
+  it("reads a workspace member's own entry as a local folder, not a download (M6 review)", () => {
+    const parsed = parseLockfile(
+      lock({
+        "packages/a": { name: "a", version: "1.0.0" },
+        "packages/b": {
+          version: "1.0.0",
+          resolved: "https://attacker.invalid/b.tgz",
+        },
+      }),
+    );
+    expect(parsed.map((e) => `${e.path}:${e.link}`)).toEqual([
+      "packages/a:true",
+      // A source on a local folder is not npm's shape: it is checked as one.
+      "packages/b:false",
+    ]);
+  });
+
   it("strips a UTF-8 BOM", () => {
     expect(parseLockfile(`﻿${lock({})}`)).toEqual([]);
   });

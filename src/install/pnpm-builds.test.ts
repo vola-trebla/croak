@@ -19,6 +19,31 @@ describe("pnpmBuildPolicy", () => {
     expect(allowed?.("sharp")).toBe(false);
   });
 
+  it("counts every script when the project pins another pnpm (M6 review)", () => {
+    const ws = "allowBuilds: {}\n";
+    expect(policy(ws, '{"packageManager":"pnpm@9.15.4"}')).toBeUndefined();
+    expect(
+      policy(ws, '{"packageManager":"pnpm@12.4.2+sha512.abc"}')?.("esbuild"),
+    ).toBe(false);
+    expect(policy(ws, '{"packageManager":"yarn@4.0.0"}')).toBeUndefined();
+    expect(
+      policy(
+        ws,
+        '{"devEngines":{"packageManager":{"name":"pnpm","version":"^9"}}}',
+      ),
+    ).toBeUndefined();
+  });
+
+  it("reads a name with a trailing comment as the name (M6 review)", () => {
+    expect(
+      policy(
+        "onlyBuiltDependencies:\n  - esbuild # for vite\n",
+        undefined,
+        "10.4.0",
+      )?.("esbuild"),
+    ).toBe(true);
+  });
+
   it("reads pnpm 10's onlyBuiltDependencies, in pnpm-workspace.yaml or package.json", () => {
     expect(
       policy(
@@ -46,6 +71,14 @@ describe("pnpmBuildPolicy", () => {
   it.each([
     ["pnpm older than 10", policy("allowBuilds: {}\n", undefined, "9.15.0")],
     ["allow every build", policy("dangerouslyAllowAllBuilds: true\n")],
+    [
+      "allow every build, with a comment",
+      policy("dangerouslyAllowAllBuilds: true # ok\n"),
+    ],
+    [
+      "allow every build, capitalised",
+      policy("dangerouslyAllowAllBuilds: True\n"),
+    ],
     [
       "a list in another file",
       policy("onlyBuiltDependenciesFile: builds.json\n"),

@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { workspaceRoot } from "../install/workspace.ts";
 import { parseYamlDocuments } from "../install/yaml.ts";
 import { type InstallIntent, installIntents } from "./install-commands.ts";
 
@@ -98,33 +99,11 @@ export function npmPrefix(
   }
 }
 
-function readJson(path: string, deps: HookDeps): unknown {
-  if (!deps.exists(path)) return undefined;
-  try {
-    return JSON.parse(deps.readFile(path));
-  } catch {
-    return undefined; // npm would fail on it too; it hides no install
-  }
-}
-
-/** The directory of a package.json with workspaces, from `prefix` up (D34: not supported yet). */
-function workspaceRoot(
-  prefix: string,
-  manager: "npm" | "pnpm",
-  deps: HookDeps,
-): string | undefined {
-  for (let at = prefix; ; at = posix.dirname(at)) {
-    if (manager === "pnpm") {
-      if (deps.exists(posix.join(at, "pnpm-workspace.yaml"))) return at;
-    } else {
-      const manifest = readJson(posix.join(at, "package.json"), deps);
-      if (isRecord(manifest) && manifest.workspaces !== undefined) return at;
-    }
-    if (at === "/") return undefined;
-  }
-}
-
-/** A registry that pnpm-workspace.yaml (pnpm 10+ settings) points pnpm at, or undefined. */
+/**
+ * A registry that pnpm-workspace.yaml (pnpm 10+ settings) points pnpm at, or
+ * a setting there that runs the repo's code or trusts another server, or
+ * undefined.
+ */
 function workspaceRegistry(root: string, deps: HookDeps): string | undefined {
   const file = posix.join(root, "pnpm-workspace.yaml");
   if (!deps.exists(file)) return undefined;
@@ -136,9 +115,16 @@ function workspaceRegistry(root: string, deps: HookDeps): string | undefined {
   }
   for (const doc of docs) {
     if (!isRecord(doc)) continue;
-    for (const key of Object.keys(doc))
-      if (REGISTRY_KEY.test(key) || key === "registries")
+    for (const key of Object.keys(doc)) {
+      if (
+        REGISTRY_KEY.test(key) ||
+        key === "registries" ||
+        key === "namedRegistries"
+      )
         return `${file} sets ${key}`;
+      if (WORKSPACE_RUNNER_KEY.test(key))
+        return `${file} sets ${key}, which changes what pnpm runs or trusts`;
+    }
   }
   return undefined;
 }
@@ -146,12 +132,20 @@ function workspaceRegistry(root: string, deps: HookDeps): string | undefined {
 const PUBLIC_REGISTRY = /^https:\/\/registry\.npmjs\.org\/?$/;
 const REGISTRY_KEY = /(?:^|:)registry$|^replace-registry-host$/;
 /**
- * Keys that load another config croak would not read, or change what npm runs
- * scripts and git with: with them, a warning the user approves would still run
- * the repo's own shell, preload or binary.
+ * Keys that load another config croak would not read, change what npm or
+ * pnpm runs scripts and git with, or let a proxy or certificate answer for
+ * the registry: with them, a warning the user approves would still run the
+ * repo's own shell, preload or binary, or packages croak never saw.
  */
 const RUNNER_KEY =
-  /^(?:userconfig|globalconfig|script-shell|node-options|shell|git|init-module)$/;
+  /^(?:userconfig|globalconfig|script-shell|node-options|shell|git|init-module|shell-emulator|global-pnpmfile|pnpmfile|proxy|https?-proxy|ca|cafile|cert|key|strict-ssl)$/;
+/**
+ * The same settings as pnpm-workspace.yaml writes them (M6 review): a shell or
+ * preload for scripts, a pnpmfile outside the project, and a proxy or
+ * certificate setting that lets another server answer for the registry.
+ */
+const WORKSPACE_RUNNER_KEY =
+  /^(?:scriptShell|nodeOptions|shellEmulator|globalPnpmfile|proxy|https?Proxy|ca|cafile|cert|key|strictSsl|userconfig|globalconfig)$/;
 
 /** Where npm config sends npm somewhere croak does not check (D34), or undefined. */
 function foreignRegistry(prefix: string, deps: HookDeps): string | undefined {
@@ -186,7 +180,7 @@ function foreignRegistry(prefix: string, deps: HookDeps): string | undefined {
         return `${file} sets ${key}`;
       // The project's npmrc comes with the repo; the user's own files do not.
       if (file === project && RUNNER_KEY.test(key))
-        return `${file} sets ${key}, which changes what npm runs`;
+        return `${file} sets ${key}, which changes what npm runs or trusts`;
     }
   }
   for (const [key, value] of env) {
@@ -297,7 +291,9 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
       id: checks.length + 1,
       manager,
       mode,
-      dir: mode === "empty" ? intent.dir : prefix,
+      // Where npm stands: croak-install finds the root itself, and checks
+      // that this folder is one of its members (M6 review).
+      dir: mode === "empty" ? intent.dir : local,
       packages: specs,
       label,
     });

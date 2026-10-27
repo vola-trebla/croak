@@ -121,6 +121,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [x] Workspaces for npm and pnpm, checked from their root (lifts D34's refusal)
 - [x] The project's `.pnpmfile.cjs` and config dependencies checked on every pnpm install
 - [x] Hook: pnpm add/install/update/dlx, pnpx; agent-command eval with pnpm cases
+- [x] Review fixes (D41): members' scripts, membership, pnpm flags and settings, the pinned pnpm
 - [ ] Not yet: yarn and bun (still denied by the hook), pnpm lockfiles before v9
 
 ### M7 — Crypto layer (the diploma chapter)

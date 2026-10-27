@@ -81,7 +81,6 @@ describe("installIntents", () => {
       "through the environment",
     ],
     [`eval "npm i x"`, "eval hides"],
-    ["pnpm add zod", "pnpm support is planned (M6)"],
     ["yarn", "yarn support is planned (M6)"],
     ["bunx cowsay", "bunx support is planned (M6)"],
     [`npm i "unbalanced`, "could not parse"],
@@ -170,5 +169,59 @@ describe("installIntents", () => {
       [],
     );
     expect(at("bash scripts/build.sh && npm test")).toEqual([]);
+  });
+
+  it.each([
+    ["pnpm add zod", "install pnpm /repo [zod]"],
+    ["pnpm i -D vitest", "install pnpm /repo [vitest]"],
+    ["pnpm install", "install pnpm /repo []"],
+    ["pnpm install --frozen-lockfile", "ci pnpm /repo"],
+    ["pnpm up react", "update pnpm /repo [react]"],
+    ["pnpm -C web add react", "install pnpm /repo/web [react]"],
+    ["pnpm dlx create-vite app", "run pnpm /repo [create-vite]"],
+    ["pnpx cowsay hi", "run pnpm /repo [cowsay]"],
+    ["pnpm create vite app", "run pnpm /repo [create-vite]"],
+  ])("finds pnpm's %s (M6)", (command, expected) => {
+    expect(
+      at(command).map((i) =>
+        i.kind === "unchecked"
+          ? `unchecked: ${i.reason}`
+          : `${i.kind} ${i.manager ?? "npm"} ${i.dir}${"packages" in i ? ` [${i.packages.join(" ")}]` : ""}`,
+      ),
+    ).toEqual([expected]);
+  });
+
+  it("ignores pnpm commands that install nothing", () => {
+    for (const command of [
+      "pnpm",
+      "pnpm test",
+      "pnpm run build",
+      "pnpm exec tsc",
+      "pnpm why react",
+    ])
+      expect(at(command)).toEqual([]);
+  });
+
+  it.each([
+    ["pnpm --registry https://evil.invalid add x", "registry or config"],
+    [
+      "pnpm_config_registry=https://evil.invalid pnpm add x",
+      "through the environment",
+    ],
+    [
+      "pnpm config set registry https://evil.invalid && pnpm add x",
+      "registry settings",
+    ],
+    ["pnpm add $PKG", "only known when the shell runs"],
+    ["yarn add react", "yarn support is planned (M6)"],
+  ])("fails closed on %s (M6)", (command, reason) => {
+    expect(at(command)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "unchecked",
+          reason: expect.stringContaining(reason),
+        }),
+      ]),
+    );
   });
 });

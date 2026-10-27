@@ -36,13 +36,18 @@ while IFS= read -r line; do
   # shellcheck disable=SC2086 # split the tab-separated fields on purpose
   set -- $line
   set +f; IFS=$old_ifs
-  id=$2 mode=$3 dir=$4
-  shift 4
+  id=$2 manager=$3 mode=$4 dir=$5
+  shift 5
+  case "$manager" in
+    npm) pm="" ;;
+    pnpm) pm="--pnpm" ;;
+    *) deny "unknown package manager: $manager" ;;
+  esac
   case "$mode" in
-    project) flags="--json" ;;
-    update) flags="--json --update" ;;
-    ci) flags="--json --ci" ;;
-    empty) flags="--json --empty" ;;
+    project) flags="--json $pm" ;;
+    update) flags="--json --update $pm" ;;
+    ci) flags="--json --ci $pm" ;;
+    empty) flags="--json --empty $pm" ;;
     *) deny "unknown check mode: $mode" ;;
   esac
   # shellcheck disable=SC2086 # flags are fixed words chosen above

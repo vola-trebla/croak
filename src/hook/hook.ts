@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { parseYamlDocuments } from "../install/yaml.ts";
 import { type InstallIntent, installIntents } from "./install-commands.ts";
 
 /**
@@ -14,6 +15,7 @@ export type CheckMode = "project" | "update" | "ci" | "empty";
 
 export interface Check {
   readonly id: number;
+  readonly manager: "npm" | "pnpm";
   readonly mode: CheckMode;
   readonly dir: string;
   readonly packages: readonly string[];
@@ -106,12 +108,39 @@ function readJson(path: string, deps: HookDeps): unknown {
 }
 
 /** The directory of a package.json with workspaces, from `prefix` up (D34: not supported yet). */
-function workspaceRoot(prefix: string, deps: HookDeps): string | undefined {
+function workspaceRoot(
+  prefix: string,
+  manager: "npm" | "pnpm",
+  deps: HookDeps,
+): string | undefined {
   for (let at = prefix; ; at = posix.dirname(at)) {
-    const manifest = readJson(posix.join(at, "package.json"), deps);
-    if (isRecord(manifest) && manifest.workspaces !== undefined) return at;
+    if (manager === "pnpm") {
+      if (deps.exists(posix.join(at, "pnpm-workspace.yaml"))) return at;
+    } else {
+      const manifest = readJson(posix.join(at, "package.json"), deps);
+      if (isRecord(manifest) && manifest.workspaces !== undefined) return at;
+    }
     if (at === "/") return undefined;
   }
+}
+
+/** A registry that pnpm-workspace.yaml (pnpm 10+ settings) points pnpm at, or undefined. */
+function workspaceRegistry(root: string, deps: HookDeps): string | undefined {
+  const file = posix.join(root, "pnpm-workspace.yaml");
+  if (!deps.exists(file)) return undefined;
+  let docs: unknown[];
+  try {
+    docs = parseYamlDocuments(deps.readFile(file));
+  } catch {
+    return `${file} cannot be read`;
+  }
+  for (const doc of docs) {
+    if (!isRecord(doc)) continue;
+    for (const key of Object.keys(doc))
+      if (REGISTRY_KEY.test(key) || key === "registries")
+        return `${file} sets ${key}`;
+  }
+  return undefined;
 }
 
 const PUBLIC_REGISTRY = /^https:\/\/registry\.npmjs\.org\/?$/;
@@ -186,12 +215,21 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
       continue;
     }
     const packages = "packages" in intent ? intent.packages : [];
-    const verb = {
-      install: "npm install",
-      update: "npm update",
-      ci: "npm ci",
-      run: "npx",
-    }[intent.kind];
+    const manager = intent.manager ?? "npm";
+    const verb =
+      manager === "pnpm"
+        ? {
+            install: "pnpm add",
+            update: "pnpm update",
+            ci: "pnpm install --frozen-lockfile",
+            run: "pnpm dlx",
+          }[intent.kind]
+        : {
+            install: "npm install",
+            update: "npm update",
+            ci: "npm ci",
+            run: "npx",
+          }[intent.kind];
     const label = [verb, ...packages, "in", intent.dir].join(" ");
     if (!SAFE.test(intent.dir) || !packages.every(isSafeSpec)) {
       unchecked(label, "a package name or path in it cannot be checked safely");
@@ -204,40 +242,45 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
       );
       continue;
     }
-    const prefix = npmPrefix(intent.dir, deps.exists);
-    const registry = foreignRegistry(prefix, deps);
+    const global = intent.kind === "install" && intent.global;
+    // A workspace installs at its root (D38): check there, with every member.
+    const local = npmPrefix(intent.dir, deps.exists);
+    const root =
+      intent.kind === "run" || global
+        ? undefined
+        : workspaceRoot(local, manager, deps);
+    const prefix = root ?? local;
+    const registry =
+      foreignRegistry(prefix, deps) ??
+      (manager === "pnpm" ? workspaceRegistry(prefix, deps) : undefined);
     if (registry !== undefined) {
       unchecked(
         label,
-        `npm here uses a registry croak does not check (${registry}); croak checks the public npm registry only`,
+        `${manager} here uses a registry croak does not check (${registry}); croak checks the public npm registry only`,
       );
       continue;
     }
-    const global = intent.kind === "install" && intent.global;
-    if (intent.kind !== "run" && !global) {
-      const root = workspaceRoot(prefix, deps);
-      if (root !== undefined) {
-        unchecked(
-          label,
-          `${root} uses npm workspaces, which croak does not check yet`,
-        );
-        continue;
-      }
-      if (deps.exists(posix.join(prefix, "npm-shrinkwrap.json"))) {
-        unchecked(
-          label,
-          "the project has an npm-shrinkwrap.json, which croak does not check yet",
-        );
-        continue;
-      }
+    if (
+      manager === "npm" &&
+      intent.kind !== "run" &&
+      !global &&
+      deps.exists(posix.join(prefix, "npm-shrinkwrap.json"))
+    ) {
+      unchecked(
+        label,
+        "the project has an npm-shrinkwrap.json, which croak does not check yet",
+      );
+      continue;
     }
     let mode: CheckMode;
     let specs = packages;
     if (intent.kind === "ci") mode = "ci";
     else if (intent.kind === "run") {
       // npx runs the prefix's own bin when it has one: no download.
+      // pnpm dlx always downloads.
       specs = packages.filter(
         (spec) =>
+          manager === "pnpm" ||
           spec.includes("@", spec.startsWith("@") ? 1 : 0) ||
           spec.includes("/") ||
           !deps.exists(posix.join(prefix, "node_modules", ".bin", spec)),
@@ -252,6 +295,7 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
     intents.push(intent);
     checks.push({
       id: checks.length + 1,
+      manager,
       mode,
       dir: mode === "empty" ? intent.dir : prefix,
       packages: specs,
@@ -261,11 +305,13 @@ export function hookPlan(input: string, deps: HookDeps): HookPlan {
   return { intents, checks };
 }
 
-/** One line per check for the shell: check <id> <mode> <dir> <package>… (tab-separated). */
+/** One line per check for the shell: check <id> <manager> <mode> <dir> <package>… (tab-separated). */
 export function planLines(plan: HookPlan): string {
   return plan.checks
     .map((c) =>
-      ["check", String(c.id), c.mode, c.dir, ...c.packages].join("\t"),
+      ["check", String(c.id), c.manager, c.mode, c.dir, ...c.packages].join(
+        "\t",
+      ),
     )
     .map((line) => `${line}\n`)
     .join("");

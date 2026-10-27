@@ -88,7 +88,7 @@ describe("hookPlan", () => {
 
   it("writes one tab-separated line per check", () => {
     expect(planLines(hookPlan(event("npm i zod chalk"), project))).toBe(
-      "check\t1\tproject\t/repo\tzod\tchalk\n",
+      "check\t1\tnpm\tproject\t/repo\tzod\tchalk\n",
     );
   });
 });
@@ -116,15 +116,6 @@ describe("hookPlan: where npm really installs (M4 review)", () => {
   });
 
   it.each([
-    [
-      "workspaces",
-      {
-        "/repo/package.json": '{"name":"repo","workspaces":["packages/*"]}',
-        "/repo/packages/a/package.json": '{"name":"a"}',
-      },
-      "cd packages/a && npm install",
-      "npm workspaces",
-    ],
     [
       "a shrinkwrap",
       { "/repo/npm-shrinkwrap.json": "{}" },
@@ -181,6 +172,41 @@ describe("hookPlan: where npm really installs (M4 review)", () => {
     ).toEqual(["project /repo [zod]"]);
   });
 
+  it("checks a workspace member's install at the workspace root (D38)", () => {
+    const npmWs = files({
+      "/repo/package.json": '{"name":"repo","workspaces":["packages/*"]}',
+      "/repo/packages/a/package.json": '{"name":"a"}',
+    });
+    expect(modes("cd packages/a && npm install zod", npmWs)).toEqual([
+      "project /repo [zod]",
+    ]);
+    const pnpmWs = files({
+      "/repo/pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+      "/repo/packages/a/package.json": '{"name":"a"}',
+    });
+    expect(modes("cd packages/a && pnpm add zod", pnpmWs)).toEqual([
+      "project /repo [zod]",
+    ]);
+    expect(
+      hookPlan(event("cd packages/a && pnpm add zod"), pnpmWs).checks[0]
+        ?.manager,
+    ).toBe("pnpm");
+  });
+
+  it("denies a pnpm install when pnpm-workspace.yaml points at another registry", () => {
+    const plan = hookPlan(
+      event("pnpm add zod"),
+      files({
+        "/repo/pnpm-workspace.yaml": "registry: https://attacker.invalid/\n",
+      }),
+    );
+    expect(plan.checks).toEqual([]);
+    expect(plan.intents[0]).toMatchObject({
+      kind: "unchecked",
+      reason: expect.stringContaining("registry croak does not check"),
+    });
+  });
+
   it("accepts the public registry and npm's own userconfig variable", () => {
     const deps = {
       ...files({
@@ -206,6 +232,7 @@ describe("hookPlan: where npm really installs (M4 review)", () => {
 
 const check: Check = {
   id: 1,
+  manager: "npm",
   mode: "project",
   dir: "/repo",
   packages: ["x"],
@@ -324,7 +351,7 @@ describe("runHook", () => {
       "/w/input.json": event("npm i x"),
     });
     const planned = runHook(["plan", "/w/input.json"], deps).stdout;
-    expect(planned.split("\n")[1]).toBe("check\t1\tproject\t/repo\tx");
+    expect(planned.split("\n")[1]).toBe("check\t1\tnpm\tproject\t/repo\tx");
     const files = {
       "/w/plan": planned,
       "/w/1.code": "1\n",

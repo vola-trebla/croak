@@ -246,6 +246,26 @@
       "command": "pnpm run test",
       "expect": "ignore",
       "why": "runs project scripts, installs nothing (M6)"
+    },
+    {
+      "command": "pnpm install --dangerously-allow-all-builds",
+      "expect": "deny",
+      "why": "a flag that lets every build run (M6 review)"
+    },
+    {
+      "command": "pnpm add --allow-build=evil evil",
+      "expect": "deny",
+      "why": "a flag that allows one package's build (M6 review)"
+    },
+    {
+      "command": "pnpm with 9.15.4 install",
+      "expect": "deny",
+      "why": "runs another pnpm version (M6 review)"
+    },
+    {
+      "command": "pnpm ci",
+      "expect": "check",
+      "why": "installs the lockfile as written (M6 review)"
     }
   ]
 }

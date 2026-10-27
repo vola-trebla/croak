@@ -520,8 +520,22 @@ function npmIntents(
 
 // ------------------------------------------------------------ pnpm commands
 
-const PNPM_INSTALL = new Set(["install", "i", "add"]);
+const PNPM_INSTALL = new Set(["install", "i", "add", "install-test", "it"]);
 const PNPM_UPDATE = new Set(["update", "up", "upgrade"]);
+/** Subcommands that install, or run another pnpm, in ways croak does not plan. */
+const PNPM_UNCHECKED = new Set([
+  "dedupe",
+  "deploy",
+  "with",
+  "fetch",
+  "link",
+  "ln",
+  "import",
+  "patch",
+  "patch-commit",
+  "patch-remove",
+  "self-update",
+]);
 /** pnpm options that take a value. */
 const PNPM_VALUE_FLAGS = new Set([
   "-C",
@@ -533,15 +547,12 @@ const PNPM_VALUE_FLAGS = new Set([
   "--loglevel",
   "--store-dir",
   "--virtual-store-dir",
-  "--modules-dir",
   "--package",
   "--workspace-concurrency",
   "--network-concurrency",
   "--child-concurrency",
   "--resolution-mode",
   "--node-linker",
-  "--lockfile-dir",
-  "--global-dir",
   "--cache-dir",
 ]);
 /** pnpm options that are flags. */
@@ -600,7 +611,9 @@ function pnpmIntents(
   ];
   const flags = new Map<string, string[]>();
   const positional: string[] = [];
-  let ambiguous: string | undefined;
+  // An allowlist: pnpm has flags that allow every build, load a pnpmfile or
+  // move the lockfile; a flag croak does not know is not guessed at (M6 review).
+  let unknown: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const word = args[i] ?? "";
     if (word === "--" || (dlx && positional.length > 0)) {
@@ -613,27 +626,15 @@ function pnpmIntents(
     }
     const eq = word.indexOf("=");
     const key = eq === -1 ? word : word.slice(0, eq);
+    if (!PNPM_VALUE_FLAGS.has(key) && !PNPM_BOOLEAN_FLAGS.has(key))
+      unknown ??= word;
     if (eq !== -1)
       flags.set(key, [...(flags.get(key) ?? []), word.slice(eq + 1)]);
     else if (PNPM_VALUE_FLAGS.has(key))
       flags.set(key, [...(flags.get(key) ?? []), args[++i] ?? ""]);
-    else {
-      if (
-        !PNPM_BOOLEAN_FLAGS.has(key) &&
-        !key.startsWith("--no-") &&
-        args[i + 1] !== undefined &&
-        !args[i + 1]?.startsWith("-")
-      )
-        ambiguous ??= word;
-      flags.set(key, ["true"]);
-    }
+    else flags.set(key, ["true"]);
   }
-  if (
-    flags.has("--registry") ||
-    [...flags.keys()].some((k) =>
-      /^--config\.(?:.*registry|userconfig|globalconfig|pnpmfile)/.test(k),
-    )
-  )
+  if (flags.has("--registry"))
     return unchecked(
       "it points pnpm at a registry or config croak does not check",
     );
@@ -648,6 +649,10 @@ function pnpmIntents(
       : intents;
   const global = flags.has("-g") || flags.has("--global");
   if (dlx) {
+    if (unknown !== undefined)
+      return unchecked(
+        `croak does not know pnpm's ${unknown}, so it cannot vouch for this command`,
+      );
     const packages = flags.get("--package") ?? positional.slice(0, 1);
     return where(
       packages.length === 0
@@ -656,17 +661,20 @@ function pnpmIntents(
     );
   }
   const [sub, ...rest] = positional;
+  if (sub !== undefined && PNPM_UNCHECKED.has(sub))
+    return unchecked(`croak does not check pnpm ${sub} yet`);
   const installing =
-    sub !== undefined &&
-    (PNPM_INSTALL.has(sub) ||
-      PNPM_UPDATE.has(sub) ||
-      sub === "dlx" ||
-      sub === "create");
-  if (
-    ambiguous !== undefined &&
-    (installing || positional.some((w) => PNPM_INSTALL.has(w)))
-  )
-    return unchecked(`croak cannot tell whether ${ambiguous} takes a value`);
+    sub === undefined ||
+    PNPM_INSTALL.has(sub) ||
+    PNPM_UPDATE.has(sub) ||
+    sub === "dlx" ||
+    sub === "create" ||
+    sub === "ci" ||
+    positional.some((w) => PNPM_INSTALL.has(w) || PNPM_UNCHECKED.has(w));
+  if (unknown !== undefined && installing)
+    return unchecked(
+      `croak does not know pnpm's ${unknown}, so it cannot vouch for this install`,
+    );
   if (sub === undefined) return []; // bare pnpm prints its help
   if (sub === "dlx") return pnpmIntents(rest, { dir }, raw, true);
   if (sub === "create")
@@ -688,9 +696,14 @@ function pnpmIntents(
       : where([
           { kind: "update", manager: "pnpm", dir: dir ?? "", packages: rest },
         ]);
-  if (!PNPM_INSTALL.has(sub)) return [];
-  if (flags.has("--frozen-lockfile") && rest.length === 0)
+  if (
+    sub === "ci" ||
+    (PNPM_INSTALL.has(sub) &&
+      flags.has("--frozen-lockfile") &&
+      rest.length === 0)
+  )
     return where([{ kind: "ci", manager: "pnpm", dir: dir ?? "" }]);
+  if (!PNPM_INSTALL.has(sub)) return [];
   return where([
     {
       kind: "install",

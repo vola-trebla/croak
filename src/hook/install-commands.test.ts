@@ -224,4 +224,29 @@ describe("installIntents", () => {
       ]),
     );
   });
+
+  it.each([
+    "pnpm install --dangerously-allow-all-builds",
+    "pnpm add --allow-build=evil evil",
+    "pnpm install --config.dangerously-allow-all-builds=true",
+    "pnpm install --ignore-workspace",
+    "pnpm install --lockfile-dir=../other",
+    "pnpm install --pnpmfile=x.cjs",
+    "pnpm dedupe",
+    "pnpm deploy out",
+    "pnpm with 9.15.4 install",
+    "pnpm dlx --allow-build=x create-thing",
+  ])("refuses what it cannot vouch for: %s (M6 review)", (command) => {
+    expect(at(command)).toEqual([
+      expect.objectContaining({ kind: "unchecked" }),
+    ]);
+  });
+
+  it("checks pnpm ci and install-test (M6 review)", () => {
+    expect(at("pnpm ci")[0]).toMatchObject({ kind: "ci", manager: "pnpm" });
+    expect(at("pnpm it")[0]).toMatchObject({
+      kind: "install",
+      manager: "pnpm",
+    });
+  });
 });

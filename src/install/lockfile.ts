@@ -93,7 +93,13 @@ export function parseLockfile(text: string): LockEntry[] {
         resolved: asString(raw.resolved),
         integrity: asString(raw.integrity),
         hasInstallScript: raw.hasInstallScript === true,
-        link: raw.link === true,
+        // A key outside node_modules is a local folder npm links (a
+        // workspace member), never a download, unless it claims a source.
+        link:
+          raw.link === true ||
+          (!path.startsWith("node_modules/") &&
+            !path.includes("/node_modules/") &&
+            raw.resolved === undefined),
         dev: raw.dev === true,
         optional: raw.optional === true,
         os: asStrings(raw.os),

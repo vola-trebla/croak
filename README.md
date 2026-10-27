@@ -71,6 +71,7 @@ croak plan - WARN
 
 ```bash
 croak-install [pkg]   # plan an npm install, check it before anything executes
+croak-install --pnpm [pkg]   # the same for pnpm
 croak repo .          # scan an unfamiliar repo before you install or open it
 ```
 

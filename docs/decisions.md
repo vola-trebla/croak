@@ -473,3 +473,23 @@ M6 makes croak check pnpm installs, with three choices by the maintainer:
   refusal once the wrapper does it.
   **Trade-off:** pnpm records no install-script flag, so install scripts are
   known from the registry manifest and the tarball, not from the lockfile.
+
+## D39 — pnpm can run code while planning; the wrapper sanitizes what it copies (2026-10-28)
+
+Checked in practice: in a project whose package.json says
+`"packageManager": "pnpm@9.15.0"`, `pnpm install --lockfile-only
+--ignore-scripts` (pnpm 12 through corepack) downloaded pnpm 9.15.0 and ran
+it, even with `manage-package-manager-versions=false`; a version already in
+corepack's cache ran without a download. So a repo chooses which package
+manager binary runs during croak's "safe" planning. pnpm-workspace.yaml can
+also load pnpmfiles and config dependencies (code). The wrapper therefore
+copies the root manifest without `packageManager`/`devEngines` (and keeps
+only resolution settings in its `pnpm` field), copies pnpm-workspace.yaml
+with resolution settings only, never copies `.pnpmfile.cjs`, and runs
+corepack with its network off over the user's own cache: only a pnpm the
+user already has can run. The sanitizing is croak's (`croak sanitize`, which
+has the YAML reader), the copying the wrapper's. An offline test plants a
+pnpmfile and config dependencies and checks that nothing ran.
+**Trade-off:** pnpm resolves without the project's patches and pnpmfile
+hooks, so a plan can differ from the real install where those change
+resolution; it is then a plan of the unpatched tree, still checked.

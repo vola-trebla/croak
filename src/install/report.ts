@@ -29,7 +29,7 @@ export function renderPlan(
       title,
       verdict: outcome.verdict,
       findings: outcome.findings,
-      footer: `${outcome.added} new and ${outcome.changed} updated packages checked · ${Math.round(outcome.durationMs)} ms`,
+      footer: `${outcome.added} new and ${outcome.changed} updated packages checked · ${Math.round(outcome.durationMs)} ms${outcome.llm === undefined ? "" : ` · ${outcome.llm.model}: ${outcome.llm.calls} call(s), $${outcome.llm.costUsd.toFixed(4)}`}`,
     },
     options,
   );

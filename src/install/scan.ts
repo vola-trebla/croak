@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { type LlmOptions, llmStep } from "../llm/plan-step.ts";
 import { aggregate, type Finding, type Verdict } from "../verdict.ts";
 import { contentFindings } from "./content.ts";
 import type { ContentCache } from "./content-cache.ts";
@@ -28,6 +29,12 @@ export type PlanOutcome =
       readonly findings: readonly Finding[];
       readonly added: number;
       readonly changed: number;
+      /** The opt-in LLM step, when it ran (D36). */
+      readonly llm?: {
+        readonly model: string;
+        readonly calls: number;
+        readonly costUsd: number;
+      };
       readonly durationMs: number;
     }
   | {
@@ -93,6 +100,8 @@ export interface OnlineOptions {
   readonly platform?: Platform;
   /** Content findings remembered by tarball hash; registry facts are always fresh. */
   readonly cache?: ContentCache;
+  /** Ask a model about packages the rules only warned about (opt-in, D36). */
+  readonly llm?: LlmOptions;
 }
 
 const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
@@ -184,11 +193,25 @@ export async function planInstallOnline(
     });
     const content =
       options.content === false ? [] : await contentOf(changes, options);
-    const findings = [...local.findings, ...notes, ...remote, ...content];
+    const ruled = [...local.findings, ...notes, ...remote, ...content];
+    const step =
+      options.llm === undefined || options.content === false
+        ? undefined
+        : await llmStep(ruled, changes, byName, options.llm, fetchOptions, now);
+    const findings = step?.findings ?? ruled;
     return {
       ...local,
       verdict: aggregate(findings),
       findings,
+      ...(step === undefined || options.llm === undefined
+        ? {}
+        : {
+            llm: {
+              model: options.llm.model,
+              calls: step.calls,
+              costUsd: step.costUsd,
+            },
+          }),
       durationMs: performance.now() - started,
     };
   } catch (error) {

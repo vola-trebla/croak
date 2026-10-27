@@ -57,9 +57,11 @@ export const OBFUSCATION_PATTERNS: readonly Pattern[] = [
   {
     kind: "dynamic-call",
     label: "computed global call",
-    // globalThis[expr](…) with a non-literal key (one level of nested [] allowed)…
+    // globalThis[expr](…) with a non-literal key (one level of nested [] allowed),
+    // but not a well-known symbol: self[Symbol.asyncIterator]() is how
+    // iterators are called (the Anthropic SDK's streaming code)…
     pattern:
-      /\b(?:globalThis|window|global|self)\s*\[\s*[^\]"'`\s][^\]]{0,100}\]{1,2}\s*\(/,
+      /\b(?:globalThis|window|global|self)\s*\[\s*(?!Symbol\s*\.)[^\]"'`\s][^\]]{0,100}\]{1,2}\s*\(/,
     threshold: 1,
     scope: "line",
   },

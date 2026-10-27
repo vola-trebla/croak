@@ -32,6 +32,13 @@ describe("repo/obfuscation", () => {
     );
   });
 
+  it("does not treat calling a well-known symbol as a computed global call", () => {
+    expect(
+      scan({ "streaming.js": "iter = self[Symbol.asyncIterator]();" }),
+    ).toEqual([]);
+    expect(scan({ "a.js": "globalThis[key](arg);" })[0]?.severity).toBe("warn");
+  });
+
   it("warns on one strong signal", () => {
     expect(scan({ "a.js": names })[0]?.severity).toBe("warn");
     expect(scan({ "a.js": dynamic })[0]?.severity).toBe("warn");

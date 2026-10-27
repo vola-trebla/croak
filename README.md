@@ -135,8 +135,11 @@ agents should treat `3` as a block. `--json` gives a versioned report for tools.
   agent waits; a human decides.
 - 📊 **Eval-driven.** No detector ships without test cases. Every change is
   measured.
-- 🪶 **Zero runtime dependencies.** croak is itself an npm package — it must not
-  become the next compromised dependency.
+- 🪶 **One runtime dependency, and only for the optional AI layer.** croak is
+  itself an npm package, so it must not become the next compromised
+  dependency: the deterministic checks use Node built-ins only, and the one
+  exception is Anthropic's official SDK, pinned to an exact version and
+  checked by croak itself (D36).
 
 ## 🙅 What croak won't catch
 

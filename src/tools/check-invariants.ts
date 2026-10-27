@@ -242,7 +242,17 @@ const hasEntries = (value: unknown): boolean =>
     ? value.length > 0
     : isRecord(value) && Object.keys(value).length > 0;
 
-/** croak ships no runtime dependencies (D4) and no install-time scripts of its own. */
+/**
+ * The one runtime dependency croak may ship (D36): Anthropic's official SDK,
+ * for the opt-in LLM layer only, pinned to an exact version so an install
+ * never picks up a release croak has not checked.
+ */
+export const ALLOWED_DEPENDENCIES: ReadonlySet<string> = new Set([
+  "@anthropic-ai/sdk",
+]);
+const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
+
+/** croak ships no other runtime dependencies (D4, D36) and no install-time scripts of its own. */
 export function checkPackageJson(manifest: unknown): Violation[] {
   if (!isRecord(manifest))
     return [
@@ -250,12 +260,22 @@ export function checkPackageJson(manifest: unknown): Violation[] {
     ];
   const violations: Violation[] = [];
   for (const field of DEPENDENCY_FIELDS) {
-    if (hasEntries(manifest[field])) {
+    const deps = manifest[field];
+    if (!hasEntries(deps)) continue;
+    const entries = isRecord(deps) ? Object.entries(deps) : [[field, ""]];
+    for (const [name, version] of entries) {
+      if (
+        field === "dependencies" &&
+        ALLOWED_DEPENDENCIES.has(name) &&
+        typeof version === "string" &&
+        EXACT_VERSION.test(version)
+      )
+        continue;
       violations.push({
         file: "package.json",
         line: 1,
         rule: "no-runtime-deps",
-        text: field,
+        text: `${field}: ${name}`,
       });
     }
   }

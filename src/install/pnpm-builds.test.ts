@@ -19,6 +19,21 @@ describe("pnpmBuildPolicy", () => {
     expect(allowed?.("sharp")).toBe(false);
   });
 
+  it("counts every script when the project pins another pnpm (M6 review)", () => {
+    const ws = "allowBuilds: {}\n";
+    expect(policy(ws, '{"packageManager":"pnpm@9.15.4"}')).toBeUndefined();
+    expect(
+      policy(ws, '{"packageManager":"pnpm@12.4.2+sha512.abc"}')?.("esbuild"),
+    ).toBe(false);
+    expect(policy(ws, '{"packageManager":"yarn@4.0.0"}')).toBeUndefined();
+    expect(
+      policy(
+        ws,
+        '{"devEngines":{"packageManager":{"name":"pnpm","version":"^9"}}}',
+      ),
+    ).toBeUndefined();
+  });
+
   it("reads a name with a trailing comment as the name (M6 review)", () => {
     expect(
       policy(

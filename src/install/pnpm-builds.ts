@@ -26,6 +26,32 @@ const matcherName = (key: string): string => {
   return (at === -1 ? key : key.slice(0, at)).trim();
 };
 
+/** Whether the manifest pins a package manager other than exactly this pnpm version. */
+function pinnedElsewhere(
+  manifest: Record<string, unknown>,
+  pnpmVersion: string,
+): boolean {
+  if (manifest.packageManager !== undefined) {
+    const pin = /^pnpm@(\d+\.\d+\.\d+)(?:\+.*)?$/.exec(
+      String(manifest.packageManager),
+    );
+    if (pin?.[1] !== pnpmVersion) return true;
+  }
+  if (
+    isRecord(manifest.devEngines) &&
+    manifest.devEngines.packageManager !== undefined
+  ) {
+    const pm = manifest.devEngines.packageManager;
+    if (
+      !isRecord(pm) ||
+      pm.name !== "pnpm" ||
+      String(pm.version ?? "") !== pnpmVersion
+    )
+      return true;
+  }
+  return false;
+}
+
 export function pnpmBuildPolicy(
   files: {
     readonly packageJson: string | undefined;
@@ -39,6 +65,11 @@ export function pnpmBuildPolicy(
   try {
     if (files.packageJson !== undefined) {
       const manifest: unknown = JSON.parse(stripBom(files.packageJson));
+      // The real install runs the pnpm the project pins (corepack, or pnpm's
+      // own version switching), not necessarily the one croak measured: any
+      // pin but exactly that version, and every script counts (M6 review).
+      if (isRecord(manifest) && pinnedElsewhere(manifest, pnpmVersion))
+        return undefined;
       if (isRecord(manifest) && isRecord(manifest.pnpm))
         settings.push(manifest.pnpm);
     }

@@ -96,7 +96,7 @@ export const integrity: InstallDetector = (changes) =>
       ruleId: "install/integrity",
       severity: "warn",
       file: label(c),
-      message: `${what(c)} and has no integrity hash, so npm does not verify the download`,
+      message: `${what(c)} and has no integrity hash, so the package manager does not verify the download`,
     }));
 
 export const installDetectors: readonly InstallDetector[] = [

@@ -6,12 +6,15 @@ import type { ContentCache } from "./content-cache.ts";
 import { type InstallDetector, installDetectors } from "./detectors.ts";
 import {
   installsOn,
+  type LockEntry,
   LockfileError,
   type Platform,
   parseLockfile,
 } from "./lockfile.ts";
 import { addedDependencyFindings, metadataFindings } from "./metadata.ts";
 import { diffLockfiles, type PlanChange } from "./plan.ts";
+import { applyBuildPolicy, type BuildPolicy } from "./pnpm-builds.ts";
+import { isPnpmLockfile, parsePnpmLockfile } from "./pnpm-lockfile.ts";
 import {
   fetchPackument,
   fetchTarball,
@@ -21,6 +24,11 @@ import {
   versionFacts,
 } from "./registry.ts";
 import { snapshotTarball, TarballError } from "./tar.ts";
+
+/** An npm package-lock.json or a pnpm-lock.yaml, told apart by their first lines. */
+export function parseAnyLockfile(text: string): LockEntry[] {
+  return isPnpmLockfile(text) ? parsePnpmLockfile(text) : parseLockfile(text);
+}
 
 export type PlanOutcome =
   | {
@@ -57,7 +65,7 @@ export function planInstall(
   const started = performance.now();
   const parse = (text: string, which: string) => {
     try {
-      return parseLockfile(text);
+      return parseAnyLockfile(text);
     } catch (error) {
       if (error instanceof LockfileError)
         throw new LockfileError(`${which} lockfile: ${error.message}`);
@@ -102,6 +110,8 @@ export interface OnlineOptions {
   readonly cache?: ContentCache;
   /** Ask a model about packages the rules only warned about (opt-in, D36). */
   readonly llm?: LlmOptions;
+  /** pnpm's rule for whose install scripts run (D38); absent: every script counts. */
+  readonly builds?: BuildPolicy;
 }
 
 const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
@@ -143,8 +153,11 @@ export async function planInstallOnline(
   const local = planInstall(beforeText, afterText);
   if (local.status === "incomplete") return local;
   const before =
-    beforeText === undefined ? undefined : parseLockfile(beforeText);
-  const fromRegistry = diffLockfiles(before, parseLockfile(afterText)).filter(
+    beforeText === undefined ? undefined : parseAnyLockfile(beforeText);
+  const fromRegistry = diffLockfiles(
+    before,
+    parseAnyLockfile(afterText),
+  ).filter(
     (c) => !c.entry.link && registryTarball(c.entry.resolved) !== undefined,
   );
   // npm skips platform packages for other systems, so they are not checked.
@@ -162,7 +175,7 @@ export async function planInstallOnline(
             ruleId: "install/other-platform",
             severity: "info",
             file: "package-lock.json",
-            message: `${skipped} package(s) built for other platforms not checked: npm will not install them on ${platform.os}-${platform.cpu}`,
+            message: `${skipped} package(s) built for other platforms not checked: the package manager will not install them on ${platform.os}-${platform.cpu}`,
           },
         ];
   const names = [...new Set(changes.map((c) => c.entry.name))];
@@ -193,7 +206,12 @@ export async function planInstallOnline(
     });
     const content =
       options.content === false ? [] : await contentOf(changes, options);
-    const ruled = [...local.findings, ...notes, ...remote, ...content];
+    const all = [...local.findings, ...notes, ...remote, ...content];
+    // Before the LLM step: a script pnpm will not run needs no second opinion.
+    const ruled =
+      options.builds === undefined
+        ? all
+        : applyBuildPolicy(all, options.builds);
     const step =
       options.llm === undefined || options.content === false
         ? undefined

@@ -140,6 +140,42 @@ describe("planInstall", () => {
   });
 });
 
+describe("planInstall on a pnpm lockfile (M6)", () => {
+  const lock = [
+    "lockfileVersion: '9.0'",
+    "importers:",
+    "  .:",
+    "    dependencies:",
+    "      is-number:",
+    "        specifier: 7.0.0",
+    "        version: 7.0.0",
+    "packages:",
+    "  is-number@7.0.0:",
+    "    resolution: {integrity: sha512-a==}",
+    "  forked@git+https://github.com/o/forked.git#abc:",
+    "    resolution: {type: git, repo: https://github.com/o/forked.git, commit: abc}",
+    "    version: 2.0.0",
+  ].join("\n");
+
+  it("reads it like an npm lockfile: registry packages clean, git sources reported", () => {
+    const outcome = planInstall(undefined, lock);
+    expect(outcome).toMatchObject({ status: "complete", added: 2 });
+    expect(
+      outcome.status === "complete" &&
+        outcome.findings.map((f) => `${f.ruleId}:${f.file}`),
+    ).toEqual([
+      "install/source:forked@2.0.0",
+      "install/integrity:forked@2.0.0",
+    ]);
+  });
+
+  it("is incomplete for a pnpm lockfile it cannot read", () => {
+    expect(planInstall(undefined, "lockfileVersion: '6.0'\n")).toMatchObject({
+      status: "incomplete",
+    });
+  });
+});
+
 describe("planInstallOnline", () => {
   const now = new Date("2026-10-25T00:00:00Z");
   const doc = (

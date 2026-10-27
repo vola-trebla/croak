@@ -10,8 +10,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
+import Anthropic from "@anthropic-ai/sdk";
 import { fetchPackument } from "../install/registry.ts";
 import { type PlanOutcome, planInstallOnline } from "../install/scan.ts";
+import { DEFAULT_MODEL, triage } from "../llm/triage.ts";
 import type { Severity } from "../verdict.ts";
 
 interface CorpusPackage {
@@ -110,10 +112,24 @@ const count = (outcome: PlanOutcome, severity: Severity): number =>
 
 async function main(root: string): Promise<number> {
   const { values } = parseArgs({
-    options: { json: { type: "boolean" } },
+    options: { json: { type: "boolean" }, llm: { type: "boolean" } },
     strict: true,
   });
   const { now, packages } = loadPackages(root);
+  // --llm: the opt-in model step on every package the rules warned about (D36).
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (values.llm === true && (key === undefined || key === ""))
+    throw new Error("--llm needs ANTHROPIC_API_KEY");
+  const client =
+    values.llm === true ? new Anthropic({ apiKey: key }) : undefined;
+  const llm =
+    client === undefined
+      ? undefined
+      : {
+          model: DEFAULT_MODEL,
+          triage: (input: Parameters<typeof triage>[0]) =>
+            triage(input, client),
+        };
   const results: {
     pkg: CorpusPackage;
     outcome?: PlanOutcome;
@@ -129,6 +145,7 @@ async function main(root: string): Promise<number> {
         outcome: await planInstallOnline(undefined, lock, {
           fetch: doFetch,
           now,
+          ...(llm === undefined ? {} : { llm }),
         }),
       });
     } catch (error) {
@@ -163,6 +180,11 @@ async function main(root: string): Promise<number> {
     lines.push(
       "",
       `allow ${results.filter((r) => r.outcome?.status === "complete" && r.outcome.verdict === "allow").length}  warn ${flagged.filter((r) => r.outcome?.status === "complete" && r.outcome.verdict === "warn").length}  block ${flagged.filter((r) => r.outcome?.status === "complete" && r.outcome.verdict === "block").length}  not checked ${results.filter((r) => r.outcome?.status !== "complete").length}`,
+      ...(llm === undefined
+        ? []
+        : [
+            `${DEFAULT_MODEL}: ${results.reduce((n, r) => n + (r.outcome?.status === "complete" ? (r.outcome.llm?.calls ?? 0) : 0), 0)} call(s), $${results.reduce((n, r) => n + (r.outcome?.status === "complete" ? (r.outcome.llm?.costUsd ?? 0) : 0), 0).toFixed(4)}`,
+          ]),
       "",
       "Blocks and warnings to review:",
     );

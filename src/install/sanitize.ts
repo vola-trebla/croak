@@ -67,8 +67,8 @@ const WORKSPACE_KEYS = new Set([
 
 /** YAML scalars come back as strings; pnpm wants booleans where YAML had them. */
 function typed(value: unknown): unknown {
-  if (value === "true") return true;
-  if (value === "false") return false;
+  if (value === "true" || value === "True" || value === "TRUE") return true;
+  if (value === "false" || value === "False" || value === "FALSE") return false;
   if (Array.isArray(value)) return value.map(typed);
   if (isRecord(value))
     return Object.fromEntries(

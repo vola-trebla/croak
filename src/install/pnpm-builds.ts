@@ -52,9 +52,10 @@ export function pnpmBuildPolicy(
   }
   const named = new Set<string>();
   for (const s of settings) {
+    // Anything but an explicit false allows every build (YAML has True, TRUE, …).
     if (
-      s.dangerouslyAllowAllBuilds === true ||
-      s.dangerouslyAllowAllBuilds === "true"
+      s.dangerouslyAllowAllBuilds !== undefined &&
+      !/^(?:false|False|FALSE)$/.test(String(s.dangerouslyAllowAllBuilds))
     )
       return undefined;
     // A list in a file croak does not read: it could allow anything.

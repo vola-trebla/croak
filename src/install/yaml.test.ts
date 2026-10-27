@@ -84,4 +84,18 @@ describe("parseYamlDocuments", () => {
       parseYamlDocuments("a: 1\nb: 2\nc: 3", { maxKeys: 2 }),
     ).toThrow(/keys/);
   });
+
+  it("drops comments the way YAML does, also inside a spread flow collection (M6 review)", () => {
+    expect(
+      one(
+        "a: true # ok\nlist:\n  - esbuild # for vite\nurl: git+https://x/r.git#abc\nflow: [\n  sharp, # img\n  esbuild\n]\nq: 'a # b'\n",
+      ),
+    ).toEqual({
+      a: "true",
+      list: ["esbuild"],
+      url: "git+https://x/r.git#abc",
+      flow: ["sharp", "esbuild"],
+      q: "a # b",
+    });
+  });
 });

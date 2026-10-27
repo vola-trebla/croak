@@ -225,6 +225,26 @@ function parseDocument(
   return root;
 }
 
+/**
+ * A line without its comment: a `#` outside quotes that starts the line or
+ * follows whitespace (YAML's rule; `repo#commit` keeps its `#`).
+ */
+function stripComment(line: string): string {
+  let quote: string | undefined;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quote !== undefined) {
+      if (ch === quote) quote = undefined;
+    } else if (ch === "'" || ch === '"') quote = ch;
+    else if (
+      ch === "#" &&
+      (i === 0 || line[i - 1] === " " || line[i - 1] === "\t")
+    )
+      return line.slice(0, i).trimEnd();
+  }
+  return line;
+}
+
 /** How many flow brackets a line leaves open, outside quotes. */
 function openBrackets(line: string, start: number): number {
   let depth = start;
@@ -253,7 +273,7 @@ export function parseYamlDocuments(
   let open: { n: number; text: string; depth: number } | undefined;
   const lines = text.split("\n");
   lines.forEach((raw, index) => {
-    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+    const line = stripComment(raw.endsWith("\r") ? raw.slice(0, -1) : raw);
     if (open !== undefined) {
       open.text += ` ${line.trim()}`;
       open.depth = openBrackets(line, open.depth);

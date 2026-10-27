@@ -16,7 +16,7 @@ import {
 import { suggestNames } from "./install/metadata.ts";
 import { pnpmBuildPolicy } from "./install/pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
-import { projectScriptFindings } from "./install/project.ts";
+import { pnpmfileFindings, projectScriptFindings } from "./install/project.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
   SanitizeError,
@@ -255,46 +255,47 @@ async function runPlan(
           },
         ]
       : [];
-  // A plain npm install or npm ci also runs the project's own install scripts (D35).
+  const tryRead = (path: string): string | undefined => {
+    try {
+      return read(path);
+    } catch {
+      return undefined;
+    }
+  };
+  const projectFs = {
+    read: tryRead,
+    kind: (path: string) => {
+      try {
+        const stats = lstatSync(path);
+        const kind: "symlink" | "file" | "other" = stats.isSymbolicLink()
+          ? "symlink"
+          : stats.isFile()
+            ? "file"
+            : "other";
+        return { kind, size: stats.size };
+      } catch {
+        return undefined;
+      }
+    },
+  };
+  // A plain npm install or npm ci also runs the project's own install scripts
+  // (D35); pnpm runs the project's pnpmfile and config dependencies on every
+  // install (D39).
   const project = values.project;
+  const extra: Finding[] = [
+    ...llmMissing,
+    ...(buildsDir === undefined || values["pnpm-version"] === undefined
+      ? []
+      : pnpmfileFindings(buildsDir, projectFs)),
+    ...(project === undefined ? [] : projectScriptFindings(project, projectFs)),
+  ];
   const judged: PlanOutcome =
-    outcome.status !== "complete"
+    outcome.status !== "complete" || extra.length === 0
       ? outcome
-      : project === undefined
-        ? llmMissing.length === 0
-          ? outcome
-          : { ...outcome, findings: [...llmMissing, ...outcome.findings] }
-        : (() => {
-            const findings = [
-              ...llmMissing,
-              ...projectScriptFindings(project, {
-                read: (path) => {
-                  try {
-                    return read(path);
-                  } catch {
-                    return undefined;
-                  }
-                },
-                kind: (path) => {
-                  try {
-                    const stats = lstatSync(path);
-                    return {
-                      kind: stats.isSymbolicLink()
-                        ? "symlink"
-                        : stats.isFile()
-                          ? "file"
-                          : "other",
-                      size: stats.size,
-                    };
-                  } catch {
-                    return undefined;
-                  }
-                },
-              }),
-              ...outcome.findings,
-            ];
-            return { ...outcome, findings, verdict: aggregate(findings) };
-          })();
+      : (() => {
+          const findings = [...extra, ...outcome.findings];
+          return { ...outcome, findings, verdict: aggregate(findings) };
+        })();
   const stdout =
     values.json === true
       ? planToJson(judged)

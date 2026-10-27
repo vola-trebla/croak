@@ -68,8 +68,8 @@
     },
     {
       "command": "pnpm add zod",
-      "expect": "deny",
-      "why": "pnpm is not checked yet (M6)"
+      "expect": "check",
+      "why": "pnpm is checked since M6"
     },
     {
       "command": "yarn add react",
@@ -216,6 +216,36 @@
       "command": "bash scripts/build.sh && npm test",
       "expect": "ignore",
       "why": "a script file, not an install"
+    },
+    {
+      "command": "pnpm dlx create-vite@latest app",
+      "expect": "check",
+      "why": "pnpm dlx downloads and runs at once (M6)"
+    },
+    {
+      "command": "cd packages/web && pnpm install",
+      "expect": "check",
+      "why": "a pnpm workspace member, checked at the root (M6)"
+    },
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "expect": "check",
+      "why": "installs the lockfile as written (M6)"
+    },
+    {
+      "command": "pnpm --registry https://npm.internal.invalid add x",
+      "expect": "deny",
+      "why": "a registry croak does not check (M6)"
+    },
+    {
+      "command": "pnpm exec tsc --noEmit",
+      "expect": "ignore",
+      "why": "runs a local bin, installs nothing (M6)"
+    },
+    {
+      "command": "pnpm run test",
+      "expect": "ignore",
+      "why": "runs project scripts, installs nothing (M6)"
     }
   ]
 }

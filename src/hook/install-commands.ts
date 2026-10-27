@@ -17,6 +17,8 @@ export type InstallIntent =
   /** npm install/add <specs>; no specs means "install what package.json lists". */
   | {
       readonly kind: "install";
+      /** Which package manager installs; npm when absent. */
+      readonly manager?: "npm" | "pnpm";
       readonly dir: string;
       readonly packages: readonly string[];
       readonly global: boolean;
@@ -24,14 +26,20 @@ export type InstallIntent =
   /** npm update [specs]: newest versions in range, not the locked ones. */
   | {
       readonly kind: "update";
+      readonly manager?: "npm" | "pnpm";
       readonly dir: string;
       readonly packages: readonly string[];
     }
   /** npm ci: installs the lockfile exactly as written. */
-  | { readonly kind: "ci"; readonly dir: string }
+  | {
+      readonly kind: "ci";
+      readonly manager?: "npm" | "pnpm";
+      readonly dir: string;
+    }
   /** npx / npm exec / npm create: downloads a package and runs it at once. */
   | {
       readonly kind: "run";
+      readonly manager?: "npm" | "pnpm";
       readonly dir: string;
       readonly packages: readonly string[];
     }
@@ -510,6 +518,190 @@ function npmIntents(
   }
 }
 
+// ------------------------------------------------------------ pnpm commands
+
+const PNPM_INSTALL = new Set(["install", "i", "add"]);
+const PNPM_UPDATE = new Set(["update", "up", "upgrade"]);
+/** pnpm options that take a value. */
+const PNPM_VALUE_FLAGS = new Set([
+  "-C",
+  "--dir",
+  "--filter",
+  "-F",
+  "--registry",
+  "--reporter",
+  "--loglevel",
+  "--store-dir",
+  "--virtual-store-dir",
+  "--modules-dir",
+  "--package",
+  "--workspace-concurrency",
+  "--network-concurrency",
+  "--child-concurrency",
+  "--resolution-mode",
+  "--node-linker",
+  "--lockfile-dir",
+  "--global-dir",
+  "--cache-dir",
+]);
+/** pnpm options that are flags. */
+const PNPM_BOOLEAN_FLAGS = new Set([
+  "-D",
+  "-P",
+  "-O",
+  "-E",
+  "-g",
+  "-w",
+  "-r",
+  "--save-dev",
+  "--save-prod",
+  "--save-optional",
+  "--save-exact",
+  "--save-peer",
+  "--global",
+  "--workspace-root",
+  "--recursive",
+  "--workspace",
+  "--frozen-lockfile",
+  "--no-frozen-lockfile",
+  "--prefer-offline",
+  "--offline",
+  "--ignore-scripts",
+  "--lockfile-only",
+  "--fix-lockfile",
+  "--force",
+  "--silent",
+  "--latest",
+  "-L",
+  "--interactive",
+  "-i",
+  "--dev",
+  "--prod",
+  "--no-optional",
+  "--strict-peer-dependencies",
+  "--shamefully-hoist",
+  "--aggregate-output",
+  "--stream",
+  "--use-stderr",
+  "--yes",
+  "-y",
+  "--shell-mode",
+  "-c",
+]);
+
+function pnpmIntents(
+  args: readonly string[],
+  state: State,
+  raw: string,
+  dlx: boolean,
+): InstallIntent[] {
+  const unchecked = (reason: string): InstallIntent[] => [
+    { kind: "unchecked", command: raw, reason },
+  ];
+  const flags = new Map<string, string[]>();
+  const positional: string[] = [];
+  let ambiguous: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const word = args[i] ?? "";
+    if (word === "--" || (dlx && positional.length > 0)) {
+      positional.push(...args.slice(word === "--" ? i + 1 : i));
+      break;
+    }
+    if (!word.startsWith("-") || word === "-") {
+      positional.push(word);
+      continue;
+    }
+    const eq = word.indexOf("=");
+    const key = eq === -1 ? word : word.slice(0, eq);
+    if (eq !== -1)
+      flags.set(key, [...(flags.get(key) ?? []), word.slice(eq + 1)]);
+    else if (PNPM_VALUE_FLAGS.has(key))
+      flags.set(key, [...(flags.get(key) ?? []), args[++i] ?? ""]);
+    else {
+      if (
+        !PNPM_BOOLEAN_FLAGS.has(key) &&
+        !key.startsWith("--no-") &&
+        args[i + 1] !== undefined &&
+        !args[i + 1]?.startsWith("-")
+      )
+        ambiguous ??= word;
+      flags.set(key, ["true"]);
+    }
+  }
+  if (
+    flags.has("--registry") ||
+    [...flags.keys()].some((k) =>
+      /^--config\.(?:.*registry|userconfig|globalconfig|pnpmfile)/.test(k),
+    )
+  )
+    return unchecked(
+      "it points pnpm at a registry or config croak does not check",
+    );
+  const target = flags.get("-C")?.at(-1) ?? flags.get("--dir")?.at(-1);
+  const dir =
+    target === undefined || state.dir === undefined
+      ? state.dir
+      : posix.resolve(state.dir, target);
+  const where = (intents: InstallIntent[]): InstallIntent[] =>
+    dir === undefined && intents.length > 0
+      ? unchecked("the directory it runs in is only known when the shell runs")
+      : intents;
+  const global = flags.has("-g") || flags.has("--global");
+  if (dlx) {
+    const packages = flags.get("--package") ?? positional.slice(0, 1);
+    return where(
+      packages.length === 0
+        ? []
+        : [{ kind: "run", manager: "pnpm", dir: dir ?? "", packages }],
+    );
+  }
+  const [sub, ...rest] = positional;
+  const installing =
+    sub !== undefined &&
+    (PNPM_INSTALL.has(sub) ||
+      PNPM_UPDATE.has(sub) ||
+      sub === "dlx" ||
+      sub === "create");
+  if (
+    ambiguous !== undefined &&
+    (installing || positional.some((w) => PNPM_INSTALL.has(w)))
+  )
+    return unchecked(`croak cannot tell whether ${ambiguous} takes a value`);
+  if (sub === undefined) return []; // bare pnpm prints its help
+  if (sub === "dlx") return pnpmIntents(rest, { dir }, raw, true);
+  if (sub === "create")
+    return where(
+      rest[0] === undefined
+        ? []
+        : [
+            {
+              kind: "run",
+              manager: "pnpm",
+              dir: dir ?? "",
+              packages: [initializer(rest[0])],
+            },
+          ],
+    );
+  if (PNPM_UPDATE.has(sub))
+    return global
+      ? unchecked("croak does not check global updates yet")
+      : where([
+          { kind: "update", manager: "pnpm", dir: dir ?? "", packages: rest },
+        ]);
+  if (!PNPM_INSTALL.has(sub)) return [];
+  if (flags.has("--frozen-lockfile") && rest.length === 0)
+    return where([{ kind: "ci", manager: "pnpm", dir: dir ?? "" }]);
+  return where([
+    {
+      kind: "install",
+      manager: "pnpm",
+      dir: dir ?? "",
+      packages: rest,
+      global,
+    },
+  ]);
+}
+
 // ------------------------------------------------------------ shell commands
 
 /** Wrappers and the options of theirs that take a value. */
@@ -600,11 +792,10 @@ const TEXT_ONLY = new Set([
   "volta",
 ]);
 const OTHER_MANAGERS: Readonly<Record<string, ReadonlySet<string>>> = {
-  pnpm: new Set(["install", "i", "add", "update", "up", "dlx", "create"]),
   yarn: new Set(["", "install", "add", "up", "upgrade", "dlx", "create"]),
   bun: new Set(["install", "i", "add", "update", "x", "create"]),
 };
-const OTHER_RUNNERS = new Set(["pnpx", "bunx", "corepack"]);
+const OTHER_RUNNERS = new Set(["bunx", "corepack"]);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 const basename = (word: string): string =>
@@ -620,7 +811,7 @@ function resolve(words: readonly ShellWord[]): {
   let foreignEnv = false;
   const assignment = (word: ShellWord | undefined): boolean => {
     if (word === undefined || !ASSIGNMENT.test(word.text)) return false;
-    if (/^npm_config_/i.test(word.text)) foreignEnv = true;
+    if (/^p?npm_config_/i.test(word.text)) foreignEnv = true;
     return true;
   };
   for (;;) {
@@ -752,6 +943,20 @@ function intentsOf(
       else found.push(...intents);
       continue;
     }
+    if (name === "pnpm" || name === "pnpx") {
+      if (foreignEnv) {
+        unchecked("pnpm settings are changed through the environment");
+        continue;
+      }
+      const intents = pnpmIntents(args, state, raw, name === "pnpx");
+      if (
+        intents.some((i) => i.kind !== "unchecked") &&
+        words.some((w) => w.dynamic)
+      )
+        unchecked("a package or path in it is only known when the shell runs");
+      else found.push(...intents);
+      continue;
+    }
     const other = OTHER_MANAGERS[name];
     if (
       OTHER_RUNNERS.has(name) ||
@@ -801,7 +1006,7 @@ function stripHeredocs(command: string): {
 
 /** Settings in the same command that move npm to another registry. */
 const CONFIG_CHANGE =
-  /\bnpm\s+(?:config\s+)?(?:set|edit)\b|\bexport\s+npm_config_|>>?\s*\S*\.npmrc\b/i;
+  /\b(?:npm|pnpm)\s+(?:config\s+)?(?:set|edit)\b|\bexport\s+(?:npm|pnpm)_config_|>>?\s*\S*(?:\.npmrc|pnpm-workspace\.yaml)\b/i;
 
 function intentsFor(
   command: string,

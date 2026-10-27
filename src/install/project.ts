@@ -8,10 +8,13 @@ import {
   type RepoEntry,
   type RepoSnapshot,
 } from "../repo-snapshot.ts";
-import { isSuspicious } from "../signals/code.ts";
+import { codeSignals, describeSignals, isSuspicious } from "../signals/code.ts";
 import { analyzeShell } from "../signals/shell.ts";
 import { stripBom } from "../signals/text.ts";
 import type { Finding } from "../verdict.ts";
+import { parseYamlDocuments, YamlError } from "./yaml.ts";
+
+const PNPM_RULE = "repo/pnpmfile";
 
 /**
  * The project's own install scripts (whole-project review, D35). A plain
@@ -81,4 +84,83 @@ export function projectScriptFindings(dir: string, fs: ProjectFs): Finding[] {
   }
   const snapshot: RepoSnapshot = { entries, read: (path) => texts.get(path) };
   return [...policy(snapshot)];
+}
+
+const PNPMFILES = [".pnpmfile.cjs", ".pnpmfile.mjs"];
+
+/**
+ * Code pnpm runs on every install of the project, scripts or not (M6, D39):
+ * the pnpmfile (`.pnpmfile.cjs`, or the file `pnpmfile:` names in
+ * pnpm-workspace.yaml) and config dependencies, which pnpm installs first and
+ * whose pnpmfiles it loads. A pnpmfile is a warning, a block when its code
+ * reaches the network with secrets or eval; config dependencies are a warning.
+ */
+export function pnpmfileFindings(dir: string, fs: ProjectFs): Finding[] {
+  const findings: Finding[] = [];
+  let settings: Record<string, unknown> = {};
+  const workspace = fs.read(posix.join(dir, "pnpm-workspace.yaml"));
+  if (workspace !== undefined) {
+    try {
+      const [doc] = parseYamlDocuments(workspace);
+      if (isRecord(doc)) settings = doc;
+    } catch (error) {
+      if (!(error instanceof YamlError)) throw error;
+      findings.push({
+        ruleId: PNPM_RULE,
+        severity: "warn",
+        file: "pnpm-workspace.yaml",
+        message:
+          "pnpm-workspace.yaml cannot be read, so croak cannot tell what pnpm loads on install",
+      });
+    }
+  }
+  const named =
+    typeof settings.pnpmfile === "string"
+      ? [posix.normalize(settings.pnpmfile)]
+      : [];
+  for (const file of [...new Set([...PNPMFILES, ...named])]) {
+    if (file === ".." || file.startsWith("../") || file.startsWith("/")) {
+      findings.push({
+        ruleId: PNPM_RULE,
+        severity: "warn",
+        file: "pnpm-workspace.yaml",
+        message: `pnpm runs ${file}, a pnpmfile outside the project, on every install`,
+      });
+      continue;
+    }
+    const at = fs.kind(posix.join(dir, file));
+    if (at === undefined) continue;
+    const text =
+      at.kind === "file" && at.size <= MAX_FILE_BYTES
+        ? fs.read(posix.join(dir, file))
+        : undefined;
+    if (text === undefined) {
+      findings.push({
+        ruleId: PNPM_RULE,
+        severity: "warn",
+        file,
+        message: `pnpm runs ${file} on every install, and croak could not read it`,
+      });
+      continue;
+    }
+    const hits = codeSignals(text);
+    const signals = new Set(hits.map((h) => h.signal));
+    findings.push({
+      ruleId: PNPM_RULE,
+      severity: isSuspicious(signals) ? "block" : "warn",
+      file,
+      message: `pnpm runs ${file} on every install${hits.length > 0 ? `: ${describeSignals(hits, file)}` : ""}`,
+    });
+  }
+  if (
+    isRecord(settings.configDependencies) &&
+    Object.keys(settings.configDependencies).length > 0
+  )
+    findings.push({
+      ruleId: PNPM_RULE,
+      severity: "warn",
+      file: "pnpm-workspace.yaml",
+      message: `pnpm installs config dependencies first and loads their pnpmfiles: ${Object.keys(settings.configDependencies).slice(0, 5).join(", ")}`,
+    });
+  return findings;
 }

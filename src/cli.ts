@@ -19,6 +19,11 @@ import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
 import { projectScriptFindings } from "./install/project.ts";
 import { planToJson, renderPlan } from "./install/report.ts";
 import {
+  SanitizeError,
+  sanitizePnpmWorkspace,
+  sanitizeRootManifest,
+} from "./install/sanitize.ts";
+import {
   type PlanOutcome,
   planInstall,
   planInstallOnline,
@@ -302,6 +307,33 @@ export async function run(
   argv: readonly string[],
   deps: CliDeps = DEFAULT_DEPS,
 ): Promise<CliResult> {
+  // What the planning wrapper may hand to pnpm from an untrusted project (D38).
+  if (argv[0] === "sanitize") {
+    const [, kind, file] = argv;
+    if (
+      file === undefined ||
+      (kind !== "root-manifest" && kind !== "pnpm-workspace")
+    )
+      return usageError(
+        "usage: croak sanitize root-manifest|pnpm-workspace <file>",
+      );
+    const read =
+      deps.readFile ?? ((path: string) => readFileSync(path, "utf8"));
+    try {
+      const text = read(file);
+      return {
+        code: EXIT.ok,
+        stdout:
+          kind === "root-manifest"
+            ? sanitizeRootManifest(text)
+            : sanitizePnpmWorkspace(text),
+        stderr: "",
+      };
+    } catch (error) {
+      if (error instanceof SanitizeError) return usageError(error.message);
+      throw error;
+    }
+  }
   // Suggestions for package names npm does not have (croak-install on E404).
   if (argv[0] === "suggest") {
     const lines = argv.slice(1).flatMap((spec) => {

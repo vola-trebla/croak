@@ -65,24 +65,29 @@ out=$(cd "$clone" && sh "$root/scripts/croak-install.sh" 2>&1)
 set -e
 echo "$out" | grep -q "install/install-script" || { echo "FAIL: a forged hidden lockfile hid the bait:"; echo "$out"; exit 1; }
 
-# Workspaces and npm-shrinkwrap.json are not checked yet: refuse (D34).
-for setup in workspaces shrinkwrap; do
-  proj="$work/$setup"
-  mkdir -p "$proj"
-  if [ "$setup" = workspaces ]; then
-    echo '{ "name": "ws", "version": "1.0.0", "private": true, "workspaces": ["packages/*"] }' >"$proj/package.json"
-  else
-    echo '{ "name": "sw", "version": "1.0.0", "private": true }' >"$proj/package.json"
-    echo '{}' >"$proj/npm-shrinkwrap.json"
-  fi
-  set +e
-  out=$(cd "$proj" && sh "$root/scripts/croak-install.sh" left-pad 2>&1)
-  code=$?
-  set -e
-  [ "$code" -eq 2 ] && echo "$out" | grep -q "not supported yet\|does not check yet" ||
-    { echo "FAIL: $setup was not refused (exit $code):"; echo "$out"; exit 1; }
-done
-echo "ok: forged hidden lockfile, workspaces and shrinkwrap handled"
+# npm-shrinkwrap.json is not checked yet: refuse (D34).
+sw="$work/shrinkwrap"
+mkdir -p "$sw"
+echo '{ "name": "sw", "version": "1.0.0", "private": true }' >"$sw/package.json"
+echo '{}' >"$sw/npm-shrinkwrap.json"
+set +e
+out=$(cd "$sw" && sh "$root/scripts/croak-install.sh" left-pad 2>&1)
+code=$?
+set -e
+[ "$code" -eq 2 ] && echo "$out" | grep -q "not supported yet" || { echo "FAIL: shrinkwrap was not refused (exit $code):"; echo "$out"; exit 1; }
+
+# An npm workspace: a member's dependency is planned from the root (D38),
+# even when croak-install runs inside the member.
+ws="$work/workspace"
+mkdir -p "$ws/packages/a"
+echo '{ "name": "ws", "version": "1.0.0", "private": true, "workspaces": ["packages/*"] }' >"$ws/package.json"
+printf '{ "name": "a", "version": "1.0.0", "dependencies": { "croak-bait": "file:%s" } }\n' "$work/bait/croak-bait-1.0.0.tgz" >"$ws/packages/a/package.json"
+set +e
+out=$(cd "$ws/packages/a" && sh "$root/scripts/croak-install.sh" 2>&1)
+set -e
+echo "$out" | grep -q "install/install-script" || { echo "FAIL: the workspace member's dependency was not planned:"; echo "$out"; exit 1; }
+[ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
+echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root"
 
 # A cache path with a space must not split into a script node would run
 # (whole-project review): a project file at the second half prints a forged
@@ -96,4 +101,35 @@ set -e
 echo "$out" | grep -q "install/install-script" || { echo "FAIL: a cache path with a space changed what ran:"; echo "$out"; exit 1; }
 [ -d "$spaced/croak/content" ] || { echo "FAIL: the spaced cache directory was not used"; exit 1; }
 echo "ok: a cache path with a space stays one argument"
+
+# pnpm (D38): the same bait, planned with --pnpm; nothing runs, nothing in
+# the project changes.
+if command -v pnpm >/dev/null; then
+  pp="$work/pnpm-project"
+  mkdir -p "$pp"
+  echo '{ "name": "pp", "version": "1.0.0", "private": true, "packageManager": "pnpm@9.15.0" }' >"$pp/package.json"
+  set +e
+  out=$(cd "$pp" && sh "$root/scripts/croak-install.sh" --pnpm "$work/bait/croak-bait-1.0.0.tgz" 2>&1)
+  set -e
+  echo "$out" | grep -q "install/source" || { echo "FAIL: pnpm did not plan the bait:"; echo "$out"; exit 1; }
+  [ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during pnpm planning"; exit 1; }
+  [ ! -e "$pp/pnpm-lock.yaml" ] && [ ! -e "$pp/node_modules" ] || { echo "FAIL: the pnpm project was modified"; exit 1; }
+
+  # A pnpm workspace whose settings would load code: the plan still works,
+  # because croak sanitize drops configDependencies and the pnpmfile.
+  pw="$work/pnpm-workspace"
+  mkdir -p "$pw/packages/b"
+  echo '{ "name": "pw", "version": "1.0.0", "private": true }' >"$pw/package.json"
+  printf 'packages:\n  - packages/*\nconfigDependencies:\n  evil-config: 1.0.0+sha512-AAAA\npnpmfile: .pnpmfile.cjs\n' >"$pw/pnpm-workspace.yaml"
+  echo "require('fs').writeFileSync('$marker', '')" >"$pw/.pnpmfile.cjs"
+  printf '{ "name": "b", "version": "1.0.0", "dependencies": { "croak-bait": "file:%s" } }\n' "$work/bait/croak-bait-1.0.0.tgz" >"$pw/packages/b/package.json"
+  set +e
+  out=$(cd "$pw" && sh "$root/scripts/croak-install.sh" --pnpm 2>&1)
+  set -e
+  echo "$out" | grep -q "install/source" || { echo "FAIL: the pnpm workspace was not planned:"; echo "$out"; exit 1; }
+  [ ! -e "$marker" ] || { echo "FAIL: the pnpmfile or a script ran during planning"; exit 1; }
+  echo "ok: pnpm planned the bait and a workspace whose settings would load code; nothing ran"
+else
+  echo "skip: pnpm is not installed"
+fi
 

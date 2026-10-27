@@ -105,8 +105,17 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
   holds that package and its source and hash match the plan (D34, D35). `--ci` checks the lockfile as written (npm ci reinstalls every
   package), `--update` plans `npm update`, `--empty` plans into an empty
   project (npx, `npm install -g`);
-- refuses (exit 2) what it does not check yet: npm workspaces and
-  `npm-shrinkwrap.json`.
+- plans a workspace from its root, where the package manager installs, with
+  every manifest of the project copied (never `node_modules` or `.git`; a
+  file name with a control character, or more than 5,000 manifests, is
+  refused); refuses (exit 2) `npm-shrinkwrap.json`, not checked yet;
+- with `--pnpm`, runs pnpm the same way, plus what pnpm needs that npm does
+  not (D39): pnpm can run code before it resolves anything. corepack fetches
+  and runs the pnpm version a project's `packageManager` names, so the root
+  manifest is copied without `packageManager`/`devEngines`, and corepack runs
+  with its network off and only the user's own cache; `pnpm-workspace.yaml`
+  can load pnpmfiles and config dependencies, so it is copied with
+  resolution settings only. Both pass through `croak sanitize`.
 
 `scripts/test-croak-install.sh` (in CI) proves the path runs no lifecycle
 script: a bait package whose `preinstall`/`postinstall`/`prepare` would create

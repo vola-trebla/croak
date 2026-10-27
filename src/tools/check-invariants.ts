@@ -172,13 +172,27 @@ export const WRITE_ALLOWED: ReadonlySet<string> = new Set([
   "src/install/content-cache.ts",
 ]);
 
+/**
+ * The one dynamic import allowed (D36): the Anthropic SDK, by its literal
+ * name, loaded only when the opt-in LLM step runs. Never a computed specifier.
+ */
+export const SDK_IMPORT_FILE = "src/llm/client.ts";
+const SDK_IMPORT =
+  /^\s*const \{ default: Anthropic \} = await import\("@anthropic-ai\/sdk"\);\s*$/;
+
 export function checkSource(
   file: string,
   text: string,
   isTest: boolean,
 ): Violation[] {
   return checkSourceRules(file, text, isTest).filter(
-    (v) => v.rule !== "no-fs-write" || !WRITE_ALLOWED.has(file),
+    (v) =>
+      !(v.rule === "no-fs-write" && WRITE_ALLOWED.has(file)) &&
+      !(
+        v.rule === "no-dynamic-import" &&
+        file === SDK_IMPORT_FILE &&
+        SDK_IMPORT.test(v.text)
+      ),
   );
 }
 

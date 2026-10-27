@@ -3,7 +3,6 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import Anthropic from "@anthropic-ai/sdk";
 import { runHook } from "./hook/hook.ts";
 import {
   type ContentCache,
@@ -19,8 +18,8 @@ import {
   planInstall,
   planInstallOnline,
 } from "./install/scan.ts";
+import { anthropicTriage, DEFAULT_MODEL } from "./llm/client.ts";
 import type { LlmOptions } from "./llm/plan-step.ts";
-import { DEFAULT_MODEL, triage } from "./llm/triage.ts";
 import { renderScan, scanToJson } from "./repo-report.ts";
 import { type ScanOutcome, ScanTargetError, scanRepoAt } from "./scan.ts";
 import { aggregate, type Finding } from "./verdict.ts";
@@ -325,20 +324,13 @@ if (import.meta.main) {
     return cache;
   };
   const key = process.env.ANTHROPIC_API_KEY;
-  let client: Anthropic | undefined;
   const result = await run(process.argv.slice(2), {
     scan: (root) => scanRepoAt(root),
     emoji: process.stdout.isTTY === true,
     ...(key === undefined || key === ""
       ? {}
       : {
-          llm: {
-            model: DEFAULT_MODEL,
-            triage: (input) => {
-              client ??= new Anthropic({ apiKey: key });
-              return triage(input, client);
-            },
-          },
+          llm: { model: DEFAULT_MODEL, triage: anthropicTriage(key) },
         }),
     cache: {
       get: (integrity, label) => contentCache().get(integrity, label),

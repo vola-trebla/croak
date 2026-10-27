@@ -434,7 +434,9 @@ exact version. 0.133.0 was chosen as the newest release over two weeks old
 model runs only on 🟡 packages, only with a key and an explicit opt-in;
 its answer can only add a finding (escalate-only, invariant 2), package
 content is untrusted input inside a random boundary, and any failure falls
-back to the deterministic verdict.
+back to the deterministic verdict. (M5 review: the SDK is loaded lazily, through one
+literal dynamic import the tripwire allows, so commands that do not run the
+step never load it.)
 **Trade-off:** croak now has a dependency tree (the SDK and three packages
 of its own) that must be kept pinned and checked on every update.
 

@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import type { PlanChange } from "../install/plan.ts";
 import {
   type FetchOptions,
@@ -5,7 +6,6 @@ import {
   IntegrityError,
   RegistryError,
   tarballOf,
-  versionFacts,
 } from "../install/registry.ts";
 import { snapshotTarball, TarballError } from "../install/tar.ts";
 import type { Finding } from "../verdict.ts";
@@ -27,7 +27,15 @@ export interface LlmOptions {
   readonly triage: TriageFn;
   /** Shown in reports. */
   readonly model: string;
+  /** Limits, so the step never outlasts the hook's timeout (M5 review). */
+  readonly maxPackages?: number;
+  readonly deadlineMs?: number;
+  readonly maxDownloadBytes?: number;
 }
+
+const DEFAULT_MAX_PACKAGES = 10;
+const DEFAULT_DEADLINE_MS = 90_000;
+const DEFAULT_MAX_DOWNLOAD_BYTES = 150 * 1024 * 1024;
 
 export interface LlmStep {
   readonly findings: Finding[];
@@ -41,7 +49,6 @@ export async function llmStep(
   docs: ReadonlyMap<string, unknown>,
   llm: LlmOptions,
   fetchOptions: FetchOptions,
-  now: Date,
 ): Promise<LlmStep> {
   const judgements: LlmJudgement[] = [];
   const notes: Finding[] = [];
@@ -55,32 +62,65 @@ export async function llmStep(
       message: `${llm.model} did not judge it: ${why}`,
     });
   };
-  for (const label of warnedPackages(findings)) {
-    const change = changes.find(
-      (c) => `${c.entry.name}@${c.entry.version ?? "?"}` === label,
-    );
-    if (change === undefined) continue;
+  const warned = new Set(warnedPackages(findings));
+  const started = performance.now();
+  const deadline = llm.deadlineMs ?? DEFAULT_DEADLINE_MS;
+  const maxPackages = llm.maxPackages ?? DEFAULT_MAX_PACKAGES;
+  const maxBytes = llm.maxDownloadBytes ?? DEFAULT_MAX_DOWNLOAD_BYTES;
+  let downloaded = 0;
+  let asked = 0;
+  const download = async (
+    url: string,
+    integrity: string | undefined,
+  ): Promise<Buffer> => {
+    const left = maxBytes - downloaded;
+    if (left <= 0)
+      throw new RegistryError(
+        `over the LLM step's ${maxBytes}-byte download budget`,
+      );
+    // fetchTarball stops reading at the cap, so the budget holds mid-download too.
+    const data = await fetchTarball(url, integrity, {
+      ...fetchOptions,
+      maxBytes: Math.min(left, 100 * 1024 * 1024),
+    });
+    downloaded += data.length;
+    return data;
+  };
+  // Every copy with a warning: D35 keeps same name@version from different
+  // sources apart, and the warned one may not be the first (M5 review).
+  for (const change of changes.filter((c) =>
+    warned.has(`${c.entry.name}@${c.entry.version ?? "?"}`),
+  )) {
     const { entry } = change;
+    const label = `${entry.name}@${entry.version ?? "?"}`;
     const doc = docs.get(entry.name);
+    if (asked >= maxPackages) {
+      skip(label, `over the LLM step's limit of ${maxPackages} packages`);
+      continue;
+    }
+    if (performance.now() - started > deadline) {
+      skip(
+        label,
+        `over the LLM step's ${Math.round(deadline / 1000)} s budget`,
+      );
+      continue;
+    }
+    asked += 1;
     try {
       const after = snapshotTarball(
-        await fetchTarball(entry.resolved ?? "", entry.integrity, fetchOptions),
+        await download(entry.resolved ?? "", entry.integrity),
       );
+      // The baseline is what the project had: a new dependency is shown whole,
+      // not as a delta from the registry's previous release (M5 review).
       const previous =
-        doc === undefined || doc === "not-found"
-          ? undefined
-          : versionFacts(doc, entry.version ?? "", now)?.previous?.version;
+        change.kind === "changed" ? change.previousVersion : undefined;
       const prevTarball =
         previous === undefined ? undefined : tarballOf(doc, previous);
       const before =
         prevTarball === undefined
           ? undefined
           : snapshotTarball(
-              await fetchTarball(
-                prevTarball.url,
-                prevTarball.integrity,
-                fetchOptions,
-              ),
+              await download(prevTarball.url, prevTarball.integrity),
             );
       const result = await llm.triage({
         label,

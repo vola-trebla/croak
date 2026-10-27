@@ -197,7 +197,7 @@ export async function planInstallOnline(
     const step =
       options.llm === undefined || options.content === false
         ? undefined
-        : await llmStep(ruled, changes, byName, options.llm, fetchOptions, now);
+        : await llmStep(ruled, changes, byName, options.llm, fetchOptions);
     const findings = step?.findings ?? ruled;
     return {
       ...local,

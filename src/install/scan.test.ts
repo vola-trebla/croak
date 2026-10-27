@@ -481,6 +481,85 @@ describe("planInstallOnline: package contents", () => {
       });
     });
 
+    it("diffs a new dependency as a whole and an update against the project's version (M5 review)", async () => {
+      const seen: (string | undefined)[] = [];
+      const options = {
+        model: "fake-model",
+        triage: async (input: {
+          label: string;
+          previousVersion: string | undefined;
+        }) => {
+          seen.push(input.previousVersion);
+          return {
+            judgement: {
+              label: input.label,
+              verdict: "benign" as const,
+              reason: "",
+              model: "m",
+            },
+            inputTokens: 1,
+            outputTokens: 1,
+            costUsd: 0,
+          };
+        },
+      };
+      await planInstallOnline(undefined, planWith(sri(installer)), {
+        fetch: serve(installer),
+        now,
+        llm: options,
+      });
+      const before = JSON.stringify({
+        lockfileVersion: 3,
+        packages: {
+          "": {},
+          "node_modules/p": {
+            version: "0.9.0",
+            resolved: "https://registry.npmjs.org/p/-/p-0.9.0.tgz",
+            integrity: "sha512-old",
+          },
+        },
+      });
+      await planInstallOnline(before, planWith(sri(installer)), {
+        fetch: serve(installer),
+        now,
+        llm: options,
+      });
+      expect(seen).toEqual([undefined, "0.9.0"]);
+    });
+
+    it("stays within its limits and says what it skipped (M5 review)", async () => {
+      const { asked, options } = llm("malicious");
+      const outcome = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        {
+          fetch: serve(installer),
+          now,
+          llm: { ...options, maxPackages: 0 },
+        },
+      );
+      expect(asked).toEqual([]);
+      expect(outcome).toMatchObject({ status: "complete", verdict: "warn" });
+      expect(outcome.status === "complete" && outcome.findings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            ruleId: "llm/triage",
+            message: expect.stringContaining("limit of 0 packages"),
+          }),
+        ]),
+      );
+      const tiny = await planInstallOnline(
+        undefined,
+        planWith(sri(installer)),
+        {
+          fetch: serve(installer),
+          now,
+          llm: { ...llm("malicious").options, maxDownloadBytes: 10 },
+        },
+      );
+      expect(tiny).toMatchObject({ status: "complete", verdict: "warn" });
+    });
+
     it("never lowers the verdict: a benign answer keeps the warning", async () => {
       const outcome = await planInstallOnline(
         undefined,

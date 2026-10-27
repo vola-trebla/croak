@@ -185,8 +185,12 @@ answer can only add a finding (`escalate()`, tested exhaustively); package
 content is untrusted input inside a per-call random boundary, and the prompt
 says text addressed to the reviewer is no evidence. A missing key, a refusal,
 a malformed answer or a network error leaves the rules' verdict with an info
-line. The SDK runs inside croak's sandbox (Node permission model); network is
-not covered by it, as for the registry.
+line. The SDK is loaded only when the step runs (one allowed dynamic import,
+`src/llm/client.ts`): never by `croak repo`, the hook's own steps, or a plan
+without `--llm`. Through `croak-install` it runs inside croak's sandbox (Node
+permission model); network is not covered by it, as for the registry. Calls
+time out after 30 s with one retry, and the step stops at 10 packages, 90 s
+or 150 MB of downloads, leaving the rules' verdict for the rest.
 
 ### 7. Verdict semantics
 

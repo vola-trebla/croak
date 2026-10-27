@@ -96,12 +96,16 @@ export function versionDiff(
       continue;
     }
     const text = after.read(path) ?? "";
-    const old = before?.read(path);
-    if (old === text) continue;
+    // A file the install scripts run is shown whole, changed or not: a payload
+    // can sit unchanged until a new version starts running it (M5 review).
+    const runsAtInstall = install.has(path);
+    const old = runsAtInstall ? undefined : before?.read(path);
+    if (!runsAtInstall && old === text) continue;
     const { lines, removed } = addedLines(old, text);
     if (lines.length === 0 && removed === 0) continue;
-    const head =
-      old === undefined
+    const head = runsAtInstall
+      ? `=== ${path} (run at install, shown in full)`
+      : old === undefined
         ? `=== ${path} (new file)`
         : `=== ${path} (changed: ${lines.length} line(s) added, ${removed} removed)`;
     const section = [head, ...lines].join("\n");

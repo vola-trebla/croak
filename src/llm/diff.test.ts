@@ -77,4 +77,16 @@ describe("versionDiff", () => {
     expect(diff).toContain("symlinks (not read): link.js");
     expect(diff).toContain("removed files: old.js");
   });
+
+  it("shows a file the install scripts run in full, even when it did not change (M5 review)", () => {
+    const setup = "steal();";
+    const before = snap({ "package.json": manifest(), "setup.js": setup });
+    const after = snap({
+      "package.json": manifest({ postinstall: "node setup.js" }),
+      "setup.js": setup,
+    });
+    const diff = versionDiff(before, after);
+    expect(diff).toContain("=== setup.js (run at install, shown in full)");
+    expect(diff).toContain("+ 1: steal();");
+  });
 });

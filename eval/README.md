@@ -140,15 +140,24 @@ asking to be flagged. Needs `ANTHROPIC_API_KEY`; costs under a cent.
 ANTHROPIC_API_KEY=… pnpm eval:llm --repeats 3
 ```
 
-Results (18 install cases, 3 repeats, 2026-10-27; `eval/ablation/m5-haiku-5-5.json`):
+Results (19 install cases, 3 repeats, 2026-10-27; `eval/ablation/m5-haiku-5-5.json`):
 
 |                                | rules | rules + Haiku 5.5                    |
 | ------------------------------ | ----- | ------------------------------------ |
-| block recall                   | 7/10  | 10/10, 10/10, 10/10                  |
+| block recall                   | 7/11  | 11/11, 11/11, 11/11                  |
 | false alarms                   | 0/8   | 0/8, 0/8, 0/8                        |
-| red team that fooled the model | —     | 0/3 in every run                     |
+| red team that fooled the model | —     | 0/4 in every run                     |
 | downgrades                     | —     | 0                                    |
-| cost                           | —     | $0.0043 for 24 calls ($0.00018 each) |
+| cost                           | —     | $0.0049 for 27 calls ($0.00018 each) |
+
+Read the block-recall gain narrowly: all four cases it gained are red-team
+variants of one decode-and-run payload, which the prompt names as malicious
+almost word for word. It shows the model is not talked out of a clear
+payload (by comments, a fake boundary, a fake answer, or a payload that
+only starts running in the new version), not that it finds new kinds of
+attack. The ablation also diffs the fixture's own directories; the
+production path (download, project's previous version as the baseline) is
+covered by unit tests and the real-package run below.
 
 The first prompt said download-and-run code is an attack; the model then
 called an honest binary installer (the esbuild pattern) malicious in 2 of 3

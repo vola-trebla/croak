@@ -1,0 +1,38 @@
+{
+  "name": "quietcolor",
+  "time": {
+    "created": "2023-07-13T00:00:00.000Z",
+    "1.9.0": "2025-12-29T00:00:00.000Z",
+    "2.0.0": "2026-06-27T00:00:00.000Z",
+    "2.0.1": "2026-09-25T00:00:00.000Z"
+  },
+  "versions": {
+    "1.9.0": {
+      "name": "quietcolor",
+      "version": "1.9.0",
+      "_npmUser": {
+        "name": "ivo"
+      },
+      "dist": {}
+    },
+    "2.0.0": {
+      "name": "quietcolor",
+      "version": "2.0.0",
+      "_npmUser": {
+        "name": "ivo"
+      },
+      "dist": {}
+    },
+    "2.0.1": {
+      "name": "quietcolor",
+      "version": "2.0.1",
+      "_npmUser": {
+        "name": "ivo"
+      },
+      "dist": {},
+      "scripts": {
+        "postinstall": "node setup.js"
+      }
+    }
+  }
+}

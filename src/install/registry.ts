@@ -75,12 +75,13 @@ async function readCapped(
   return (await readCappedBytes(response, maxBytes)).toString("utf8");
 }
 
-/** The package document, or "not-found" when the registry has no such package. */
-export async function fetchPackument(
-  name: string,
-  options: FetchOptions = {},
+/** A JSON document from the registry, or "not-found" on 404. */
+async function getJson(
+  url: string,
+  label: string,
+  options: FetchOptions,
+  maxBytes: number,
 ): Promise<unknown> {
-  const url = packageUrl(name);
   const doFetch = options.fetch ?? fetch;
   let response: Response;
   try {
@@ -90,21 +91,67 @@ export async function fetchPackument(
     });
   } catch (error) {
     throw new RegistryError(
-      `${name}: ${error instanceof Error ? error.message : String(error)}`,
+      `${label}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   if (response.status === 404) return "not-found";
   if (!response.ok)
-    throw new RegistryError(`${name}: registry answered ${response.status}`);
-  const text = await readCapped(
-    response,
-    options.maxBytes ?? DEFAULT_MAX_BYTES,
-  );
+    throw new RegistryError(`${label}: registry answered ${response.status}`);
+  const text = await readCapped(response, maxBytes);
   try {
     return JSON.parse(text);
   } catch {
-    throw new RegistryError(`${name}: registry response is not JSON`);
+    throw new RegistryError(`${label}: registry response is not JSON`);
   }
+}
+
+/** The package document, or "not-found" when the registry has no such package. */
+export async function fetchPackument(
+  name: string,
+  options: FetchOptions = {},
+): Promise<unknown> {
+  return getJson(
+    packageUrl(name),
+    name,
+    options,
+    options.maxBytes ?? DEFAULT_MAX_BYTES,
+  );
+}
+
+// A provenance bundle is ~10 KB; a version has two attestations.
+const MAX_ATTESTATIONS_BYTES = 2 * 1024 * 1024;
+const VERSION = /^[0-9A-Za-z.+-]{1,256}$/;
+
+/**
+ * A version's SLSA provenance bundle from the registry's attestations
+ * endpoint, or "missing" when there is none. The URL is built here, never
+ * taken from the packument's dist.attestations.url.
+ */
+export async function fetchProvenanceBundle(
+  name: string,
+  version: string,
+  options: FetchOptions = {},
+): Promise<unknown> {
+  if (!VERSION.test(version) || version.includes(".."))
+    throw new RegistryError(
+      `not a valid npm version: ${JSON.stringify(version)}`,
+    );
+  const path = packageUrl(name).slice(REGISTRY.length + 1);
+  const doc = await getJson(
+    `${REGISTRY}/-/npm/v1/attestations/${path}@${version}`,
+    `${name}@${version} attestations`,
+    options,
+    MAX_ATTESTATIONS_BYTES,
+  );
+  const list =
+    isRecord(doc) && Array.isArray(doc.attestations) ? doc.attestations : [];
+  const slsa = list.find(
+    (a: unknown) =>
+      isRecord(a) &&
+      typeof a.predicateType === "string" &&
+      a.predicateType.startsWith("https://slsa.dev/provenance/"),
+  );
+  return isRecord(slsa) && slsa.bundle !== undefined ? slsa.bundle : "missing";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

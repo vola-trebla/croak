@@ -227,9 +227,9 @@ allowed to fail again. Format, metrics and the real attacks behind each case:
 | ✅  | **M4** — Claude Code hook, agent-friendly verdicts                          |
 | ✅  | **M5** — LLM triage of version diffs (Haiku by default)                     |
 | ✅  | **M6** — pnpm and workspaces                                                |
-| ⏳  | **M7** — provenance verification + tarball-vs-source diff                   |
+| ⏳  | **M7** — registry signatures + provenance verification (under review)       |
 | ⏳  | **M8** — public release                                                     |
-| 💭  | Later: Python, shared signed verdicts                                       |
+| 💭  | Later: Python, shared signed verdicts, tarball vs source (D44)              |
 
 Details in [ROADMAP.md](ROADMAP.md); the reasoning behind every choice is in
 [docs/decisions.md](docs/decisions.md).

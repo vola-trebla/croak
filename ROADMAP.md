@@ -129,7 +129,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 Three separate mechanisms, never merged into one "verified" badge:
 - [x] Registry signatures: the tarball is what the registry has — ECDSA P-256 checked against npm's pinned keys, and the lockfile's hash must be the signed one (D42)
 - [x] Provenance (Sigstore): which workflow built it from which commit — signal on _changes_ (provenance dropped, repo or workflow changed); never lowers severity. Own verifier on pinned Fulcio/Rekor roots (D43); repos compared by numeric id; eval with a test Sigstore
-- [ ] Tarball vs source at the attested commit: flag new executable entry points (install scripts, `bin`, native binaries), not ordinary build output
+- [ ] ~~Tarball vs source at the attested commit~~ — moved to Later (D44): the source manifest cannot be located reliably without reading the whole repository
 
 ### M8 — npm release
 
@@ -139,6 +139,7 @@ Three separate mechanisms, never merged into one "verified" badge:
 
 ### Later
 
+- Tarball vs source at the attested commit (D44): new install scripts, `bin`, native binaries the source does not have; needs the manifest located from the repository tree, not from the tarball's own `repository.directory`
 - Python (PyPI attestations / PEP 740, `setup.py`, `.pth`)
 - Shared, signed verdicts between users
 

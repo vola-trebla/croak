@@ -596,3 +596,26 @@ Left out, each one "unverifiable" (🟡) rather than a pass:
 
 **Trade-off:** a bundle that names a log croak does not pin is asked about,
 not blocked; a bundle that does not verify against what croak pins blocks.
+
+## D44 — Tarball vs source moves to Later (2026-10-31)
+
+D42 planned a narrow source comparison: the tarball's install scripts,
+`bin` and `gypfile` against `package.json` at the attested commit. A survey
+of the package corpus (36 packages with verified provenance) showed it does
+not hold up:
+- For 4 of the 16 packages with install scripts or `bin` (next, playwright,
+  puppeteer, esbuild), the source manifest cannot be found: they publish from
+  a monorepo folder without `repository.directory`, so the repository root
+  holds another manifest (`nextjs-project`, `puppeteer-repo`) or none.
+- The folder to look in comes from the tarball itself. An attacker who
+  controls the build output (the threat this check is for) can drop or
+  point `repository.directory` elsewhere. Treating "not found" as 🟡 would
+  make every `next` install ask the user; treating it as silence lets the
+  attacker skip the check.
+- Where the manifest was found, nothing differed; a new or changed install
+  script is already caught against the previous version (D27, D30).
+
+Finding the manifest reliably means reading the repository tree at the
+commit, which is too heavy for the hook. So M7 closes with registry
+signatures and provenance; the source comparison waits in Later, with this
+survey as its starting point. This supersedes D42's last bullet.

@@ -204,7 +204,7 @@ const INSTALLING = new Set([
 ]);
 
 /** npm's deref: camelCase to kebab-case, aliases, then a unique prefix. */
-export function npmCommand(word: string): string | undefined {
+function npmCommand(word: string): string | undefined {
   const name = word.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
   const exact =
     NPM_ALIASES[name] ?? (NPM_COMMANDS.includes(name) ? name : undefined);

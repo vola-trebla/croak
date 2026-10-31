@@ -1,6 +1,11 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  TEST_SIGSTORE,
+  type TestSigner,
+  testProvenanceBundle,
+} from "../install/test-sigstore.ts";
 import { rekorLog } from "./rekor.ts";
 import {
   SIGSTORE_PUBLIC_GOOD,
@@ -192,47 +197,100 @@ describe("verifyProvenance", () => {
     expect(verifyProvenance(bundle, NEW_SUBJECT).status).toBe("invalid");
   });
 
-  it("rejects a log entry for another signature, even with a good timestamp", () => {
-    // A log key of our own, so the timestamp over a doctored body verifies
-    // and the body check is what has to catch it.
-    const { publicKey, privateKey } = generateKeyPairSync("ec", {
-      namedCurve: "P-256",
-    });
-    const trust: SigstoreTrustRoot = {
-      fulcio: SIGSTORE_PUBLIC_GOOD.fulcio,
-      rekor: rekorLog(
-        publicKey.export({ type: "spki", format: "der" }).toString("base64"),
-      ),
+  // The logged body as Rekor stores it (dsse 0.0.1).
+  interface LoggedBody {
+    spec: {
+      payloadHash: { value: string };
+      signatures: { signature: string; verifier: string }[];
     };
+  }
+  const OLD_CERT_PEM = Buffer.from(
+    `-----BEGIN CERTIFICATE-----\n${OLD_CERT}\n-----END CERTIFICATE-----\n`,
+  ).toString("base64");
+
+  it.each<[string, (body: LoggedBody) => void]>([
+    [
+      "another signature",
+      (body) => {
+        body.spec.signatures = body.spec.signatures.map((s) => ({
+          ...s,
+          signature: OLD_SIG,
+        }));
+      },
+    ],
+    [
+      "another certificate",
+      (body) => {
+        body.spec.signatures = body.spec.signatures.map((s) => ({
+          ...s,
+          verifier: OLD_CERT_PEM,
+        }));
+      },
+    ],
+    [
+      "another payload",
+      (body) => {
+        body.spec.payloadHash.value = "0".repeat(64);
+      },
+    ],
+  ])(
+    "rejects a log entry for %s, even with a good timestamp",
+    (_what, edit) => {
+      // A log key of our own, so the timestamp over a doctored body verifies
+      // and the body check is what has to catch it.
+      const { publicKey, privateKey } = generateKeyPairSync("ec", {
+        namedCurve: "P-256",
+      });
+      const trust: SigstoreTrustRoot = {
+        fulcio: SIGSTORE_PUBLIC_GOOD.fulcio,
+        rekor: rekorLog(
+          publicKey.export({ type: "spki", format: "der" }).toString("base64"),
+        ),
+      };
+      const bundle = tampered(NEW, (b) => {
+        const entry = entryOf(b);
+        const body: LoggedBody = JSON.parse(
+          Buffer.from(entry.canonicalizedBody, "base64").toString(),
+        );
+        edit(body);
+        entry.canonicalizedBody = Buffer.from(JSON.stringify(body)).toString(
+          "base64",
+        );
+        entry.logId.keyId = trust.rekor.logId;
+        const promise = JSON.stringify({
+          body: entry.canonicalizedBody,
+          integratedTime: Number(entry.integratedTime),
+          logID: Buffer.from(trust.rekor.logId, "base64").toString("hex"),
+          logIndex: Number(entry.logIndex),
+        });
+        entry.inclusionPromise = {
+          signedEntryTimestamp: sign(
+            "sha256",
+            Buffer.from(promise),
+            privateKey,
+          ).toString("base64"),
+        };
+      });
+      expect(verifyProvenance(bundle, NEW_SUBJECT, trust)).toMatchObject({
+        status: "invalid",
+        reason: expect.stringContaining("different signature"),
+      });
+    },
+  );
+
+  it("rejects a signing certificate whose own signature was altered", () => {
+    // The issuer's name and key id still match; only the chain signature fails.
     const bundle = tampered(NEW, (b) => {
-      const entry = entryOf(b);
-      const body: { spec: { signatures: { signature: string }[] } } =
-        JSON.parse(Buffer.from(entry.canonicalizedBody, "base64").toString());
-      body.spec.signatures = body.spec.signatures.map((s) => ({
-        ...s,
-        signature: OLD_SIG,
-      }));
-      entry.canonicalizedBody = Buffer.from(JSON.stringify(body)).toString(
+      const der = Buffer.from(
+        b.verificationMaterial.certificate?.rawBytes ?? "",
         "base64",
       );
-      entry.logId.keyId = trust.rekor.logId;
-      const promise = JSON.stringify({
-        body: entry.canonicalizedBody,
-        integratedTime: Number(entry.integratedTime),
-        logID: Buffer.from(trust.rekor.logId, "base64").toString("hex"),
-        logIndex: Number(entry.logIndex),
-      });
-      entry.inclusionPromise = {
-        signedEntryTimestamp: sign(
-          "sha256",
-          Buffer.from(promise),
-          privateKey,
-        ).toString("base64"),
-      };
+      der.writeUInt8(der.readUInt8(der.length - 1) ^ 1, der.length - 1);
+      setCert(b, der.toString("base64"));
     });
-    expect(verifyProvenance(bundle, NEW_SUBJECT, trust)).toMatchObject({
+    expect(verifyProvenance(bundle, NEW_SUBJECT)).toMatchObject({
       status: "invalid",
-      reason: expect.stringContaining("different signature"),
+      reason: expect.stringContaining("does not chain"),
     });
   });
 
@@ -244,5 +302,59 @@ describe("verifyProvenance", () => {
     expect(SIGSTORE_PUBLIC_GOOD.rekor.logId).toBe(
       "wNI9atQGlz+VWfO6LRygH4QUfY/8W4RFwiT5i5WRgB0=",
     );
+  });
+});
+
+describe("verifyProvenance with test certificates", () => {
+  const subject = {
+    name: "widget",
+    version: "2.0.0",
+    integrity: `sha512-${Buffer.alloc(64, 7).toString("base64")}`,
+  };
+
+  it.each<[string, TestSigner, Date | undefined, string]>([
+    ["a CA certificate", "acme-ca", undefined, "is a CA"],
+    [
+      "no code-signing usage",
+      "acme-no-codesign",
+      undefined,
+      "not for code signing",
+    ],
+    [
+      "a log time before the certificate starts",
+      "acme-late",
+      undefined,
+      "lifetime",
+    ],
+    [
+      "a log time before Fulcio's own certificates",
+      "acme",
+      new Date("2024-06-01T00:00:00Z"),
+      "Fulcio's certificate was not valid",
+    ],
+  ])("rejects %s", (_what, signer, loggedAt, reason) => {
+    const bundle = testProvenanceBundle(subject, signer, loggedAt);
+    expect(verifyProvenance(bundle, subject, TEST_SIGSTORE)).toMatchObject({
+      status: "invalid",
+      reason: expect.stringContaining(reason),
+    });
+  });
+
+  it("verifies the same build with a sound certificate", () => {
+    expect(
+      verifyProvenance(
+        testProvenanceBundle(subject, "acme"),
+        subject,
+        TEST_SIGSTORE,
+      ).status,
+    ).toBe("verified");
+  });
+
+  it("cannot verify a signing key that is not EC or RSA, and does not throw", () => {
+    const bundle = testProvenanceBundle(subject, "acme-ed25519");
+    expect(verifyProvenance(bundle, subject, TEST_SIGSTORE)).toMatchObject({
+      status: "unverifiable",
+      reason: expect.stringContaining("ed25519"),
+    });
   });
 });

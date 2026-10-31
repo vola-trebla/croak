@@ -80,4 +80,37 @@ describe("fulcioIdentity", () => {
     runnerOid.copy(twice, at);
     expect(() => fulcioIdentity(twice)).toThrow(/twice/);
   });
+
+  describe("a hand-built extension", () => {
+    // Just the path fulcioIdentity walks: certificate > tbs > [3] > extensions.
+    const tlv = (tag: number, ...parts: Buffer[]): Buffer => {
+      const body = Buffer.concat(parts);
+      return Buffer.concat([Buffer.from([tag, body.length]), body]);
+    };
+    const issuerOid = Buffer.from("2b0601040183bf300108", "hex");
+    const certWith = (value: Buffer): Buffer =>
+      tlv(
+        0x30,
+        tlv(
+          0x30,
+          tlv(
+            0xa3,
+            tlv(0x30, tlv(0x30, tlv(0x06, issuerOid), tlv(0x04, value))),
+          ),
+        ),
+      );
+    const issuer = tlv(0x0c, Buffer.from("https://issuer.example"));
+
+    it("reads its string", () => {
+      expect(fulcioIdentity(certWith(issuer)).issuer).toBe(
+        "https://issuer.example",
+      );
+    });
+
+    it("rejects bytes after its string", () => {
+      expect(() =>
+        fulcioIdentity(certWith(Buffer.concat([issuer, Buffer.from([0])]))),
+      ).toThrow(/trailing/);
+    });
+  });
 });

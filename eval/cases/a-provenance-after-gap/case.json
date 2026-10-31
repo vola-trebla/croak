@@ -1,0 +1,10 @@
+{
+  "id": "a-provenance-after-gap",
+  "kind": "install",
+  "threat": "A",
+  "description": "A hijack hidden behind a gap: 1.8.0 was built by acme/widget, 1.9.0 has no provenance but already adds the postinstall, and 2.0.0 is built by mallory/widget. Compared with its semver predecessor nothing changed; compared with the last version that has provenance, the repository and the install script did. Twin: benign-provenance-renamed-repo.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/provenance"]
+  }
+}

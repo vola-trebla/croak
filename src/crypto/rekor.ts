@@ -1,9 +1,4 @@
-import {
-  createHash,
-  createPublicKey,
-  type KeyObject,
-  verify,
-} from "node:crypto";
+import { createHash, createPublicKey, type KeyObject } from "node:crypto";
 import {
   b64,
   certFrom,
@@ -11,6 +6,7 @@ import {
   isRecord,
   str,
   unverifiable,
+  verifies,
 } from "./fields.ts";
 
 /**
@@ -89,7 +85,7 @@ export function readLogEntry(entry: unknown, log: RekorLog): LoggedEntry {
     logID: b64(log.logId).toString("hex"),
     logIndex: Number(logIndex),
   });
-  if (!verify("sha256", Buffer.from(promise), log.publicKey, b64(set)))
+  if (!verifies(Buffer.from(promise), log.publicKey, b64(set)))
     throw invalid("the transparency log's signed timestamp does not verify");
 
   let logged: unknown;

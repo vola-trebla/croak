@@ -47,6 +47,16 @@ describe("fileContentCache", () => {
     ).toBeUndefined();
   });
 
+  it("keeps entries for one tarball under different labels apart", () => {
+    const dir = temp();
+    const cache = fileContentCache(dir, "c");
+    const other = { ...finding, ruleId: "install/provenance" };
+    cache.set(sha512, "x@1", [finding]);
+    cache.set(sha512, "provenance x@1", [other]);
+    expect(cache.get(sha512, "x@1")).toEqual([finding]);
+    expect(cache.get(sha512, "provenance x@1")).toEqual([other]);
+  });
+
   it("caches only sha512 integrity", () => {
     const dir = temp();
     const cache = fileContentCache(dir, "c");

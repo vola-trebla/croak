@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { LlmError } from "../llm/triage.ts";
 import type { Finding } from "../verdict.ts";
+import type { ContentCache } from "./content-cache.ts";
 import { planInstall, planInstallOnline } from "./scan.ts";
 import { signPackument, TEST_REGISTRY_KEY } from "./test-registry.ts";
 import { tar } from "./test-tar.ts";
@@ -688,7 +689,11 @@ describe("planInstallOnline: provenance", () => {
       },
     }),
   );
-  const plan = (attestations: Record<string, unknown>, seen: string[] = []) =>
+  const plan = (
+    attestations: Record<string, unknown>,
+    seen: string[] = [],
+    cache?: ContentCache,
+  ) =>
     planInstallOnline(
       undefined,
       lock({
@@ -722,6 +727,7 @@ describe("planInstallOnline: provenance", () => {
         now,
         content: false,
         registryKeys: [TEST_REGISTRY_KEY],
+        ...(cache === undefined ? {} : { cache }),
       },
     );
   const provenance = (outcome: Awaited<ReturnType<typeof plan>>) =>
@@ -739,6 +745,41 @@ describe("planInstallOnline: provenance", () => {
       "https://registry.npmjs.org/-/npm/v1/attestations/semver@7.5.2",
       "https://registry.npmjs.org/-/npm/v1/attestations/semver@7.7.2",
     ]);
+  });
+
+  const memoryCache = (): ContentCache => {
+    const store = new Map<string, Finding[]>();
+    return {
+      get: (integrity, label) => store.get(`${integrity} ${label}`),
+      set: (integrity, label, findings) =>
+        void store.set(`${integrity} ${label}`, [...findings]),
+    };
+  };
+  const attestationFetches = (seen: string[]) =>
+    seen.filter((u) => u.includes("/attestations/")).length;
+
+  it("remembers verified provenance, so a second plan fetches no attestation", async () => {
+    const cache = memoryCache();
+    const first: string[] = [];
+    const second: string[] = [];
+    const tampered = { "7.7.2": OLD, "7.5.2": OLD };
+    const cold = await plan(tampered, first, cache);
+    const warm = await plan(tampered, second, cache);
+    expect([attestationFetches(first), attestationFetches(second)]).toEqual([
+      2, 0,
+    ]);
+    expect(provenance(warm)).toEqual(provenance(cold));
+    expect(provenance(warm)).toEqual(["block"]);
+  });
+
+  it("does not remember a bundle the registry did not serve", async () => {
+    const cache = memoryCache();
+    const second: string[] = [];
+    await plan({ "7.5.2": OLD }, [], cache);
+    expect(provenance(await plan({ "7.5.2": OLD }, second, cache))).toEqual([
+      "warn",
+    ]);
+    expect(attestationFetches(second)).toBe(2);
   });
 
   it("warns when the registry lists provenance but serves none", async () => {

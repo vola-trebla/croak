@@ -1,4 +1,4 @@
-import { X509Certificate } from "node:crypto";
+import { type KeyObject, verify, X509Certificate } from "node:crypto";
 
 /**
  * Reading Sigstore bundles, which come from the registry: every field is
@@ -51,5 +51,22 @@ export function certFrom(der: Buffer, what: string): X509Certificate {
     return new X509Certificate(der);
   } catch {
     throw invalid(`${what} is not a certificate`);
+  }
+}
+
+/**
+ * A SHA-256 signature check that answers false instead of throwing: keys
+ * and signatures come from the registry, and node:crypto throws on some
+ * (an Ed25519 key with a digest, malformed DER).
+ */
+export function verifies(
+  data: Buffer,
+  key: KeyObject,
+  signature: Buffer,
+): boolean {
+  try {
+    return verify("sha256", data, key, signature);
+  } catch {
+    return false;
   }
 }

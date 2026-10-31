@@ -42,9 +42,20 @@ describe("signatureFindings", () => {
     );
   });
 
-  it("is silent when the lockfile has no sha512 to compare (old sha1 lockfiles)", () => {
+  it("notes a lockfile with no sha512 to compare (old sha1 lockfiles)", () => {
     expect(
       findings("sha1-abc", { integrity: SIGNED, signatures: good }),
+    ).toEqual([
+      expect.objectContaining({
+        severity: "info",
+        message: expect.stringContaining("only a sha1"),
+      }),
+    ]);
+  });
+
+  it("leaves a lockfile entry with no hash at all to install/integrity", () => {
+    expect(
+      findings(undefined, { integrity: SIGNED, signatures: good }),
     ).toEqual([]);
   });
 

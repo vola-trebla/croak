@@ -2,6 +2,7 @@ import { performance } from "node:perf_hooks";
 import type { RegistryKey } from "../crypto/registry-signature.ts";
 import {
   type SigstoreTrustRoot,
+  type Subject,
   verifyProvenance,
 } from "../crypto/sigstore.ts";
 import { type LlmOptions, llmStep } from "../llm/plan-step.ts";
@@ -20,7 +21,11 @@ import { addedDependencyFindings, metadataFindings } from "./metadata.ts";
 import { diffLockfiles, type PlanChange } from "./plan.ts";
 import { applyBuildPolicy, type BuildPolicy } from "./pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./pnpm-lockfile.ts";
-import { type Provenance, provenanceFindings } from "./provenance.ts";
+import {
+  type Provenance,
+  provenanceBaseline,
+  provenanceFindings,
+} from "./provenance.ts";
 import {
   fetchPackument,
   fetchProvenanceBundle,
@@ -28,6 +33,7 @@ import {
   IntegrityError,
   RegistryError,
   registryTarball,
+  type VersionFacts,
   versionFacts,
 } from "./registry.ts";
 import { signatureFindings } from "./signature.ts";
@@ -131,13 +137,13 @@ const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
 /** The plan is too large to inspect within the download budget. */
 class BudgetError extends Error {}
 
-/** Runs `work` over `items` with at most `limit` in flight. */
-interface Subject {
-  readonly name: string;
-  readonly version: string;
-  readonly integrity: string;
-}
 const keyOf = (s: Subject): string => `${s.name}@${s.version}`;
+
+/** A planned version and what the registry says about it. */
+interface Known {
+  readonly change: PlanChange;
+  readonly facts: VersionFacts | "not-found" | undefined;
+}
 
 /**
  * Provenance findings (D42, D43) for planned versions the registry lists
@@ -145,39 +151,35 @@ const keyOf = (s: Subject): string => `${s.name}@${s.version}`;
  * and verified, then compared.
  */
 async function provenanceOf(
-  changes: readonly PlanChange[],
-  byName: ReadonlyMap<string, unknown>,
+  known: readonly Known[],
   options: OnlineOptions,
   fetchOptions: { fetch?: typeof globalThis.fetch },
-  now: Date,
 ): Promise<Finding[]> {
-  const plans = changes.flatMap((change) => {
-    const doc = byName.get(change.entry.name);
-    if (doc === "not-found") return [];
-    const facts = versionFacts(doc, change.entry.version ?? "", now);
-    if (facts === undefined || !facts.hasProvenance) return [];
+  const plans = known.flatMap(({ change, facts }) => {
+    if (facts === undefined || facts === "not-found" || !facts.hasProvenance)
+      return [];
     const subject = (version: string, integrity: string | undefined) => ({
       name: change.entry.name,
       version,
       integrity: integrity ?? "",
     });
-    const before = facts.previous;
-    return [
-      {
-        change,
-        facts,
-        current: subject(change.entry.version ?? "", facts.integrity),
-        previous:
-          before?.hasProvenance === true
-            ? subject(before.version, before.integrity)
-            : undefined,
-      },
-    ];
+    const before = provenanceBaseline(facts);
+    const current = subject(change.entry.version ?? "", facts.integrity);
+    const previous =
+      before === undefined
+        ? undefined
+        : subject(before.version, before.integrity);
+    // Both bundles are immutable for these tarballs, and so are both
+    // versions' install scripts: the findings can be remembered.
+    const label = `provenance ${keyOf(current)} after ${previous === undefined ? "none" : `${keyOf(previous)} ${previous.integrity}`}`;
+    const cached = options.cache?.get(current.integrity, label);
+    return [{ change, facts, before, current, previous, label, cached }];
   });
   const subjects = new Map<string, Subject>();
   for (const plan of plans)
-    for (const s of [plan.current, plan.previous])
-      if (s !== undefined) subjects.set(keyOf(s), s);
+    if (plan.cached === undefined)
+      for (const s of [plan.current, plan.previous])
+        if (s !== undefined) subjects.set(keyOf(s), s);
   const list = [...subjects.values()];
   const bundles = await pool(list, options.concurrency ?? 8, (s) =>
     fetchProvenanceBundle(s.name, s.version, fetchOptions),
@@ -190,19 +192,34 @@ async function provenanceOf(
         : verifyProvenance(bundles[i], s, options.sigstore),
     ]),
   );
-  return plans.flatMap(({ change, facts, current, previous }) =>
-    provenanceFindings(
+  return plans.flatMap((plan) => {
+    if (plan.cached !== undefined) return plan.cached;
+    const { change, facts, before, current, previous } = plan;
+    const now = checked.get(keyOf(current)) ?? "missing";
+    const then =
+      previous === undefined
+        ? undefined
+        : (checked.get(keyOf(previous)) ?? "missing");
+    const findings = provenanceFindings(
       change,
-      checked.get(keyOf(current)) ?? "missing",
-      previous === undefined ? undefined : checked.get(keyOf(previous)),
-      {
-        current: facts.installCommands,
-        previous: facts.previous?.installCommands ?? "",
-      },
-    ),
-  );
+      now,
+      before === undefined || then === undefined
+        ? undefined
+        : {
+            version: before.version,
+            provenance: then,
+            installCommands: before.installCommands,
+          },
+      facts.installCommands,
+    );
+    // A bundle the registry did not serve may be served next time.
+    if (now !== "missing" && then !== "missing")
+      options.cache?.set(current.integrity, plan.label, findings);
+    return findings;
+  });
 }
 
+/** Runs `work` over `items` with at most `limit` in flight. */
 async function pool<T, R>(
   items: readonly T[],
   limit: number,
@@ -275,12 +292,17 @@ export async function planInstallOnline(
       if (doc !== "not-found")
         created.set(name, versionFacts(doc, firstVersion(doc), now)?.created);
     }
-    const remote = changes.flatMap((c) => {
-      const doc = byName.get(c.entry.name);
-      const facts =
-        doc === "not-found"
-          ? "not-found"
-          : versionFacts(doc, c.entry.version ?? "", now);
+    const known: Known[] = changes.map((change) => {
+      const doc = byName.get(change.entry.name);
+      return {
+        change,
+        facts:
+          doc === "not-found"
+            ? "not-found"
+            : versionFacts(doc, change.entry.version ?? "", now),
+      };
+    });
+    const remote = known.flatMap(({ change: c, facts }) => {
       const deps =
         facts === undefined || facts === "not-found"
           ? []
@@ -291,15 +313,11 @@ export async function planInstallOnline(
           : signatureFindings(c, facts, options.registryKeys);
       return [...metadataFindings(c, facts, now), ...signature, ...deps];
     });
-    const provenance = await provenanceOf(
-      changes,
-      byName,
-      options,
-      fetchOptions,
-      now,
-    );
-    const content =
-      options.content === false ? [] : await contentOf(changes, options);
+    // Both only read the registry; neither waits for the other.
+    const [provenance, content] = await Promise.all([
+      provenanceOf(known, options, fetchOptions),
+      options.content === false ? [] : contentOf(changes, options),
+    ]);
     const all = [
       ...local.findings,
       ...notes,

@@ -11,7 +11,8 @@ import { join } from "node:path";
 import type { Finding, Severity } from "../verdict.ts";
 
 /**
- * Remembers the content findings of a tarball by its sha512 integrity (D32).
+ * Remembers the findings about a tarball by its sha512 integrity (D32): its
+ * content findings, and its provenance findings under their own label.
  * npm verifies every download against that same hash, so what it installs is
  * byte for byte what croak already read. Registry facts (release age,
  * publisher) are never cached: they change while the tarball does not.
@@ -52,17 +53,19 @@ export function fileContentCache(
   dir: string,
   fingerprint: string,
 ): ContentCache {
-  const path = (integrity: string): string =>
+  // One file per tarball and label: content and provenance findings for the
+  // same tarball do not overwrite each other.
+  const path = (integrity: string, label: string): string =>
     join(
       dir,
-      `${createHash("sha256").update(`${fingerprint}\n${integrity.trim()}`).digest("hex")}.json`,
+      `${createHash("sha256").update(`${fingerprint}\n${integrity.trim()}\n${label}`).digest("hex")}.json`,
     );
   return {
     get(integrity, label) {
       if (!cacheable(integrity)) return undefined;
       let data: unknown;
       try {
-        data = JSON.parse(readFileSync(path(integrity), "utf8"));
+        data = JSON.parse(readFileSync(path(integrity, label), "utf8"));
       } catch (error) {
         if (error instanceof SyntaxError || isFsError(error)) return undefined;
         throw error;
@@ -80,7 +83,7 @@ export function fileContentCache(
     },
     set(integrity, label, findings) {
       if (!cacheable(integrity)) return;
-      const file = path(integrity);
+      const file = path(integrity, label);
       const tmp = `${file}.${process.pid}.tmp`;
       try {
         mkdirSync(dir, { recursive: true, mode: 0o700 });

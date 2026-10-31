@@ -1,4 +1,4 @@
-import { createHash, verify, type X509Certificate } from "node:crypto";
+import { createHash, type X509Certificate } from "node:crypto";
 import { type BuildIdentity, DerError, fulcioIdentity } from "./der.ts";
 import {
   b64,
@@ -8,6 +8,7 @@ import {
   SigstoreError,
   str,
   unverifiable,
+  verifies,
 } from "./fields.ts";
 import { REKOR_V1, type RekorLog, readLogEntry } from "./rekor.ts";
 
@@ -159,7 +160,11 @@ function check(
     throw invalid(`the envelope carries ${type}, not an in-toto statement`);
   const payload = b64(str(bundle, "dsseEnvelope", "payload"));
   const sig = str(bundle, "dsseEnvelope", "signatures", 0, "sig");
-  if (!verify("sha256", pae(type, payload), leaf.publicKey, b64(sig)))
+  // Fulcio also certifies Ed25519 keys; npm's are EC. Others are unchecked.
+  const keyType = leaf.publicKey.asymmetricKeyType;
+  if (keyType !== "ec" && keyType !== "rsa")
+    throw unverifiable(`the signing key is ${keyType ?? "of an unknown type"}`);
+  if (!verifies(pae(type, payload), leaf.publicKey, b64(sig)))
     throw invalid("the envelope's signature does not verify");
 
   if (

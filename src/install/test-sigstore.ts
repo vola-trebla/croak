@@ -26,6 +26,15 @@ export const TEST_SIGNERS = {
   "acme-renamed": "acme-renamed",
   /** github.com/mallory/widget, repository id 6666. */
   mallory: "mallory",
+  // acme/widget certificates the verifier must refuse, one flaw each:
+  /** An Ed25519 key. */
+  "acme-ed25519": "acme-ed25519",
+  /** A CA certificate. */
+  "acme-ca": "acme-ca",
+  /** No code-signing extended key usage. */
+  "acme-no-codesign": "acme-no-codesign",
+  /** Valid only from 2026-06-01, after the default log time. */
+  "acme-late": "acme-late",
 } as const;
 export type TestSigner = keyof typeof TEST_SIGNERS;
 
@@ -83,7 +92,9 @@ export function testProvenanceBundle(
     Buffer.from(`DSSEv1 ${type.length} ${type} ${payload.length} `),
     payload,
   ]);
-  const sig = sign("sha256", pae, key).toString("base64");
+  // Ed25519 signs the message itself; EC keys sign its SHA-256.
+  const digest = key.asymmetricKeyType === "ed25519" ? null : "sha256";
+  const sig = sign(digest, pae, key).toString("base64");
   const body = {
     apiVersion: "0.0.1",
     kind: "dsse",

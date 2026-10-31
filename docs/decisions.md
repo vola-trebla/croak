@@ -583,8 +583,11 @@ entry that is exactly this signature and certificate, and a subject that is
 this package, version and sha512. Who built it comes from the certificate's
 Fulcio extensions, never from the statement the build wrote about itself.
 Both bundle shapes npm serves are read: v0.3 with a dsse entry, and the
-2023 v0.1 shape with an intoto entry. Live: 42 of 42 packages with
-provenance (scoped and 2023 ones included) verify.
+2023 v0.1 shape with an intoto entry. Live: 40 releases with provenance
+verify, none fail: the 36 in the package corpus (`eval/packages.json`,
+scoped ones included) and four 2023-shape releases (semver@7.5.2,
+sigstore@1.3.0, @sigstore/bundle@1.0.0, @sigstore/core@1.0.0). The "42"
+first reported counted vite and hono twice.
 
 Left out, each one "unverifiable" (🟡) rather than a pass:
 - **Rekor v2** (Ed25519, since 2025-09) and any log croak does not pin;
@@ -593,6 +596,17 @@ Left out, each one "unverifiable" (🟡) rather than a pass:
   not checked: the SET is Rekor's signed promise of the entry and its time,
   which is what binds the short-lived certificate.
 - **RFC 3161 timestamps and certificate transparency (SCTs)** are not read.
+- **Signing keys other than EC or RSA.** Fulcio also certifies Ed25519
+  keys; npm's are EC (D45).
+
+A bundle with no log entry at all (an RFC 3161-only bundle, say) is invalid
+(🔴), not unverifiable: croak requires a Rekor entry to date the signature.
+
+Compared between versions: the repository (its numeric id at its issuer, so
+a rename is not a change) and the workflow file. **Not compared: the git
+ref.** On the package corpus, 6 of 36 packages (react, react-dom, koa,
+@babel/core, playwright, tailwindcss) alternate between release branches
+and tags from one version to the next; a ref check would ask about each.
 
 **Trade-off:** a bundle that names a log croak does not pin is asked about,
 not blocked; a bundle that does not verify against what croak pins blocks.
@@ -619,3 +633,40 @@ Finding the manifest reliably means reading the repository tree at the
 commit, which is too heavy for the hook. So M7 closes with registry
 signatures and provenance; the source comparison waits in Later, with this
 survey as its starting point. This supersedes D42's last bullet.
+
+## D45 — M7 review: a baseline gap, a crash, and checks no test held (2026-10-31)
+
+The M7 toad review (`review/m6..main`) found no way for a forged or altered
+package, signature, bundle or log entry to verify. It found:
+- **A gap in the provenance baseline.** A planned version was compared only
+  with its semver predecessor; when that release had no provenance, the
+  repository check was skipped without a word. A release without provenance
+  could hide a later build from another repository. The baseline is now the
+  newest settled version with provenance, install scripts are compared with
+  that same version, and messages name it (eval: `a-provenance-after-gap`).
+- **A crash on registry input.** `verify("sha256", …)` throws on an Ed25519
+  key, and the error escaped `croak plan`. Keys other than EC or RSA are
+  unverifiable, and the DSSE and SET checks go through `verifies()`, which
+  answers false instead of throwing.
+- **Checks no test held.** Deleting the chain signature, CA, code signing,
+  validity, logged certificate or payload hash checks left every test green.
+  New test certificates (Ed25519, CA, no code signing, late start) and
+  tests now kill each deletion; `checkIssued` alone survives, because the
+  signature check subsumes it. OpenSSL counts a `CA:TRUE` certificate as a
+  CA only with `keyCertSign`, so the test CA leaf carries it.
+- **Repository ids** are compared with their issuer (GitHub and GitLab ids
+  overlap).
+- **Latency:** provenance and content checks run side by side, and verified
+  provenance findings are cached under the tarball hash and the baseline
+  (warm plan of 30 corpus packages: 0.8 s → 0.6 s, 32 → 0 attestation
+  requests). Cache files are named by hash and label.
+- **Docs:** the security model lists the pinned roots and the attestations
+  request; D43 states the corpus numbers, the invalid no-log-entry case and
+  why refs are not compared.
+- Smaller: registry facts are read once per version; a sha1-only lockfile
+  entry gets an info note that its hash was not compared with the signed
+  one.
+
+Not changed: the ref (6 of 36 corpus packages would warn, see D43), and
+`der.ts` accepting a non-minimal OID encoding (only bytes Fulcio signed
+reach it).

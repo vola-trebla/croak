@@ -1,6 +1,10 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  TEST_SIGSTORE,
+  testProvenanceBundle,
+} from "../install/test-sigstore.ts";
 import { rekorLog } from "./rekor.ts";
 import {
   SIGSTORE_PUBLIC_GOOD,
@@ -244,5 +248,21 @@ describe("verifyProvenance", () => {
     expect(SIGSTORE_PUBLIC_GOOD.rekor.logId).toBe(
       "wNI9atQGlz+VWfO6LRygH4QUfY/8W4RFwiT5i5WRgB0=",
     );
+  });
+});
+
+describe("verifyProvenance with test certificates", () => {
+  const subject = {
+    name: "widget",
+    version: "2.0.0",
+    integrity: `sha512-${Buffer.alloc(64, 7).toString("base64")}`,
+  };
+
+  it("cannot verify a signing key that is not EC or RSA, and does not throw", () => {
+    const bundle = testProvenanceBundle(subject, "acme-ed25519");
+    expect(verifyProvenance(bundle, subject, TEST_SIGSTORE)).toMatchObject({
+      status: "unverifiable",
+      reason: expect.stringContaining("ed25519"),
+    });
   });
 });

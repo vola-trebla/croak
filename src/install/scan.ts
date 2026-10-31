@@ -20,7 +20,11 @@ import { addedDependencyFindings, metadataFindings } from "./metadata.ts";
 import { diffLockfiles, type PlanChange } from "./plan.ts";
 import { applyBuildPolicy, type BuildPolicy } from "./pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./pnpm-lockfile.ts";
-import { type Provenance, provenanceFindings } from "./provenance.ts";
+import {
+  type Provenance,
+  provenanceBaseline,
+  provenanceFindings,
+} from "./provenance.ts";
 import {
   fetchPackument,
   fetchProvenanceBundle,
@@ -161,16 +165,17 @@ async function provenanceOf(
       version,
       integrity: integrity ?? "",
     });
-    const before = facts.previous;
+    const before = provenanceBaseline(facts);
     return [
       {
         change,
         facts,
+        before,
         current: subject(change.entry.version ?? "", facts.integrity),
         previous:
-          before?.hasProvenance === true
-            ? subject(before.version, before.integrity)
-            : undefined,
+          before === undefined
+            ? undefined
+            : subject(before.version, before.integrity),
       },
     ];
   });
@@ -190,15 +195,18 @@ async function provenanceOf(
         : verifyProvenance(bundles[i], s, options.sigstore),
     ]),
   );
-  return plans.flatMap(({ change, facts, current, previous }) =>
+  return plans.flatMap(({ change, facts, before, current, previous }) =>
     provenanceFindings(
       change,
       checked.get(keyOf(current)) ?? "missing",
-      previous === undefined ? undefined : checked.get(keyOf(previous)),
-      {
-        current: facts.installCommands,
-        previous: facts.previous?.installCommands ?? "",
-      },
+      before === undefined || previous === undefined
+        ? undefined
+        : {
+            version: before.version,
+            provenance: checked.get(keyOf(previous)) ?? "missing",
+            installCommands: before.installCommands,
+          },
+      facts.installCommands,
     ),
   );
 }

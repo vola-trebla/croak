@@ -1,0 +1,31 @@
+{
+  "name": "widget",
+  "time": {
+    "created": "2021-04-10T00:00:00.000Z",
+    "1.9.0": "2026-03-02T00:00:00.000Z",
+    "2.0.0": "2026-06-15T00:00:00.000Z"
+  },
+  "versions": {
+    "1.9.0": {
+      "name": "widget",
+      "version": "1.9.0",
+      "_npmUser": {
+        "name": "ana"
+      },
+      "dist": {},
+      "x-test-provenance": "acme"
+    },
+    "2.0.0": {
+      "name": "widget",
+      "version": "2.0.0",
+      "_npmUser": {
+        "name": "ana"
+      },
+      "dist": {},
+      "x-test-provenance": "acme-renamed",
+      "scripts": {
+        "postinstall": "node setup.js"
+      }
+    }
+  }
+}

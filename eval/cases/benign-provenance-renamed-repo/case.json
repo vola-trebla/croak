@@ -1,0 +1,10 @@
+{
+  "id": "benign-provenance-renamed-repo",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: the same release from the same repository after a rename (acme/widget became acme-labs/widget, same repository id). The new postinstall script is still worth a look.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["install/new-install-script"]
+  }
+}

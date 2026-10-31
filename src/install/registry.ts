@@ -167,6 +167,8 @@ const date = (value: unknown): Date | undefined => {
 export interface EarlierVersion {
   readonly version: string;
   readonly hasProvenance: boolean;
+  /** The registry's dist.integrity: the tarball hash its signature covers. */
+  readonly integrity?: string | undefined;
   readonly publisher: string | undefined;
   /** Which of preinstall/install/postinstall the version's manifest defines. */
   readonly installScripts: readonly string[];
@@ -180,7 +182,7 @@ export interface VersionFacts {
   readonly created: Date | undefined;
   readonly published: Date | undefined;
   readonly ageDays: number | undefined;
-  /** The registry recorded a provenance attestation for this version (not verified here; M7). */
+  /** The registry recorded a provenance attestation for this version (verified in scan.ts). */
   readonly hasProvenance: boolean;
   /** The registry's dist.integrity: the tarball hash its signature covers. */
   readonly integrity: string | undefined;
@@ -246,7 +248,12 @@ function predecessor(
 
 const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall"];
 
-function versionInfo(meta: unknown): Omit<EarlierVersion, "version"> {
+function versionInfo(meta: unknown): Omit<
+  EarlierVersion,
+  "version" | "integrity"
+> & {
+  integrity: string | undefined;
+} {
   const record = isRecord(meta) ? meta : {};
   const dist = isRecord(record.dist) ? record.dist : {};
   const user = isRecord(record._npmUser) ? record._npmUser : {};
@@ -257,6 +264,7 @@ function versionInfo(meta: unknown): Omit<EarlierVersion, "version"> {
   return {
     hasProvenance:
       isRecord(dist.attestations) && dist.attestations.provenance !== undefined,
+    integrity: typeof dist.integrity === "string" ? dist.integrity : undefined,
     publisher: typeof user.name === "string" ? user.name : undefined,
     installScripts: INSTALL_SCRIPTS.filter(
       (name) => typeof scripts[name] === "string",
@@ -307,7 +315,6 @@ export function versionFacts(
         ? undefined
         : Math.floor((now.getTime() - published.getTime()) / DAY_MS),
     ...versionInfo(meta),
-    integrity: typeof dist.integrity === "string" ? dist.integrity : undefined,
     signatures: dist.signatures,
     earlier,
     previous: predecessor(version, earlier),

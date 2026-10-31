@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   fetchPackument,
+  fetchProvenanceBundle,
   fetchTarball,
   IntegrityError,
   packageUrl,
@@ -253,5 +254,63 @@ describe("tarballOf", () => {
     });
     expect(tarballOf(doc, "2.0.0")).toBeUndefined();
     expect(tarballOf("not a packument", "1.0.0")).toBeUndefined();
+  });
+});
+
+describe("fetchProvenanceBundle", () => {
+  const slsa = { mediaType: "bundle", n: 1 };
+  const serve =
+    (status: number, body: unknown, seen: string[] = []): typeof fetch =>
+    async (input) => {
+      seen.push(String(input));
+      return new Response(JSON.stringify(body), { status });
+    };
+
+  it("asks the registry's own attestations endpoint and picks the SLSA bundle", async () => {
+    const seen: string[] = [];
+    const body = {
+      attestations: [
+        {
+          predicateType:
+            "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+          bundle: { n: 0 },
+        },
+        { predicateType: "https://slsa.dev/provenance/v1", bundle: slsa },
+      ],
+    };
+    expect(
+      await fetchProvenanceBundle("@scope/p", "1.0.0-rc.1", {
+        fetch: serve(200, body, seen),
+      }),
+    ).toEqual(slsa);
+    expect(seen).toEqual([
+      "https://registry.npmjs.org/-/npm/v1/attestations/@scope%2Fp@1.0.0-rc.1",
+    ]);
+  });
+
+  it.each([
+    ["a 404", 404, {}],
+    [
+      "no SLSA attestation",
+      200,
+      { attestations: [{ predicateType: "x", bundle: {} }] },
+    ],
+    ["no list", 200, { attestations: "x" }],
+  ])("is missing on %s", async (_what, status, body) => {
+    expect(
+      await fetchProvenanceBundle("p", "1.0.0", { fetch: serve(status, body) }),
+    ).toBe("missing");
+  });
+
+  it("fails on server errors and on names or versions that are not npm's", async () => {
+    await expect(
+      fetchProvenanceBundle("p", "1.0.0", { fetch: serve(503, {}) }),
+    ).rejects.toThrow(RegistryError);
+    await expect(
+      fetchProvenanceBundle("../p", "1.0.0", { fetch: serve(200, {}) }),
+    ).rejects.toThrow(RegistryError);
+    await expect(
+      fetchProvenanceBundle("p", "1.0.0/../../x", { fetch: serve(200, {}) }),
+    ).rejects.toThrow(RegistryError);
   });
 });

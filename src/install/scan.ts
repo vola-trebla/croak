@@ -1,5 +1,9 @@
 import { performance } from "node:perf_hooks";
 import type { RegistryKey } from "../crypto/registry-signature.ts";
+import {
+  type SigstoreTrustRoot,
+  verifyProvenance,
+} from "../crypto/sigstore.ts";
 import { type LlmOptions, llmStep } from "../llm/plan-step.ts";
 import { aggregate, type Finding, type Verdict } from "../verdict.ts";
 import { contentFindings } from "./content.ts";
@@ -16,12 +20,15 @@ import { addedDependencyFindings, metadataFindings } from "./metadata.ts";
 import { diffLockfiles, type PlanChange } from "./plan.ts";
 import { applyBuildPolicy, type BuildPolicy } from "./pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./pnpm-lockfile.ts";
+import { type Provenance, provenanceFindings } from "./provenance.ts";
 import {
   fetchPackument,
+  fetchProvenanceBundle,
   fetchTarball,
   IntegrityError,
   RegistryError,
   registryTarball,
+  tarballOf,
   versionFacts,
 } from "./registry.ts";
 import { signatureFindings } from "./signature.ts";
@@ -116,6 +123,8 @@ export interface OnlineOptions {
   readonly builds?: BuildPolicy;
   /** Keys registry signatures are checked against (default: npm's, pinned; D42). */
   readonly registryKeys?: readonly RegistryKey[];
+  /** Roots provenance is checked against (default: Sigstore's public good, pinned; D43). */
+  readonly sigstore?: SigstoreTrustRoot;
 }
 
 const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
@@ -124,6 +133,77 @@ const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
 class BudgetError extends Error {}
 
 /** Runs `work` over `items` with at most `limit` in flight. */
+interface Subject {
+  readonly name: string;
+  readonly version: string;
+  readonly integrity: string;
+}
+const keyOf = (s: Subject): string => `${s.name}@${s.version}`;
+
+/**
+ * Provenance findings (D42, D43) for planned versions the registry lists
+ * with provenance: each one's bundle, and its previous version's, fetched
+ * and verified, then compared.
+ */
+async function provenanceOf(
+  changes: readonly PlanChange[],
+  byName: ReadonlyMap<string, unknown>,
+  options: OnlineOptions,
+  fetchOptions: { fetch?: typeof globalThis.fetch },
+  now: Date,
+): Promise<Finding[]> {
+  const plans = changes.flatMap((change) => {
+    const doc = byName.get(change.entry.name);
+    if (doc === "not-found") return [];
+    const facts = versionFacts(doc, change.entry.version ?? "", now);
+    if (facts === undefined || !facts.hasProvenance) return [];
+    const subject = (version: string, integrity: string | undefined) => ({
+      name: change.entry.name,
+      version,
+      integrity: integrity ?? "",
+    });
+    const before = facts.previous;
+    return [
+      {
+        change,
+        facts,
+        current: subject(change.entry.version ?? "", facts.integrity),
+        previous:
+          before?.hasProvenance === true
+            ? subject(before.version, tarballOf(doc, before.version)?.integrity)
+            : undefined,
+      },
+    ];
+  });
+  const subjects = new Map<string, Subject>();
+  for (const plan of plans)
+    for (const s of [plan.current, plan.previous])
+      if (s !== undefined) subjects.set(keyOf(s), s);
+  const list = [...subjects.values()];
+  const bundles = await pool(list, options.concurrency ?? 8, (s) =>
+    fetchProvenanceBundle(s.name, s.version, fetchOptions),
+  );
+  const checked = new Map<string, Provenance>(
+    list.map((s, i) => [
+      keyOf(s),
+      bundles[i] === "missing"
+        ? "missing"
+        : verifyProvenance(bundles[i], s, options.sigstore),
+    ]),
+  );
+  return plans.flatMap(({ change, facts, current, previous }) =>
+    provenanceFindings(
+      change,
+      checked.get(keyOf(current)) ?? "missing",
+      previous === undefined ? undefined : checked.get(keyOf(previous)),
+      {
+        current: facts.installCommands,
+        previous: facts.previous?.installCommands ?? "",
+      },
+    ),
+  );
+}
+
 async function pool<T, R>(
   items: readonly T[],
   limit: number,
@@ -212,9 +292,22 @@ export async function planInstallOnline(
           : signatureFindings(c, facts, options.registryKeys);
       return [...metadataFindings(c, facts, now), ...signature, ...deps];
     });
+    const provenance = await provenanceOf(
+      changes,
+      byName,
+      options,
+      fetchOptions,
+      now,
+    );
     const content =
       options.content === false ? [] : await contentOf(changes, options);
-    const all = [...local.findings, ...notes, ...remote, ...content];
+    const all = [
+      ...local.findings,
+      ...notes,
+      ...remote,
+      ...provenance,
+      ...content,
+    ];
     // Before the LLM step: a script pnpm will not run needs no second opinion.
     const ruled =
       options.builds === undefined

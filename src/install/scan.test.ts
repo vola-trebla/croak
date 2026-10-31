@@ -1,6 +1,7 @@
 // croak-invariants: pattern-data
 // Package contents below are detector inputs, not code (D16).
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { LlmError } from "../llm/triage.ts";
 import type { Finding } from "../verdict.ts";
@@ -651,5 +652,102 @@ describe("planInstallOnline: package contents", () => {
       status: "incomplete",
       reason: expect.stringContaining("bytes of tarballs"),
     });
+  });
+});
+
+describe("planInstallOnline: provenance", () => {
+  const now = new Date("2026-10-25T00:00:00Z");
+  const bundle = (file: string): unknown =>
+    JSON.parse(
+      readFileSync(
+        new URL(`../crypto/fixtures/${file}`, import.meta.url),
+        "utf8",
+      ),
+    );
+  // semver's real provenance bundles (src/crypto/fixtures).
+  const OLD = bundle("semver-7.5.2-provenance.json");
+  const NEW = bundle("semver-7.7.2-provenance.json");
+  const INTEGRITY = {
+    "7.5.2":
+      "sha512-SoftuTROv/cRjCze/scjGyiDtcUyxw1rgYQSZY7XTmtR5hX+dm76iDbTH8TkLPHCQmlbQVSSbNZCPM2hb0knnQ==",
+    "7.7.2":
+      "sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==",
+  };
+  const withProvenance = { attestations: { url: "x", provenance: {} } };
+  const packument = JSON.stringify(
+    signPackument({
+      name: "semver",
+      time: {
+        created: "2011-01-01T00:00:00Z",
+        "7.5.2": "2023-06-15T00:00:00Z",
+        "7.7.2": "2025-05-12T00:00:00Z",
+      },
+      versions: {
+        "7.5.2": { dist: { integrity: INTEGRITY["7.5.2"], ...withProvenance } },
+        "7.7.2": { dist: { integrity: INTEGRITY["7.7.2"], ...withProvenance } },
+      },
+    }),
+  );
+  const plan = (attestations: Record<string, unknown>, seen: string[] = []) =>
+    planInstallOnline(
+      undefined,
+      lock({
+        "node_modules/semver": {
+          version: "7.7.2",
+          resolved: "https://registry.npmjs.org/semver/-/semver-7.7.2.tgz",
+          integrity: INTEGRITY["7.7.2"],
+        },
+      }),
+      {
+        fetch: async (input) => {
+          const url = String(input);
+          seen.push(url);
+          if (!url.includes("/attestations/"))
+            return new Response(packument, { status: 200 });
+          const body = attestations[url.slice(url.lastIndexOf("@") + 1)];
+          return body === undefined
+            ? new Response("", { status: 404 })
+            : new Response(
+                JSON.stringify({
+                  attestations: [
+                    {
+                      predicateType: "https://slsa.dev/provenance/v1",
+                      bundle: body,
+                    },
+                  ],
+                }),
+                { status: 200 },
+              );
+        },
+        now,
+        content: false,
+        registryKeys: [TEST_REGISTRY_KEY],
+      },
+    );
+  const provenance = (outcome: Awaited<ReturnType<typeof plan>>) =>
+    outcome.status === "complete"
+      ? outcome.findings
+          .filter((f) => f.ruleId === "install/provenance")
+          .map((f) => f.severity)
+      : outcome.reason;
+
+  it("verifies the planned version and the one before it, and says nothing when the same build made both", async () => {
+    const seen: string[] = [];
+    const outcome = await plan({ "7.7.2": NEW, "7.5.2": OLD }, seen);
+    expect(provenance(outcome)).toEqual([]);
+    expect(seen.filter((u) => u.includes("/attestations/")).sort()).toEqual([
+      "https://registry.npmjs.org/-/npm/v1/attestations/semver@7.5.2",
+      "https://registry.npmjs.org/-/npm/v1/attestations/semver@7.7.2",
+    ]);
+  });
+
+  it("warns when the registry lists provenance but serves none", async () => {
+    expect(provenance(await plan({ "7.5.2": OLD }))).toEqual(["warn"]);
+  });
+
+  it("blocks an attestation that is not about this release", async () => {
+    expect(provenance(await plan({ "7.7.2": OLD, "7.5.2": OLD }))).toEqual([
+      "block",
+    ]);
   });
 });

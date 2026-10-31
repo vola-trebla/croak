@@ -2,6 +2,7 @@ import { performance } from "node:perf_hooks";
 import type { RegistryKey } from "../crypto/registry-signature.ts";
 import {
   type SigstoreTrustRoot,
+  type Subject,
   verifyProvenance,
 } from "../crypto/sigstore.ts";
 import { type LlmOptions, llmStep } from "../llm/plan-step.ts";
@@ -32,6 +33,7 @@ import {
   IntegrityError,
   RegistryError,
   registryTarball,
+  type VersionFacts,
   versionFacts,
 } from "./registry.ts";
 import { signatureFindings } from "./signature.ts";
@@ -135,13 +137,13 @@ const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
 /** The plan is too large to inspect within the download budget. */
 class BudgetError extends Error {}
 
-/** Runs `work` over `items` with at most `limit` in flight. */
-interface Subject {
-  readonly name: string;
-  readonly version: string;
-  readonly integrity: string;
-}
 const keyOf = (s: Subject): string => `${s.name}@${s.version}`;
+
+/** A planned version and what the registry says about it. */
+interface Known {
+  readonly change: PlanChange;
+  readonly facts: VersionFacts | "not-found" | undefined;
+}
 
 /**
  * Provenance findings (D42, D43) for planned versions the registry lists
@@ -149,17 +151,13 @@ const keyOf = (s: Subject): string => `${s.name}@${s.version}`;
  * and verified, then compared.
  */
 async function provenanceOf(
-  changes: readonly PlanChange[],
-  byName: ReadonlyMap<string, unknown>,
+  known: readonly Known[],
   options: OnlineOptions,
   fetchOptions: { fetch?: typeof globalThis.fetch },
-  now: Date,
 ): Promise<Finding[]> {
-  const plans = changes.flatMap((change) => {
-    const doc = byName.get(change.entry.name);
-    if (doc === "not-found") return [];
-    const facts = versionFacts(doc, change.entry.version ?? "", now);
-    if (facts === undefined || !facts.hasProvenance) return [];
+  const plans = known.flatMap(({ change, facts }) => {
+    if (facts === undefined || facts === "not-found" || !facts.hasProvenance)
+      return [];
     const subject = (version: string, integrity: string | undefined) => ({
       name: change.entry.name,
       version,
@@ -211,6 +209,7 @@ async function provenanceOf(
   );
 }
 
+/** Runs `work` over `items` with at most `limit` in flight. */
 async function pool<T, R>(
   items: readonly T[],
   limit: number,
@@ -283,12 +282,17 @@ export async function planInstallOnline(
       if (doc !== "not-found")
         created.set(name, versionFacts(doc, firstVersion(doc), now)?.created);
     }
-    const remote = changes.flatMap((c) => {
-      const doc = byName.get(c.entry.name);
-      const facts =
-        doc === "not-found"
-          ? "not-found"
-          : versionFacts(doc, c.entry.version ?? "", now);
+    const known: Known[] = changes.map((change) => {
+      const doc = byName.get(change.entry.name);
+      return {
+        change,
+        facts:
+          doc === "not-found"
+            ? "not-found"
+            : versionFacts(doc, change.entry.version ?? "", now),
+      };
+    });
+    const remote = known.flatMap(({ change: c, facts }) => {
       const deps =
         facts === undefined || facts === "not-found"
           ? []
@@ -299,15 +303,11 @@ export async function planInstallOnline(
           : signatureFindings(c, facts, options.registryKeys);
       return [...metadataFindings(c, facts, now), ...signature, ...deps];
     });
-    const provenance = await provenanceOf(
-      changes,
-      byName,
-      options,
-      fetchOptions,
-      now,
-    );
-    const content =
-      options.content === false ? [] : await contentOf(changes, options);
+    // Both only read the registry; neither waits for the other.
+    const [provenance, content] = await Promise.all([
+      provenanceOf(known, options, fetchOptions),
+      options.content === false ? [] : contentOf(changes, options),
+    ]);
     const all = [
       ...local.findings,
       ...notes,

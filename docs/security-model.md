@@ -12,11 +12,17 @@ checks (`pnpm invariants`) enforce it.
 | croak's own code and its pinned dev toolchain | every file in a scanned repo or package                  |
 | Node.js runtime                               | package tarballs and their entries (names, sizes, types) |
 | user's croak configuration                    | registry metadata: names, READMEs, versions, maintainers |
+| crypto roots pinned in croak's code (M7)      | registry signatures and provenance bundles (M7)          |
 |                                               | LLM output (M5)                                          |
 |                                               | the user's project `.npmrc` when planning installs (M3)  |
 
 Registry _transport_ is trusted to deliver what the registry has; the
-_content_ is not.
+_content_ is not. The pinned crypto roots are npm's registry keys and
+Sigstore's public-good Fulcio CA and Rekor v1 key (D42, D43): fetched keys
+would only check a server against itself. A key croak does not know is
+"unverifiable" (🟡), never a pass. The test-only keys under
+`src/crypto/fixtures/test-sigstore/` are trusted only where a test or the
+eval passes them explicitly; no CLI path can.
 
 ## Rules
 
@@ -70,6 +76,7 @@ _content_ is not.
 | tarball entries (M3)                      | 20,000  | `TarballError` → incomplete             |
 | one tarball download (M3)                 | 100 MB  | `RegistryError` → incomplete            |
 | all tarballs of one plan (M3)             | 300 MB  | incomplete                              |
+| one attestations response (M7)            | 2 MB    | `RegistryError` → incomplete            |
 | scan time (M2)                            | TBD     | fail closed                             |
 
 An incomplete scan is never reported as a clean scan. Oversized code files
@@ -132,12 +139,16 @@ The bait is packed with `tar`: npm 10's `npm pack` runs `prepare` even with
 `--ignore-scripts`.
 
 `croak plan` itself talks to one host, registry.npmjs.org over https, for
-two things: each new package's metadata (names validated against npm's rules
-first, 15 s timeout, 200 MB cap per response) and each new version's tarball
+three things: each new package's metadata (names validated against npm's rules
+first, 15 s timeout, 200 MB cap per response), each new version's tarball
 (only URLs that pass `registryTarball()`: https, that host, no port or
 credentials; 60 s timeout, 100 MB cap, 300 MB per plan; verified against the
-lockfile's integrity hash). `--metadata-only` skips the tarballs; `--offline`
-skips both. A lockfile entry that points anywhere else is reported as
+lockfile's integrity hash), and, for versions the registry lists with
+provenance, the provenance bundles of that version and of the version it is
+compared with (`/-/npm/v1/attestations/<name>@<version>`, built by croak and
+never taken from the packument; 15 s timeout, 2 MB cap; verified findings
+are cached like content, M7). `--metadata-only` skips the tarballs but still
+checks provenance; `--offline` skips all three. A lockfile entry that points anywhere else is reported as
 `install/source`, never silently skipped.
 
 The agent hook (`scripts/croak-hook.sh`, D32) is a second small shell script
@@ -235,11 +246,12 @@ or 150 MB of downloads, leaving the rules' verdict for the rest.
   provenance (M7).
 - **Provenance is evidence of origin, not of safety.** A registry signature
   shows the tarball is what the registry has; provenance shows which CI
-  workflow built it from which commit; a source diff shows whether the
-  published files match that commit. A valid provenance on a malicious commit
+  workflow built it from which commit. A valid provenance on a malicious commit
   is still malicious. The useful signals are _changes_: provenance that
-  disappeared, a different repo or workflow, or new executable entry points
-  (install scripts, `bin`, native binaries) that the source does not have.
+  disappeared, or a different repo or workflow than the last version with
+  provenance (D45). Comparing the published files with the source at that
+  commit (new install scripts, `bin`, native binaries the source does not
+  have) is Later (D44): the source manifest cannot be located reliably.
 
 ### 8. Eval fixtures
 

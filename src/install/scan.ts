@@ -28,7 +28,6 @@ import {
   IntegrityError,
   RegistryError,
   registryTarball,
-  tarballOf,
   versionFacts,
 } from "./registry.ts";
 import { signatureFindings } from "./signature.ts";
@@ -170,7 +169,7 @@ async function provenanceOf(
         current: subject(change.entry.version ?? "", facts.integrity),
         previous:
           before?.hasProvenance === true
-            ? subject(before.version, tarballOf(doc, before.version)?.integrity)
+            ? subject(before.version, before.integrity)
             : undefined,
       },
     ];

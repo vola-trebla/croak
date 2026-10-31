@@ -1,0 +1,10 @@
+{
+  "id": "benign-provenance-same-repo",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: 2.0.0 with its own provenance, built by the same repository and workflow as 1.9.0.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

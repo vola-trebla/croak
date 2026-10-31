@@ -23,7 +23,8 @@ in-memory registry instead (no network):
 fixture/
   package-lock.json          # the planned install
   before.package-lock.json   # optional: the lockfile before
-  registry/<name>.json       # packuments, signed by a test key (a version's own dist.signatures stay)
+  registry/<name>.json       # packuments, signed by a test key (a version's own dist.signatures stay);
+                             # a version's "x-test-provenance": "acme" serves provenance by a test signer
   packages/<name>@<version>/ # files served as that version's tarball
 ```
 

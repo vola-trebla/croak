@@ -1,0 +1,10 @@
+{
+  "id": "a-replayed-provenance",
+  "kind": "install",
+  "threat": "A",
+  "description": "2.0.0 is served with 1.9.0's genuine provenance attestation, replayed: it is signed, but about another tarball. Twin: benign-provenance-same-repo.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/provenance"]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "widget",
+  "version": "2.0.0",
+  "description": "SYNTHETIC croak eval fixture",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "node setup.js"
+  }
+}

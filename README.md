@@ -40,14 +40,14 @@ Think of `npm install` as a courier whose parcels **unpack themselves**.
 croak is the customs officer at your door. It x-rays the contents as plain
 data and never lets anything inside run (how: [security model](docs/security-model.md)):
 
-|     | Check                                     | Catches                                                                                                                       |
-| --- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 🔍  | **Does the sender exist?**                | hallucinated and typosquatted packages                                                                                        |
-| ⚖️  | **What changed since the last delivery?** | a new dependency or install script that appeared in a patch release                                                           |
-| 🩻  | **Will anything run on unpack?**          | `postinstall`, `binding.gyp`, prebuilt binaries, IDE autorun tasks                                                            |
-| 🕵️  | **Is something hidden?**                  | obfuscated code, payloads in build configs                                                                                    |
-| 🔏  | **Is the seal intact?**                   | a tarball that doesn't match the lockfile hash, dropped [provenance](https://docs.npmjs.com/generating-provenance-statements) |
-| 🤖  | **Ask an expert (optional)**              | an LLM reviews the _diff_ between versions — and can only raise the alarm, never lower it                                     |
+|     | Check                                     | Catches                                                                                                                                      |
+| --- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔍  | **Does the sender exist?**                | hallucinated and typosquatted packages                                                                                                       |
+| ⚖️  | **What changed since the last delivery?** | a new dependency or install script that appeared in a patch release                                                                          |
+| 🩻  | **Will anything run on unpack?**          | `postinstall`, `binding.gyp`, prebuilt binaries, IDE autorun tasks                                                                           |
+| 🕵️  | **Is something hidden?**                  | obfuscated code, payloads in build configs                                                                                                   |
+| 🔏  | **Is the seal intact?**                   | a registry signature or [provenance](https://docs.npmjs.com/generating-provenance-statements) that doesn't verify, a build from another repo |
+| 🤖  | **Ask an expert (optional)**              | an LLM reviews the _diff_ between versions — and can only raise the alarm, never lower it                                                    |
 
 Then it gives a verdict — 🟢 **allow** (nothing suspicious found, not a
 guarantee), 🟡 **warn** (needs your attention, never "safe"), or 🔴 **block** — with
@@ -124,7 +124,9 @@ packages it added no blocks, for about $0.001 a package
 not touched), then `croak plan` checks every version that is not installed
 yet, transitive ones included (on a fresh clone, the whole lockfile): the lockfile (install scripts, sources, integrity),
 the registry (release age, provenance, publisher, look-alike names, brand-new
-packages and dependencies), and the package contents, downloaded and verified
+packages and dependencies), the registry's signature and the Sigstore
+provenance, verified by croak itself against keys it pins (did the same
+repository and workflow build this version as the last one?), and the package contents, downloaded and verified
 against the lockfile hash and read in memory, never extracted or run.
 
 **pnpm** (`croak-install --pnpm`, and `pnpm add/install/update/dlx`, `pnpx`

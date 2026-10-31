@@ -1,0 +1,10 @@
+{
+  "id": "a-provenance-other-repo",
+  "kind": "install",
+  "threat": "A",
+  "description": "A hijacked release: 2.0.0 carries valid provenance, but from another repository (mallory/widget, a different repository id) than 1.9.0, and adds a postinstall script. Twin: benign-provenance-renamed-repo.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/provenance"]
+  }
+}

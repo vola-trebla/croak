@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { LlmError } from "../llm/triage.ts";
 import type { Finding } from "../verdict.ts";
 import { planInstall, planInstallOnline } from "./scan.ts";
+import { signPackument, TEST_REGISTRY_KEY } from "./test-registry.ts";
 import { tar } from "./test-tar.ts";
 
 const lock = (packages: Record<string, object>) =>
@@ -201,13 +202,23 @@ describe("planInstallOnline", () => {
   it("adds registry signals and fetches each package once", async () => {
     let calls = 0;
     const docs = {
-      b: doc(
-        "b",
-        {
-          "1.0.0": { _npmUser: { name: "x" } },
-          "2.0.0": { _npmUser: { name: "mallory" } },
-        },
-        { "1.0.0": "2025-01-01T00:00:00Z", "2.0.0": "2026-10-24T00:00:00Z" },
+      b: JSON.stringify(
+        signPackument(
+          JSON.parse(
+            doc(
+              "b",
+              {
+                "1.0.0": { _npmUser: { name: "x" } },
+                "2.0.0": { _npmUser: { name: "mallory" } },
+              },
+              {
+                "1.0.0": "2025-01-01T00:00:00Z",
+                "2.0.0": "2026-10-24T00:00:00Z",
+              },
+            ),
+          ),
+          () => "sha512-abc",
+        ),
       ),
     };
     const counting: typeof fetch = async (...args) => {
@@ -223,6 +234,7 @@ describe("planInstallOnline", () => {
       fetch: counting,
       now,
       content: false,
+      registryKeys: [TEST_REGISTRY_KEY],
     });
     expect(calls).toBe(1);
     expect(
@@ -370,10 +382,10 @@ describe("planInstallOnline: package contents", () => {
       planWith(sri(Buffer.from("other"))),
       { fetch: serve(tgz), now },
     );
-    expect(outcome.status === "complete" && outcome.findings[0]).toMatchObject({
-      ruleId: "install/integrity",
-      severity: "block",
-    });
+    expect(
+      outcome.status === "complete" &&
+        outcome.findings.find((f) => f.ruleId === "install/integrity"),
+    ).toMatchObject({ severity: "block" });
   });
 
   it("does not check platform packages npm will not install here", async () => {

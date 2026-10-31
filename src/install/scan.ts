@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import type { RegistryKey } from "../crypto/registry-signature.ts";
 import { type LlmOptions, llmStep } from "../llm/plan-step.ts";
 import { aggregate, type Finding, type Verdict } from "../verdict.ts";
 import { contentFindings } from "./content.ts";
@@ -23,6 +24,7 @@ import {
   registryTarball,
   versionFacts,
 } from "./registry.ts";
+import { signatureFindings } from "./signature.ts";
 import { snapshotTarball, TarballError } from "./tar.ts";
 
 /** An npm package-lock.json or a pnpm-lock.yaml, told apart by their first lines. */
@@ -112,6 +114,8 @@ export interface OnlineOptions {
   readonly llm?: LlmOptions;
   /** pnpm's rule for whose install scripts run (D38); absent: every script counts. */
   readonly builds?: BuildPolicy;
+  /** Keys registry signatures are checked against (default: npm's, pinned; D42). */
+  readonly registryKeys?: readonly RegistryKey[];
 }
 
 const DEFAULT_MAX_DOWNLOAD_BYTES = 300 * 1024 * 1024;
@@ -202,7 +206,11 @@ export async function planInstallOnline(
         facts === undefined || facts === "not-found"
           ? []
           : addedDependencyFindings(c, facts, created, now);
-      return [...metadataFindings(c, facts, now), ...deps];
+      const signature =
+        facts === undefined || facts === "not-found"
+          ? []
+          : signatureFindings(c, facts, options.registryKeys);
+      return [...metadataFindings(c, facts, now), ...signature, ...deps];
     });
     const content =
       options.content === false ? [] : await contentOf(changes, options);

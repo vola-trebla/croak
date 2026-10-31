@@ -33,6 +33,8 @@ const facts = (extra: Partial<VersionFacts> = {}): VersionFacts => {
     published: new Date("2026-01-01"),
     ageDays: 300,
     hasProvenance: false,
+    integrity: undefined,
+    signatures: undefined,
     publisher: "alice",
     installScripts: [],
     installCommands: "",

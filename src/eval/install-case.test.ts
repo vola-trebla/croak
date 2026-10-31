@@ -14,7 +14,12 @@ describe("checkInstallFixture", () => {
 
   it("keeps an integrity the fixture states (tampered tarball)", async () => {
     const outcome = await checkInstallFixture(fixture("a-tampered-tarball"));
+    // The registry signed the real tarball's hash, not the lockfile's.
     expect(outcome.status === "complete" && outcome.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "install/signature",
+        severity: "block",
+      }),
       expect.objectContaining({ ruleId: "install/integrity" }),
     ]);
   });

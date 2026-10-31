@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { REGISTRY } from "../install/registry.ts";
 import { type PlanOutcome, planInstallOnline } from "../install/scan.ts";
+import { signPackument, TEST_REGISTRY_KEY } from "../install/test-registry.ts";
 import { tar } from "../install/test-tar.ts";
 import { snapshotRepo } from "../repo-snapshot.ts";
 
@@ -9,7 +10,9 @@ import { snapshotRepo } from "../repo-snapshot.ts";
  *
  *   package-lock.json          the planned install (after)
  *   before.package-lock.json   optional: the project's lockfile before
- *   registry/<name>.json       packuments, served at registry.npmjs.org/<name>
+ *   registry/<name>.json       packuments, served at registry.npmjs.org/<name>,
+ *                              each version signed by a test key unless it
+ *                              states its own dist.signatures
  *   packages/<name>@<version>/ package files, served as that version's tarball
  *
  * Lockfile entries without `resolved` / `integrity` get the registry URL and
@@ -95,9 +98,13 @@ export async function checkInstallFixture(
     if (tgz !== undefined) return new Response(new Uint8Array(tgz));
     const name = decodeURIComponent(url.slice(REGISTRY.length + 1));
     const doc = read(`registry/${name}.json`);
-    return doc === undefined
-      ? new Response("not found", { status: 404 })
-      : new Response(doc);
+    if (doc === undefined) return new Response("not found", { status: 404 });
+    // Signed like the real registry: each version's tarball hash, by a test key.
+    const signed = signPackument(JSON.parse(doc), (version) => {
+      const tgz = tarballs.get(tarballUrl(name, version));
+      return tgz === undefined ? undefined : sri(tgz);
+    });
+    return new Response(JSON.stringify(signed));
   };
 
   return planInstallOnline(
@@ -107,6 +114,7 @@ export async function checkInstallFixture(
       fetch: fakeFetch,
       now: EVAL_NOW,
       platform: EVAL_PLATFORM,
+      registryKeys: [TEST_REGISTRY_KEY],
     },
   );
 }

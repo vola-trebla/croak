@@ -541,3 +541,33 @@ not list is refused rather than planned on its own; checking it as its own
 project is a follow-up. Eval cases for pnpm and workspaces need install-case
 support for pnpm lockfiles and project scripts; until then, unit tests and
 `scripts/test-croak-install.sh` cover these shapes.
+
+## D42 — M7: croak verifies signatures itself, against keys it pins (2026-10-31)
+
+M7 adds three separate checks, never merged into one "verified" badge:
+registry signatures (the tarball is what the registry has), provenance (which
+workflow built it from which commit), and the tarball against the source at
+the attested commit. The maintainer chose:
+- **Own verifier on `node:crypto`.** Registry signatures and Sigstore bundles
+  are ECDSA P-256, which Node verifies without a library; sigstore-js would
+  bring dozens of transitive dependencies and break D4. Crypto code is easy
+  to get subtly wrong, so every check is tested on real signatures and on a
+  tampered copy of each field it reads.
+- **Pinned trust roots.** npm's registry keys, the Fulcio roots and the
+  Rekor key live in croak's code. Keys fetched from the same server as the
+  packument would only check the server against itself. A key croak does
+  not know (a rotation croak missed) is "unverifiable": 🟡, so an agent asks
+  the user instead of every install being blocked until croak is updated.
+- **Severity.** Broken is 🔴: a registry signature by a known key that does
+  not verify, or a provenance claim that does not verify. A change is 🟡: a
+  version without a registry signature, or a source repo or workflow that
+  differs from the previous version's; with a new install script it is 🔴,
+  as in D30. Provenance never lowers a finding.
+- **Source comparison stays narrow.** Only `package.json` at the attested
+  commit (raw.githubusercontent.com, following `repository.directory`):
+  install scripts, `bin` and `gypfile` that the tarball has and the source
+  does not. Prebuilt binaries without source are not compared yet.
+
+**Trade-off:** pinned keys go stale. Rotations are rare and announced, and
+an unknown key fails towards asking, not towards passing; there is no TUF
+client to update the roots by themselves.

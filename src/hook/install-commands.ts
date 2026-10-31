@@ -975,7 +975,7 @@ function intentsOf(
       OTHER_RUNNERS.has(name) ||
       other?.has(args.find((a) => !a.startsWith("-")) ?? "") === true
     ) {
-      unchecked(`croak checks npm only; ${name} support is planned (M6)`);
+      unchecked(`croak checks npm and pnpm; ${name} is not supported yet`);
       continue;
     }
     // xargs npm i, find -exec npm i, watch npm i, docker run … npm i: a

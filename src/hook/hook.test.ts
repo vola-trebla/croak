@@ -371,8 +371,8 @@ describe("hookDecide", () => {
       [
         {
           kind: "unchecked",
-          command: "pnpm add zod",
-          reason: "croak checks npm only",
+          command: "yarn add zod",
+          reason: "croak checks npm and pnpm; yarn is not supported yet",
         },
       ],
       [result(0, report("allow"))],

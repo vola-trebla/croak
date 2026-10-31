@@ -25,6 +25,11 @@ function workflowOf(identity: BuildIdentity): string | undefined {
   return uri?.startsWith(repo) === true ? uri.slice(repo.length) : uri;
 }
 
+const repoIdOf = (identity: BuildIdentity): string | undefined =>
+  identity.sourceRepositoryId === undefined
+    ? undefined
+    : `${identity.issuer ?? ""}#${identity.sourceRepositoryId}`;
+
 /** How this build differs from the previous version's, if it does. */
 function buildChanges(
   now: BuildIdentity,
@@ -34,10 +39,12 @@ function buildChanges(
   const changes: string[] = [];
   // Repos get renamed (react now builds from github.com/react/react); the
   // numeric id survives a rename and changes when a name is re-registered.
+  // An id is only unique at its issuer (GitHub's and GitLab's overlap).
+  const nowId = repoIdOf(now);
+  const beforeId = repoIdOf(before);
   const otherRepo =
-    now.sourceRepositoryId !== undefined &&
-    before.sourceRepositoryId !== undefined
-      ? now.sourceRepositoryId !== before.sourceRepositoryId
+    nowId !== undefined && beforeId !== undefined
+      ? nowId !== beforeId
       : now.sourceRepositoryUri !== before.sourceRepositoryUri;
   if (otherRepo)
     changes.push(

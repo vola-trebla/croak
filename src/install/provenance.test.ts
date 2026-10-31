@@ -128,6 +128,23 @@ describe("provenanceFindings", () => {
     ]);
   });
 
+  it("tells the same id at another issuer apart (a GitLab project is not a GitHub repo)", () => {
+    const gitlab = verified({
+      issuer: "https://gitlab.com",
+      sourceRepositoryUri: "https://gitlab.com/acme/p",
+      buildConfigUri:
+        "https://gitlab.com/acme/p/.github/workflows/release.yml@refs/tags/v2.0.0",
+    });
+    expect(findings(gitlab, previousIdentity, noScript)).toEqual([
+      expect.objectContaining({
+        severity: "warn",
+        message: expect.stringContaining(
+          "was built from https://gitlab.com/acme/p",
+        ),
+      }),
+    ]);
+  });
+
   it("compares repository URLs when the ids are missing", () => {
     const old = verified({ sourceRepositoryId: undefined });
     const other = verified({

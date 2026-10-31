@@ -23,7 +23,7 @@ in-memory registry instead (no network):
 fixture/
   package-lock.json          # the planned install
   before.package-lock.json   # optional: the lockfile before
-  registry/<name>.json       # packuments
+  registry/<name>.json       # packuments, signed by a test key (a version's own dist.signatures stay)
   packages/<name>@<version>/ # files served as that version's tarball
 ```
 

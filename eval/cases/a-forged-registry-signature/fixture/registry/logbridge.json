@@ -1,0 +1,33 @@
+{
+  "name": "logbridge",
+  "time": {
+    "created": "2019-06-02T00:00:00.000Z",
+    "2.3.0": "2025-11-20T00:00:00.000Z",
+    "2.3.1": "2026-05-14T00:00:00.000Z"
+  },
+  "versions": {
+    "2.3.0": {
+      "name": "logbridge",
+      "version": "2.3.0",
+      "_npmUser": {
+        "name": "ines"
+      },
+      "dist": {}
+    },
+    "2.3.1": {
+      "name": "logbridge",
+      "version": "2.3.1",
+      "_npmUser": {
+        "name": "ines"
+      },
+      "dist": {
+        "signatures": [
+          {
+            "keyid": "SHA256:croak-test-key",
+            "sig": "MEUCIQDf3mKq0Zt7Yw1c2Hn8vJpXr4aLs9eB6uT0oWc5dGi1NgIgV7pQ2xR9mZk4hYb3nCs8fJt1uLw6eA0oDr5qGiK2Mx8="
+          }
+        ]
+      }
+    }
+  }
+}

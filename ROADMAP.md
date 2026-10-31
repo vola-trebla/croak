@@ -127,7 +127,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 ### M7 — Crypto layer (the diploma chapter)
 
 Three separate mechanisms, never merged into one "verified" badge:
-- [ ] Registry signatures: the tarball is what the registry has
+- [x] Registry signatures: the tarball is what the registry has — ECDSA P-256 checked against npm's pinned keys, and the lockfile's hash must be the signed one (D42)
 - [ ] Provenance (Sigstore): which workflow built it from which commit — signal on _changes_ (provenance dropped, repo or workflow changed); never lowers severity
 - [ ] Tarball vs source at the attested commit: flag new executable entry points (install scripts, `bin`, native binaries), not ordinary build output
 

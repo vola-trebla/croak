@@ -1,0 +1,10 @@
+{
+  "id": "a-forged-registry-signature",
+  "kind": "install",
+  "threat": "A",
+  "description": "A mirror or proxy swapped the tarball and rewrote dist.integrity to match, but could not re-sign it: the registry signature no longer verifies. The contents look clean, so only the signature catches it. Twin: benign-registry-signed.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["install/signature"]
+  }
+}

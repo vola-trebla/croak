@@ -135,6 +135,10 @@ export interface VersionFacts {
   readonly ageDays: number | undefined;
   /** The registry recorded a provenance attestation for this version (not verified here; M7). */
   readonly hasProvenance: boolean;
+  /** The registry's dist.integrity: the tarball hash its signature covers. */
+  readonly integrity: string | undefined;
+  /** The registry's dist.signatures, unchecked (src/crypto/registry-signature.ts). */
+  readonly signatures: unknown;
   readonly publisher: string | undefined;
   /** Which of preinstall/install/postinstall this version's manifest defines. */
   readonly installScripts: readonly string[];
@@ -232,6 +236,8 @@ export function versionFacts(
   )
     return undefined;
   const versions = packument.versions;
+  const meta = versions[version];
+  const dist = isRecord(meta) && isRecord(meta.dist) ? meta.dist : {};
   const time = isRecord(packument.time) ? packument.time : {};
   const published = date(time[version]);
   const earlier = Object.keys(versions)
@@ -253,7 +259,9 @@ export function versionFacts(
       published === undefined
         ? undefined
         : Math.floor((now.getTime() - published.getTime()) / DAY_MS),
-    ...versionInfo(versions[version]),
+    ...versionInfo(meta),
+    integrity: typeof dist.integrity === "string" ? dist.integrity : undefined,
+    signatures: dist.signatures,
     earlier,
     previous: predecessor(version, earlier),
   };

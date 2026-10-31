@@ -571,3 +571,28 @@ the attested commit. The maintainer chose:
 **Trade-off:** pinned keys go stale. Rotations are rare and announced, and
 an unknown key fails towards asking, not towards passing; there is no TUF
 client to update the roots by themselves.
+
+## D43 — The Sigstore verifier: what it checks and what it leaves out (2026-10-31)
+
+`verifyProvenance()` (src/crypto/sigstore.ts, with src/crypto/rekor.ts) checks an npm SLSA provenance
+bundle against Sigstore's public-good instance, pinned in code (D42): the
+Rekor v1 signed entry timestamp (SET) over the log entry, the signing
+certificate chained to the Fulcio CA and valid when the entry was logged,
+code signing only, the DSSE signature over the in-toto statement, a log
+entry that is exactly this signature and certificate, and a subject that is
+this package, version and sha512. Who built it comes from the certificate's
+Fulcio extensions, never from the statement the build wrote about itself.
+Both bundle shapes npm serves are read: v0.3 with a dsse entry, and the
+2023 v0.1 shape with an intoto entry. Live: 42 of 42 packages with
+provenance (scoped and 2023 ones included) verify.
+
+Left out, each one "unverifiable" (🟡) rather than a pass:
+- **Rekor v2** (Ed25519, since 2025-09) and any log croak does not pin;
+  every npm bundle seen on 2026-10-31 is in Rekor v1.
+- **Entries without a SET.** The Merkle inclusion proof and checkpoint are
+  not checked: the SET is Rekor's signed promise of the entry and its time,
+  which is what binds the short-lived certificate.
+- **RFC 3161 timestamps and certificate transparency (SCTs)** are not read.
+
+**Trade-off:** a bundle that names a log croak does not pin is asked about,
+not blocked; a bundle that does not verify against what croak pins blocks.

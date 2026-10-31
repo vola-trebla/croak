@@ -74,7 +74,17 @@ export function signatureFindings(
     case "valid": {
       const locked = sha512Of(entry.integrity);
       const signed = sha512Of(facts.integrity);
-      return locked !== undefined && signed !== undefined && locked !== signed
+      if (locked === undefined)
+        // No hash at all is install/integrity's finding.
+        return entry.integrity === undefined
+          ? []
+          : [
+              finding(
+                "info",
+                "is locked with only a sha1 hash, which croak did not compare with the sha512 the registry signed",
+              ),
+            ];
+      return signed !== undefined && locked !== signed
         ? [
             finding(
               "block",

@@ -164,23 +164,22 @@ async function provenanceOf(
       integrity: integrity ?? "",
     });
     const before = provenanceBaseline(facts);
-    return [
-      {
-        change,
-        facts,
-        before,
-        current: subject(change.entry.version ?? "", facts.integrity),
-        previous:
-          before === undefined
-            ? undefined
-            : subject(before.version, before.integrity),
-      },
-    ];
+    const current = subject(change.entry.version ?? "", facts.integrity);
+    const previous =
+      before === undefined
+        ? undefined
+        : subject(before.version, before.integrity);
+    // Both bundles are immutable for these tarballs, and so are both
+    // versions' install scripts: the findings can be remembered.
+    const label = `provenance ${keyOf(current)} after ${previous === undefined ? "none" : `${keyOf(previous)} ${previous.integrity}`}`;
+    const cached = options.cache?.get(current.integrity, label);
+    return [{ change, facts, before, current, previous, label, cached }];
   });
   const subjects = new Map<string, Subject>();
   for (const plan of plans)
-    for (const s of [plan.current, plan.previous])
-      if (s !== undefined) subjects.set(keyOf(s), s);
+    if (plan.cached === undefined)
+      for (const s of [plan.current, plan.previous])
+        if (s !== undefined) subjects.set(keyOf(s), s);
   const list = [...subjects.values()];
   const bundles = await pool(list, options.concurrency ?? 8, (s) =>
     fetchProvenanceBundle(s.name, s.version, fetchOptions),
@@ -193,20 +192,31 @@ async function provenanceOf(
         : verifyProvenance(bundles[i], s, options.sigstore),
     ]),
   );
-  return plans.flatMap(({ change, facts, before, current, previous }) =>
-    provenanceFindings(
+  return plans.flatMap((plan) => {
+    if (plan.cached !== undefined) return plan.cached;
+    const { change, facts, before, current, previous } = plan;
+    const now = checked.get(keyOf(current)) ?? "missing";
+    const then =
+      previous === undefined
+        ? undefined
+        : (checked.get(keyOf(previous)) ?? "missing");
+    const findings = provenanceFindings(
       change,
-      checked.get(keyOf(current)) ?? "missing",
-      before === undefined || previous === undefined
+      now,
+      before === undefined || then === undefined
         ? undefined
         : {
             version: before.version,
-            provenance: checked.get(keyOf(previous)) ?? "missing",
+            provenance: then,
             installCommands: before.installCommands,
           },
       facts.installCommands,
-    ),
-  );
+    );
+    // A bundle the registry did not serve may be served next time.
+    if (now !== "missing" && then !== "missing")
+      options.cache?.set(current.integrity, plan.label, findings);
+    return findings;
+  });
 }
 
 /** Runs `work` over `items` with at most `limit` in flight. */

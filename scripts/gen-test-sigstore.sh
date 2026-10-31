@@ -47,7 +47,11 @@ leaf() {
   {
     echo "[leaf]"
     echo "basicConstraints = critical, CA:$ca"
-    echo "keyUsage = critical, digitalSignature"
+    if [ "$ca" = true ]; then
+      echo "keyUsage = critical, digitalSignature, keyCertSign"
+    else
+      echo "keyUsage = critical, digitalSignature"
+    fi
     echo "extendedKeyUsage = $eku"
     echo "subjectAltName = critical, URI:$repo/$workflow@$ref"
     echo "$f.8 = ASN1:UTF8String:https://token.actions.githubusercontent.com"

@@ -1,0 +1,10 @@
+{
+  "id": "benign-registry-signed",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin: the same package, years old, same publisher, with a registry signature that verifies over its tarball hash.",
+  "expect": {
+    "verdict": "allow",
+    "rules": []
+  }
+}

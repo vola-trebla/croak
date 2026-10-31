@@ -1,0 +1,6 @@
+{
+  "name": "logbridge",
+  "version": "2.3.1",
+  "description": "SYNTHETIC croak eval fixture",
+  "main": "index.js"
+}

@@ -769,3 +769,26 @@ provenance by itself; the workflow also passes `--provenance`.
 
 **Trade-off:** the first version on npm is the one version croak cannot
 check the provenance of; the self-check demo waits for 0.1.1.
+
+## D50 — The release workflow (2026-11-01)
+
+`.github/workflows/release.yml` publishes from a `v*` tag, the second and
+every later version (D49). Choices:
+- **npm trusted publishing (OIDC).** Only the publish job may mint an
+  `id-token`; no npm token exists in the repository or its secrets, and
+  npm adds provenance. The trusted publisher on npm names this repository
+  and this workflow file, so a renamed file stops publishing.
+- **The commit is checked again before it ships:** everything CI runs
+  (check, ReDoS, eval, both wrapper tests) plus the tarball smoke test,
+  the tag must equal package.json's version, and npm must be 11.5.1 or
+  later (trusted publishing).
+- **No dependency cache** in the job that publishes, and `npm publish
+  --ignore-scripts`.
+- **Every action pinned by commit SHA,** now an invariant over all
+  workflows (`pinned-actions`), since this one holds the right to publish.
+
+Who may push a `v*` tag is a repository setting (a tag ruleset), set by the
+maintainer.
+
+**Trade-off:** a release reruns the whole suite (a few minutes) rather
+than trusting the CI run on the same commit.

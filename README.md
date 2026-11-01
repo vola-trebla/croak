@@ -7,10 +7,11 @@
 first: when an agent reaches for `npm install`, croak stops it, explains why,
 and lets the agent fix its own mistake.
 
-> 🚧 **Status: early development.** `croak repo`, the npm install check
-> (`croak-install`) and the Claude Code hook work end to end and have been
-> through four security reviews; the LLM layer and an npm release are not
-> there yet. Use it, but don't rely on it as your only line of defense. The
+> 🚧 **Status: early stage (0.x).** `croak repo`, the npm and pnpm install
+> checks, signature and provenance verification, the optional LLM layer and
+> the Claude Code hook work end to end, and each milestone since M1 has had a
+> security review. It is young software: use it, but don't make it your only
+> line of defense, and expect the CLI to change before 1.0. The
 > [roadmap](ROADMAP.md) shows what's done.
 
 ---
@@ -67,17 +68,31 @@ croak plan - WARN
            25 package(s) built for other platforms not checked: npm will not install them on darwin-arm64
 ```
 
+## 📦 Install and use
+
+```bash
+npm install -g @vola-trebla/croak   # Node 24.2+, macOS or Linux
+```
+
+Or once, without installing (fitting for a tool about installs: croak has
+no install scripts and one dependency, Anthropic's SDK):
+
+```bash
+npx @vola-trebla/croak repo ./that-test-assignment
+```
+
 ### Two modes
 
 ```bash
-croak-install [pkg]   # plan an npm install, check it before anything executes
+croak-install [pkg]          # plan an npm install, check it before anything executes
 croak-install --pnpm [pkg]   # the same for pnpm
-croak repo .          # scan an unfamiliar repo before you install or open it
+croak repo .                 # scan an unfamiliar repo before you install or open it
 ```
 
-Plus a **Claude Code hook** (🧪 early, M4) that puts croak in front of every
-install command an agent runs. Add it to `.claude/settings.json` (croak never
-edits your config):
+Plus a **Claude Code hook** that puts croak in front of every install
+command an agent runs. Add it to `~/.claude/settings.json` (or a project's
+`.claude/settings.json`; croak never edits your config), with the path that
+`command -v croak-hook` prints:
 
 ```json
 {
@@ -88,7 +103,7 @@ edits your config):
         "hooks": [
           {
             "type": "command",
-            "command": "/path/to/croak/scripts/croak-hook.sh",
+            "command": "/usr/local/bin/croak-hook",
             "timeout": 300,
             "onFailure": "block"
           }
@@ -105,7 +120,10 @@ registry) → the command is denied and the agent is told why;
 🟡 → Claude Code asks you; 🟢 → the hook stays silent and your normal
 permissions apply. `onFailure: "block"` matters: without it, Claude Code lets
 a command through when a hook crashes or times out. It needs Claude Code
-2.1.295 or later.
+2.1.295 or later. The hook runs `node` from Claude Code's own PATH: if that
+finds a Node older than 24.2 (common with nvm when Claude Code starts from
+the desktop), every install is denied with a message saying so, so put
+Node 24 first on that PATH.
 
 **The AI layer (optional).** With `CROAK_LLM=1` and `ANTHROPIC_API_KEY` set
 (for the hook: in the environment Claude Code runs it with; for
@@ -201,12 +219,12 @@ pnpm eval
 ```
 
 ```
-🐸 croak eval — 46 cases (23 malicious, 23 benign)
+🐸 croak eval — 67 cases (35 malicious, 32 benign)
   …
-  block recall  18/23   78%  ████████████████░░░░
-  flag recall   23/23  100%  ████████████████████
-  false alarms   0/23    0%  ░░░░░░░░░░░░░░░░░░░░
-  rule recall   33/33  100%  ████████████████████
+  block recall  26/35   74%  ███████████████░░░░░
+  flag recall   35/35  100%  ████████████████████
+  false alarms   0/32    0%  ░░░░░░░░░░░░░░░░░░░░
+  rule recall   52/52  100%  ████████████████████
 ```
 
 Synthetic cases are written by us, so two more runs check the noise on code we

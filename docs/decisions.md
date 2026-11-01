@@ -670,3 +670,27 @@ package, signature, bundle or log entry to verify. It found:
 Not changed: the ref (6 of 36 corpus packages would warn, see D43), and
 `der.ts` accepting a non-minimal OID encoding (only bytes Fulcio signed
 reach it).
+
+## D46 — The install eval covers pnpm lockfiles (2026-10-31)
+
+D41 left pnpm without eval cases: an install case could only carry
+package-lock.json. A case may now carry pnpm-lock.yaml instead, and the
+harness reads the project's build rule from the fixture's package.json and
+pnpm-workspace.yaml the way `croak plan --pnpm-builds` does, with a fixed
+pnpm 10 version. Three cases, all on one package, pin the rule from both
+sides:
+- a malicious postinstall the project never approved still blocks
+  (`a-pnpm-install-script-exfil`): pnpm will not run it today, but a later
+  `pnpm approve-builds` would;
+- an honest binary installer the project did not approve is a note
+  (`benign-pnpm-unapproved-build`, allow);
+- the same installer approved in `allowBuilds` warns, as under npm
+  (`benign-pnpm-approved-build`).
+
+The harness fills each `resolution: {}` with the built tarball's hash
+textually, line by line, and croak's own parser then reads the result: a
+test-only shortcut that keeps fixtures hand-written, with no YAML writer.
+
+**Trade-off:** the pnpmfile and config-dependency checks (D39) and the
+project's own scripts still have no eval cases; they come with project
+manifests in install cases (D47).

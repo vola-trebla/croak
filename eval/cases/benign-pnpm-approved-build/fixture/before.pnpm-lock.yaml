@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      nodebridge:
+        specifier: ^6.0.0
+        version: 6.0.0
+
+packages:
+
+  nodebridge@6.0.0:
+    resolution: {}
+
+snapshots:
+
+  nodebridge@6.0.0: {}

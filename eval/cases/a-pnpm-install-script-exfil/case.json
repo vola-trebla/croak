@@ -1,0 +1,10 @@
+{
+  "id": "a-pnpm-install-script-exfil",
+  "kind": "install",
+  "threat": "A",
+  "description": "pnpm twin of a-install-script-exfil: the hijacked release's postinstall posts process.env away. The project never approved its build, so pnpm 10+ will not run it today, but it is still evidence about the package and a later `pnpm approve-builds` would run it: the block stays.",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

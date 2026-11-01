@@ -28,8 +28,15 @@ fixture/
   packages/<name>@<version>/ # files served as that version's tarball
 ```
 
+A pnpm case carries `pnpm-lock.yaml` (and `before.pnpm-lock.yaml`) instead,
+never both managers' lockfiles. Its `package.json` and `pnpm-workspace.yaml`,
+when present, are the project's build rule: an install script that pnpm 10+
+will not run is a note, not a warning, as in `croak-install --pnpm` (D38,
+D46).
+
 Lockfile entries without `resolved`/`integrity` get the registry URL and the
-hash of the built tarball; an entry that states its own integrity keeps it.
+hash of the built tarball (in pnpm-lock.yaml: a package's `resolution: {}`);
+an entry that states its own integrity keeps it.
 Dates are relative to a fixed clock (2026-10-25) and the platform is fixed
 (linux-x64). An incomplete plan scores as a block (`install/incomplete`): it
 blocks an agent (D20).

@@ -1,0 +1,10 @@
+{
+  "id": "benign-pnpm-approved-build",
+  "kind": "install",
+  "threat": "benign",
+  "description": "The same installer, approved in pnpm-workspace.yaml (allowBuilds): pnpm will run it, so it is worth a look, as under npm.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

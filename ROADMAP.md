@@ -139,7 +139,8 @@ Three separate mechanisms, never merged into one "verified" badge:
 - [x] Package `@vola-trebla/croak` 0.1.0, tarball smoke test in CI, release workflow on npm trusted publishing (D49, D50)
 - [x] Publish `@vola-trebla/croak` from CI with provenance (name checked for conflicts first, D22): 0.1.0 by hand, 0.1.1 from CI, verified by croak itself (D51)
 - [x] Review fixes (D52, D53): a forged root lockfile could hide a non-member's install; release split into a tokenless verify job and a publish job
-- [ ] Article: "From a 2013 ECC diploma to croak"
+- [x] Dogfooding 0.1.3 as a real user: the hook denies approve-builds and rebuild (D55), npm 12's allowScripts is read (D56), pnpm typo hints; shipped as 0.1.4
+- [x] Article: ["In 2013 I wrote a diploma on elliptic curves. Last night my tool used them to check its own release."](https://dev.to/vola-trebla/in-2013-i-wrote-a-diploma-on-elliptic-curves-last-night-my-tool-used-them-to-check-its-own-release-1k3i)
 
 ### Later
 

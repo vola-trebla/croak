@@ -274,7 +274,9 @@ export async function planInstallOnline(
           {
             ruleId: "install/other-platform",
             severity: "info",
-            file: "package-lock.json",
+            file: isPnpmLockfile(afterText)
+              ? "pnpm-lock.yaml"
+              : "package-lock.json",
             message: `${skipped} package(s) built for other platforms not checked: the package manager will not install them on ${platform.os}-${platform.cpu}`,
           },
         ];

@@ -95,7 +95,7 @@ export function renderScan(
       title,
       verdict: outcome.verdict,
       findings: outcome.findings,
-      footer: `${outcome.filesScanned} files scanned · ${Math.round(outcome.durationMs)} ms`,
+      footer: `${outcome.filesScanned} ${outcome.filesScanned === 1 ? "file" : "files"} scanned · ${Math.round(outcome.durationMs)} ms`,
     },
     options,
   );

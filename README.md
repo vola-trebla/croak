@@ -58,7 +58,7 @@ reasons a human _and_ an agent can act on:
 $ croak-install reactt-domm
 croak-install: a requested package does not exist on npm. Check the name:
 AI agents often invent plausible package names, and attackers register them.
-  reactt-domm: did you mean `react-dom`?
+  reactt-domm: not on npm; did you mean `react-dom`?
 
 $ croak-install esbuild
 croak plan - WARN

@@ -902,3 +902,29 @@ ways.
 The tag `v0.1.2` is left where it is, on the commit whose workflow failed:
 croak pins actions by commit because tags can move, and it does not move
 its own. The fix ships as 0.1.3, so npm goes from 0.1.1 to 0.1.3.
+
+## D55 — Approving builds is the user's call: the hook denies it (2026-11-01)
+
+Found while dogfooding 0.1.3. `pnpm add esbuild` is rightly silent: pnpm
+10+ will not run a build the project has not allowed, so croak notes the
+script as info. pnpm then fails with `ERR_PNPM_IGNORED_BUILDS` and tells
+the agent to run `pnpm approve-builds`; the agent does, the hook stayed
+silent (it did not know the command), and pnpm ran the postinstall. The
+same held for `pnpm rebuild`, and for npm 11.19, which holds back
+dependency install scripts by default (`allowScripts` in package.json):
+`npm install-scripts approve` / `npm approve-scripts`, then `npm rebuild`.
+Checked by hand with the real esbuild.
+
+The hook now reports these as unchecked, so it denies them with the reason
+"it lets installed packages run their install scripts; the user should
+approve that, not the agent": `pnpm approve-builds`, `pnpm rebuild`/`rb`,
+`npm rebuild`/`rb`, `npm approve-scripts`, `npm install-scripts approve`.
+The read-only ones (`pnpm ignored-builds`, `npm install-scripts ls`) and
+denials stay silent. Deny, not ask: croak has not judged the scripts being
+approved, and an ask would read as croak's 🟡 on them. pnpm's flags that
+allow builds were already refused (an allowlist of flags, M6 review).
+
+Not covered, as before: an agent editing package.json or
+pnpm-workspace.yaml with a file tool (the hook sees shell commands only),
+and npm's own script policy, which croak does not read yet (it warns on a
+script npm 11.19 will not run; next).

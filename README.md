@@ -116,7 +116,9 @@ command an agent runs. Add it to `~/.claude/settings.json` (or a project's
 
 🔴, an incomplete check, or a command croak cannot vouch for (yarn or bun, a
 custom registry, `npm i $PKG`, an `.npmrc` that points at a private
-registry) → the command is denied and the agent is told why;
+registry, `pnpm approve-builds` or `npm rebuild`, which let installed
+packages run install scripts the package manager held back) → the command
+is denied and the agent is told why;
 🟡 → Claude Code asks you; 🟢 → the hook stays silent and your normal
 permissions apply. `onFailure: "block"` matters: without it, Claude Code lets
 a command through when a hook crashes or times out. It needs Claude Code

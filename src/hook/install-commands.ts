@@ -53,6 +53,14 @@ export type InstallIntent =
 const MAX_COMMAND_LENGTH = 100_000;
 const MAX_DEPTH = 4;
 
+/**
+ * Approving or rebuilding lets packages that are already installed run the
+ * install scripts the package manager held back (pnpm 10+, npm's
+ * allowScripts). That is the user's call, not the agent's (D55).
+ */
+const RUNS_SCRIPTS =
+  "it lets installed packages run their install scripts; the user should approve that, not the agent";
+
 /** Any of these in a command croak cannot follow makes it unchecked. */
 const MENTIONS = /\b(?:npm|npx|pnpm|pnpx|yarn|bun|bunx|corepack)\b/;
 const PACKAGE_MANAGERS = new Set([
@@ -72,6 +80,7 @@ const PACKAGE_MANAGERS = new Set([
 const NPM_COMMANDS = [
   "access",
   "adduser",
+  "approve-scripts",
   "audit",
   "bugs",
   "cache",
@@ -97,6 +106,7 @@ const NPM_COMMANDS = [
   "init",
   "install",
   "install-ci-test",
+  "install-scripts",
   "install-test",
   "link",
   "ll",
@@ -471,6 +481,12 @@ function npmIntents(
   const [word, ...rest] = positional;
   if (word === undefined) return [];
   const sub = npmCommand(word);
+  if (
+    sub === "rebuild" ||
+    sub === "approve-scripts" ||
+    (sub === "install-scripts" && rest[0] === "approve")
+  )
+    return unchecked(RUNS_SCRIPTS);
   if (sub === "audit" && rest[0] === "fix")
     return unchecked("croak does not check npm audit fix yet");
   if (
@@ -522,6 +538,7 @@ function npmIntents(
 
 const PNPM_INSTALL = new Set(["install", "i", "add", "install-test", "it"]);
 const PNPM_UPDATE = new Set(["update", "up", "upgrade"]);
+const PNPM_RUNS_SCRIPTS = new Set(["approve-builds", "rebuild", "rb"]);
 /** Subcommands that install, or run another pnpm, in ways croak does not plan. */
 const PNPM_UNCHECKED = new Set([
   "dedupe",
@@ -661,6 +678,8 @@ function pnpmIntents(
     );
   }
   const [sub, ...rest] = positional;
+  if (sub !== undefined && PNPM_RUNS_SCRIPTS.has(sub))
+    return unchecked(RUNS_SCRIPTS);
   if (sub !== undefined && PNPM_UNCHECKED.has(sub))
     return unchecked(`croak does not check pnpm ${sub} yet`);
   const installing =

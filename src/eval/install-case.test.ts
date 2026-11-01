@@ -191,3 +191,114 @@ describe("checkInstallFixture with pnpm-lock.yaml", () => {
     );
   });
 });
+
+describe("checkInstallFixture with the project's own files", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true });
+  });
+  const make = (files: Record<string, string>): string => {
+    const dir = mkdtempSync(join(tmpdir(), "croak-project-fixture-"));
+    dirs.push(dir);
+    for (const [path, content] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(join(dir, path), content);
+    }
+    return dir;
+  };
+  // The fake test assignment's exfil script of the d-postinstall-exfil case.
+  const exfil = readFileSync(
+    join(
+      import.meta.dirname,
+      "../../eval/cases/d-postinstall-exfil/fixture/scripts/setup.js",
+    ),
+    "utf8",
+  );
+  const npmLock = (members: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      name: "app",
+      lockfileVersion: 3,
+      packages: { "": { name: "app", version: "1.0.0" }, ...members },
+    });
+  const findings = async (dir: string) => {
+    const outcome = await checkInstallFixture(dir);
+    if (outcome.status !== "complete") throw new Error(outcome.reason);
+    return outcome;
+  };
+
+  it("checks the root package.json's install scripts, as a plain npm install runs them", async () => {
+    const outcome = await findings(
+      make({
+        "package-lock.json": npmLock(),
+        "package.json": JSON.stringify({
+          name: "app",
+          scripts: { postinstall: "node scripts/setup.js" },
+        }),
+        "scripts/setup.js": exfil,
+      }),
+    );
+    expect(outcome.verdict).toBe("block");
+    expect(outcome.findings).toContainEqual(
+      expect.objectContaining({
+        ruleId: "repo/lifecycle-script",
+        severity: "block",
+        file: "package.json",
+      }),
+    );
+  });
+
+  it("checks the install scripts of the workspace members the lockfile lists", async () => {
+    const outcome = await findings(
+      make({
+        "package-lock.json": npmLock({
+          "apps/web": { name: "web", version: "1.0.0" },
+          "node_modules/web": { resolved: "apps/web", link: true },
+        }),
+        "package.json": JSON.stringify({
+          name: "app",
+          workspaces: ["apps/*"],
+        }),
+        "apps/web/package.json": JSON.stringify({
+          name: "web",
+          scripts: { preinstall: "node setup.js" },
+        }),
+        "apps/web/setup.js": exfil,
+      }),
+    );
+    expect(outcome.findings).toContainEqual(
+      expect.objectContaining({
+        ruleId: "repo/lifecycle-script",
+        severity: "block",
+        file: "apps/web/package.json",
+      }),
+    );
+  });
+
+  it("checks a pnpm project's pnpmfile, which pnpm runs on every install", async () => {
+    const outcome = await findings(
+      make({
+        "pnpm-lock.yaml": "lockfileVersion: '9.0'\n\nimporters:\n\n  .: {}\n",
+        "package.json": JSON.stringify({ name: "app" }),
+        ".pnpmfile.cjs": exfil,
+      }),
+    );
+    expect(outcome.findings).toContainEqual(
+      expect.objectContaining({
+        ruleId: "repo/pnpmfile",
+        severity: "block",
+        file: ".pnpmfile.cjs",
+      }),
+    );
+  });
+
+  it("adds nothing for a fixture without the project's package.json", async () => {
+    const outcome = await findings(
+      make({
+        "package-lock.json": npmLock(),
+        "scripts/setup.js": exfil,
+        ".pnpmfile.cjs": exfil,
+      }),
+    );
+    expect(outcome).toMatchObject({ verdict: "allow", findings: [] });
+  });
+});

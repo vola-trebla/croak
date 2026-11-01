@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import { type BuildPolicy, pnpmBuildPolicy } from "../install/pnpm-builds.ts";
+import {
+  type ProjectFs,
+  pnpmfileFindings,
+  projectScriptFindings,
+  workspaceMembers,
+} from "../install/project.ts";
 import { REGISTRY } from "../install/registry.ts";
 import { type PlanOutcome, planInstallOnline } from "../install/scan.ts";
 import { signPackument, TEST_REGISTRY_KEY } from "../install/test-registry.ts";
@@ -9,7 +15,8 @@ import {
   testProvenanceBundle,
 } from "../install/test-sigstore.ts";
 import { tar } from "../install/test-tar.ts";
-import { snapshotRepo } from "../repo-snapshot.ts";
+import { type RepoSnapshot, snapshotRepo } from "../repo-snapshot.ts";
+import { aggregate, type Finding } from "../verdict.ts";
 
 /**
  * Runs `croak plan` on an install fixture with a fake, in-memory registry:
@@ -17,9 +24,14 @@ import { snapshotRepo } from "../repo-snapshot.ts";
  *   package-lock.json          the planned install (after), or pnpm-lock.yaml
  *   before.package-lock.json   optional: the project's lockfile before (for
  *                              pnpm: before.pnpm-lock.yaml)
- *   package.json,              optional, pnpm only: the project's build rule
- *   pnpm-workspace.yaml        (which install scripts pnpm 10+ runs), read as
- *                              `croak plan --pnpm-builds` reads it
+ *   package.json               optional: the project itself, so the plan is
+ *                              a plain install of it, as `croak plan
+ *                              --project` checks one: its own install scripts
+ *                              and its workspace members' (D35, D47)
+ *   pnpm-workspace.yaml,       pnpm only: the project's build rule (which
+ *   .pnpmfile.cjs              install scripts pnpm 10+ runs, with
+ *                              package.json) and the code pnpm loads on every
+ *                              install, as `croak plan --pnpm-builds` reads them
  *   registry/<name>.json       packuments, served at registry.npmjs.org/<name>,
  *                              each version signed by a test key unless it
  *                              states its own dist.signatures; a version's
@@ -87,6 +99,22 @@ function provenanceFor(
   return testProvenanceBundle({ name, version: about, integrity }, signer);
 }
 
+/** The fixture as the project folder `croak plan --project` reads. */
+const projectFs = (repo: RepoSnapshot): ProjectFs => {
+  const kinds = new Map(repo.entries.map((e) => [e.path, e]));
+  return {
+    read: (path) => repo.read(path),
+    kind: (path) => {
+      const entry = kinds.get(path);
+      if (entry === undefined) return undefined;
+      return {
+        kind: entry.kind === "symlink" ? "symlink" : "file",
+        size: entry.size,
+      };
+    },
+  };
+};
+
 const sri = (data: Buffer): string =>
   `sha512-${createHash("sha512").update(data).digest("base64")}`;
 
@@ -98,7 +126,8 @@ function fillNpmLock(text: string, tarballs: Map<string, Buffer>): string {
   for (const [path, raw] of Object.entries(lock.packages)) {
     if (path === "" || !isRecord(raw) || typeof raw.version !== "string")
       continue;
-    if (raw.link === true) continue;
+    // Links and workspace members (keys outside node_modules) are local folders.
+    if (raw.link === true || !path.includes("node_modules/")) continue;
     const name =
       typeof raw.name === "string"
         ? raw.name
@@ -274,7 +303,7 @@ export async function checkInstallFixture(
     return new Response(JSON.stringify(doc));
   };
 
-  return planInstallOnline(before, after, {
+  const outcome = await planInstallOnline(before, after, {
     fetch: fakeFetch,
     now: EVAL_NOW,
     platform: EVAL_PLATFORM,
@@ -282,4 +311,23 @@ export async function checkInstallFixture(
     sigstore: TEST_SIGSTORE,
     ...(builds === undefined ? {} : { builds }),
   });
+  if (outcome.status !== "complete") return outcome;
+  // What the planning wrapper adds for the project (scripts/croak-install.sh):
+  // the pnpmfile on every pnpm install (D39), the project's own install
+  // scripts on a plain install (D35). The fixture's package.json is that
+  // project; without one, the case is about the packages alone.
+  const fs = projectFs(repo);
+  const pnpm = pnpmLock !== undefined;
+  const extra: Finding[] = [
+    ...(pnpm ? pnpmfileFindings(".", fs) : []),
+    ...(read("package.json") === undefined
+      ? []
+      : projectScriptFindings(".", fs, {
+          members: workspaceMembers(after),
+          pnpm,
+        })),
+  ];
+  if (extra.length === 0) return outcome;
+  const findings = [...extra, ...outcome.findings];
+  return { ...outcome, findings, verdict: aggregate(findings) };
 }

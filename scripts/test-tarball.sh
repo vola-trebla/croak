@@ -52,6 +52,20 @@ got=$(cd "$work" && "$bin/croak" --version)
 [ "$got" = "$want" ] || { echo "FAIL: croak --version printed '$got', package.json says $want"; exit 1; }
 echo "ok: croak, croak-install and croak-hook installed from the tarball; croak --version is $got"
 
+# croak on its own installed files: nothing in them may look obfuscated. Its
+# comments name the very patterns it hunts (`globalThis[key](…)`), so the
+# build drops comments (D51); its own dependencies are not this test's subject.
+pkg="$work/prefix/lib/node_modules/@vola-trebla/croak"
+(cd "$work" && "$bin/croak" repo "$pkg" --json >"$work/self.json" || true)
+self=$(node -e '
+  const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  for (const f of report.findings ?? [])
+    if (f.ruleId === "repo/obfuscation" && f.severity !== "info") console.log(`${f.file}:${f.line ?? ""} ${f.message}`);
+  if (report.status !== "complete") console.log(`incomplete: ${report.reason ?? ""}`);
+' "$work/self.json")
+[ -z "$self" ] || { echo "FAIL: croak flags its own installed files:"; echo "$self"; exit 1; }
+echo "ok: croak finds nothing obfuscated in its own installed files"
+
 # croak repo on a fake test assignment, from the installed CLI.
 out=$(cd "$work" && "$bin/croak" repo "$root/eval/cases/d-known-tool-chained/fixture" --json || true)
 echo "$out" | grep -q '"verdict": "block"' || { echo "FAIL: installed croak repo did not block:"; echo "$out"; exit 1; }

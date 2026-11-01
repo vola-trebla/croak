@@ -1,0 +1,10 @@
+{
+  "id": "benign-pnpm-pnpmfile-pin",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin of d-pnpm-pnpmfile-exfil: a pnpmfile that pins a transitive dependency's version. pnpm runs it on every install, so it is worth a look, never a block.",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/pnpmfile"]
+  }
+}

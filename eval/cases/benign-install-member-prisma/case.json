@@ -1,0 +1,10 @@
+{
+  "id": "benign-install-member-prisma",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin of d-install-member-preinstall: a workspace member's postinstall runs prisma generate. Prisma runs the repo's generator config, so it stays a warning with a known-tool note (D19).",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

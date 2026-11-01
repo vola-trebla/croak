@@ -670,3 +670,102 @@ package, signature, bundle or log entry to verify. It found:
 Not changed: the ref (6 of 36 corpus packages would warn, see D43), and
 `der.ts` accepting a non-minimal OID encoding (only bytes Fulcio signed
 reach it).
+
+## D46 — The install eval covers pnpm lockfiles (2026-10-31)
+
+D41 left pnpm without eval cases: an install case could only carry
+package-lock.json. A case may now carry pnpm-lock.yaml instead, and the
+harness reads the project's build rule from the fixture's package.json and
+pnpm-workspace.yaml the way `croak plan --pnpm-builds` does, with a fixed
+pnpm 10 version. Three cases, all on one package, pin the rule from both
+sides:
+- a malicious postinstall the project never approved still blocks
+  (`a-pnpm-install-script-exfil`): pnpm will not run it today, but a later
+  `pnpm approve-builds` would;
+- an honest binary installer the project did not approve is a note
+  (`benign-pnpm-unapproved-build`, allow);
+- the same installer approved in `allowBuilds` warns, as under npm
+  (`benign-pnpm-approved-build`).
+
+The harness fills each `resolution: {}` with the built tarball's hash
+textually, line by line, and croak's own parser then reads the result: a
+test-only shortcut that keeps fixtures hand-written, with no YAML writer.
+
+**Trade-off:** the pnpmfile and config-dependency checks (D39) and the
+project's own scripts still have no eval cases; they come with project
+manifests in install cases (D47).
+
+## D47 — Install cases can carry the project (2026-10-31)
+
+The checks on the project's own files ran only through `croak plan
+--project` and `--pnpm-builds`: no eval case reached them, though the fake
+test assignment (threat D) attacks exactly there. A fixture's root
+package.json is now the project, installed with a plain install, and the
+harness adds what the planning wrapper adds: the project's install scripts
+and its workspace members' (D35, D41), and on pnpm cases the pnpmfile and
+config dependencies (D39). A fixture without package.json is about its
+packages alone, so the 26 earlier install cases are unchanged.
+
+Six cases, each with a twin: a test assignment's own postinstall (block)
+against husky in prepare (allow); the same exfil in a workspace member's
+preinstall (block) against a member's `prisma generate` (warn); a
+`.pnpmfile.cjs` that posts the environment (block) against one that pins
+a dependency (warn).
+
+Writing them found a harness bug: workspace members in an npm fixture
+lockfile got a registry URL filled in, as if they were downloads.
+
+**Trade-off:** the project-level part is a copy of the CLI's wiring
+(`runPlan` in src/cli.ts), not shared code; a change to one must be
+mirrored in the other, and the cases are what catches a drift.
+
+## D48 — A folder the workspace does not list is planned on its own (2026-10-31)
+
+D41 refused a project inside a workspace folder that the workspace does not
+list (exit 3): an agent working in `examples/demo` of a monorepo could not
+install anything there. The wrapper already ran the package manager from
+that folder in the copied workspace, and the package manager's own choice
+showed where the real install goes: a lockfile in the folder, not at the
+root, means it installs the folder as a project of its own. That plan is
+not used, because it lacked the folder's own lockfile and its manifest was
+not sanitized. The folder is planned again, from scratch, exactly as a
+project outside any workspace: its sanitized package.json, its lockfile,
+its node_modules as the baseline, its own install scripts, and its own
+`npm-shrinkwrap.json` refused (D34).
+
+Observed: npm 11 installs such a folder on its own; pnpm 12.4.2 adds it to
+the workspace lockfile as an importer and installs from the root, so the
+plan stays at the root. Both follow from what the package manager wrote,
+not from croak's reading of the workspace globs.
+
+Unchanged: `--ci` in such a folder stays incomplete, since no package
+manager runs to tell where it installs, and `croak plan` still refuses a
+`--member` the planned lockfile does not list, as a backstop. This lifts
+D41's trade-off.
+
+**Trade-off:** planning such a folder runs the package manager twice.
+
+## D49 — The npm package and how 0.1.0 reaches npm (2026-10-31)
+
+The package is `@vola-trebla/croak` (D22; the bare `croak` belongs to
+someone else), first version **0.1.0**: 0.x says early stage, as the README
+does. package.json gains `repository` (provenance requires it to match the
+repository that builds the package), `homepage`, `bugs`, `keywords` and
+`publishConfig.access: public` (a scoped package is private by default),
+and loses `private`. `bin` paths all start with `./`. A test ties the
+CLI's `--version` to package.json's version.
+
+How releases happen, chosen by the maintainer:
+- **0.1.0 by hand.** npm lets a trusted publisher be set only on a package
+  that exists, so the maintainer publishes the first version from a laptop
+  (2FA, no token stored anywhere). It has no provenance.
+- **Every later version from CI**, from a `v*` tag, through npm trusted
+  publishing (OIDC): no long-lived token, provenance generated by npm.
+  The release workflow comes in its own change.
+
+`publishConfig.provenance` is not set: a publish outside CI fails with it,
+which would break the manual first release, and trusted publishing adds
+provenance by itself; the workflow also passes `--provenance`.
+
+**Trade-off:** the first version on npm is the one version croak cannot
+check the provenance of; the self-check demo waits for 0.1.1.

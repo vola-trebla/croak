@@ -92,13 +92,26 @@ echo "$out" | grep -q "install/install-script" || { echo "FAIL: the workspace me
 echo "$out" | grep -q "packages/a/package.json" || { echo "FAIL: the member's postinstall was not checked:"; echo "$out"; exit 1; }
 [ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
 # A project inside the workspace folder that is not a member: npm installs it
-# on its own, not where croak would plan, so the check is incomplete.
-echo '{ "name": "demo", "version": "1.0.0" }' >"$ws/examples/demo/package.json"
+# on its own, so croak plans it on its own, with its own install scripts (D48).
+printf '{ "name": "demo", "version": "1.0.0", "scripts": { "postinstall": "node demo-setup.js" }, "dependencies": { "croak-bait": "file:%s" } }\n' "$work/bait/croak-bait-1.0.0.tgz" >"$ws/examples/demo/package.json"
+echo "require('fs').writeFileSync('$marker', '')" >"$ws/examples/demo/demo-setup.js"
 set +e
 out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
 code=$?
 set -e
-[ "$code" -eq 3 ] && echo "$out" | grep -q "does not list it as a member" || { echo "FAIL: a non-member was planned at the root (exit $code):"; echo "$out"; exit 1; }
+[ "$code" -ne 3 ] || { echo "FAIL: a non-member was not planned on its own (exit $code):"; echo "$out"; exit 1; }
+echo "$out" | grep -q "install/install-script" || { echo "FAIL: the non-member's dependency was not planned:"; echo "$out"; exit 1; }
+echo "$out" | grep -q "demo-setup.js" || { echo "FAIL: the non-member's postinstall was not checked:"; echo "$out"; exit 1; }
+[ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
+[ ! -e "$ws/examples/demo/package-lock.json" ] || { echo "FAIL: the non-member's files were modified"; exit 1; }
+# Planned on its own, its own npm-shrinkwrap.json counts: refused (D34).
+echo '{}' >"$ws/examples/demo/npm-shrinkwrap.json"
+set +e
+out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
+code=$?
+set -e
+rm "$ws/examples/demo/npm-shrinkwrap.json"
+[ "$code" -eq 2 ] && echo "$out" | grep -q "not supported yet" || { echo "FAIL: a non-member's shrinkwrap was not refused (exit $code):"; echo "$out"; exit 1; }
 # A member behind a linked folder would be left out of the copy: refused.
 mkdir -p "$work/elsewhere/c"
 echo '{ "name": "c", "version": "1.0.0", "scripts": { "postinstall": "node x.js" } }' >"$work/elsewhere/c/package.json"
@@ -109,7 +122,7 @@ code=$?
 set -e
 rm "$ws/packages/c"
 [ "$code" -eq 3 ] && echo "$out" | grep -q "symbolic link" || { echo "FAIL: a linked member was not refused (exit $code):"; echo "$out"; exit 1; }
-echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root, non-member and linked member refused"
+echo "ok: forged hidden lockfile, shrinkwrap refused, npm workspace planned from its root, non-member planned on its own, linked member refused"
 
 # A cache path with a space must not split into a script node would run
 # (whole-project review): a project file at the second half prints a forged

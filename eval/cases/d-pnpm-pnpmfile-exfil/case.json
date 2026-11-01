@@ -1,0 +1,10 @@
+{
+  "id": "d-pnpm-pnpmfile-exfil",
+  "kind": "install",
+  "threat": "D",
+  "description": "A test assignment for pnpm with no install scripts at all: its .pnpmfile.cjs, which pnpm loads on every install, posts process.env away (D39).",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/pnpmfile"]
+  }
+}

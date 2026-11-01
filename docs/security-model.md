@@ -118,8 +118,11 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
   manifest or folder, or, for pnpm, a package.yaml or package.json5, is
   refused: the copy would leave a member out). The root is found by `croak workspace-root`, which reads
   package.json as JSON, the hook's reading; the plan runs from the member's
-  folder, and a folder the planned lockfile does not list as a member is
-  incomplete (exit 3), since npm would install it on its own. A plain
+  folder. When the package manager plans that folder as a project of its
+  own (a folder the workspace does not list), the folder is planned again
+  on its own, from its own manifest and lockfile, as outside any workspace
+  (D48); `--ci` there, and any `--member` the planned lockfile does not
+  list, stay incomplete (exit 3). A plain
   install also checks every member's install scripts, not just the root's
   (M6 review); refuses (exit 2) `npm-shrinkwrap.json`, not checked yet;
 - with `--pnpm`, runs pnpm the same way, plus what pnpm needs that npm does

@@ -1,0 +1,10 @@
+{
+  "id": "benign-install-project-husky",
+  "kind": "install",
+  "threat": "benign",
+  "description": "Twin of d-install-project-postinstall: the project's prepare runs husky to install git hooks. A known tool: a note, not a warning.",
+  "expect": {
+    "verdict": "allow",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

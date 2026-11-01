@@ -1,0 +1,10 @@
+{
+  "id": "d-install-member-preinstall",
+  "kind": "install",
+  "threat": "D",
+  "description": "The root package.json of a monorepo test assignment is clean; a workspace member's preinstall posts process.env away. npm runs every member's install scripts on a plain install (M6 review, D41).",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "benign-pnpm-unapproved-build",
+  "kind": "install",
+  "threat": "benign",
+  "description": "pnpm twin of benign-binary-installer: an esbuild-style postinstall that the project does not allow to build. pnpm 10+ will not run it, so the warning becomes a note.",
+  "expect": {
+    "verdict": "allow",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

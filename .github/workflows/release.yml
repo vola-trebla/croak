@@ -1,0 +1,58 @@
+name: Release
+
+# Publishes @vola-trebla/croak to npm when a version tag is pushed (D49).
+# npm trusted publishing: npm trusts this workflow file in this repository
+# through a short-lived OIDC token, so no npm token is stored anywhere, and
+# npm attaches provenance that croak itself can verify (M7).
+on:
+  push:
+    tags: ["v*"]
+
+# Least privilege by default; only the publish job may mint an OIDC token.
+permissions:
+  contents: read
+
+# One release at a time; a second tag waits instead of racing the first.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing and provenance
+    steps:
+      # Actions are pinned by commit SHA, not tag: tags are mutable.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # No dependency cache in the job that can publish: a poisoned cache
+      # entry would end up in the package.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: The tag names the version in package.json
+        run: |
+          version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "tag $GITHUB_REF_NAME, package.json $version"; exit 1; }
+      - name: npm supports trusted publishing (11.5.1 or later)
+        run: |
+          node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)' "$(npm --version)" ||
+            { echo "npm $(npm --version) is too old for trusted publishing"; exit 1; }
+      - run: pnpm install --frozen-lockfile
+      # The same gates as CI, on the exact commit that is published.
+      - run: pnpm check
+      - run: pnpm redos
+        timeout-minutes: 2
+      - run: pnpm eval --plain
+      - run: pnpm build
+      - run: sh scripts/test-croak-install.sh
+      - run: sh scripts/test-croak-hook.sh
+      - run: sh scripts/test-tarball.sh
+      # No token: npm exchanges this job's OIDC token for a one-time publish
+      # credential. --ignore-scripts: croak has no publish scripts, and none may run.
+      - run: npm publish --provenance --access public --ignore-scripts

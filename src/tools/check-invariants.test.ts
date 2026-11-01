@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkPackageJson,
   checkSource,
+  checkWorkflow,
   PATTERN_DATA_MARKER,
 } from "./check-invariants.ts";
 
@@ -298,5 +299,51 @@ describe("the SDK import allowance (D36)", () => {
         false,
       ).map((v) => v.rule),
     ).toEqual(["no-dynamic-import"]);
+  });
+});
+
+describe("checkWorkflow", () => {
+  const sha = "3d3c42e5aac5ba805825da76410c181273ba90b1";
+  const flagged = (text: string) =>
+    checkWorkflow(".github/workflows/x.yml", text).map((v) => v.text);
+
+  it("passes actions pinned by commit SHA, and local actions", () => {
+    expect(
+      flagged(
+        [
+          "steps:",
+          `  - uses: actions/checkout@${sha} # v7.0.1`,
+          `    uses: github/codeql-action/init@${sha}`,
+          "  - uses: ./.github/actions/setup",
+          "  - run: echo uses: anything",
+        ].join("\n"),
+      ),
+    ).toEqual([]);
+  });
+
+  it.each([
+    "actions/checkout@v7",
+    "actions/checkout@main",
+    "actions/checkout",
+    `actions/checkout@${sha.slice(0, 12)}`,
+    `"actions/checkout@v7"`,
+    "docker://alpine:3",
+  ])("flags an action that is not pinned by SHA: %s", (ref) => {
+    expect(flagged(`steps:\n  - uses: ${ref}`)).toEqual([
+      expect.stringContaining("uses:"),
+    ]);
+  });
+
+  it("reports the line", () => {
+    expect(
+      checkWorkflow("w.yml", "on: push\nsteps:\n  - uses: a/b@v1"),
+    ).toEqual([
+      {
+        file: "w.yml",
+        line: 3,
+        rule: "pinned-actions",
+        text: "- uses: a/b@v1",
+      },
+    ]);
   });
 });

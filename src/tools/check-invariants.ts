@@ -307,6 +307,29 @@ export function checkPackageJson(manifest: unknown): Violation[] {
   return violations;
 }
 
+const USES = /^\s*(?:-\s+)?uses:\s*(\S+)/;
+const PINNED = /^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/;
+
+/**
+ * Every action a workflow runs is pinned by commit SHA (M0): a tag can be
+ * moved to other code, and the release workflow holds the right to publish
+ * croak (D49). Local actions (`./…`) are part of the repository.
+ */
+export function checkWorkflow(file: string, text: string): Violation[] {
+  const violations: Violation[] = [];
+  text.split("\n").forEach((line, index) => {
+    const ref = USES.exec(line)?.[1];
+    if (ref === undefined || ref.startsWith("./") || PINNED.test(ref)) return;
+    violations.push({
+      file,
+      line: index + 1,
+      rule: "pinned-actions",
+      text: line.trim(),
+    });
+  });
+  return violations;
+}
+
 function main(root: string): number {
   // This file and its test spell out the forbidden patterns: the only exemptions.
   const self = relative(root, import.meta.filename);
@@ -318,6 +341,9 @@ function main(root: string): number {
     .map((path) => join("src", path))
     .filter((path) => path.endsWith(".ts") && !exempt.has(path));
 
+  const workflows = readdirSync(join(root, ".github/workflows"))
+    .filter((name) => /\.ya?ml$/.test(name))
+    .map((name) => join(".github/workflows", name));
   const violations = [
     ...files.flatMap((path) =>
       checkSource(
@@ -329,13 +355,16 @@ function main(root: string): number {
     ...checkPackageJson(
       JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
     ),
+    ...workflows.flatMap((path) =>
+      checkWorkflow(path, readFileSync(join(root, path), "utf8")),
+    ),
   ];
 
   for (const v of violations)
     process.stderr.write(`${v.file}:${v.line}  ${v.rule}  ${v.text}\n`);
   process.stdout.write(
     violations.length === 0
-      ? `invariants: ${files.length} files + package.json clean\n`
+      ? `invariants: ${files.length} files + package.json + ${workflows.length} workflow(s) clean\n`
       : `invariants: ${violations.length} violation(s)\n`,
   );
   return violations.length === 0 ? 0 : 1;

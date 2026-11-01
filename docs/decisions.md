@@ -773,25 +773,31 @@ check the provenance of; the self-check demo waits for 0.1.1.
 ## D50 — The release workflow (2026-11-01)
 
 `.github/workflows/release.yml` publishes from a `v*` tag, the second and
-every later version (D49). Choices:
-- **npm trusted publishing (OIDC).** Only the publish job may mint an
-  `id-token`; no npm token exists in the repository or its secrets, and
-  npm adds provenance. The trusted publisher on npm names this repository
-  and this workflow file, so a renamed file stops publishing.
-- **The commit is checked again before it ships:** everything CI runs
-  (check, ReDoS, eval, both wrapper tests) plus the tarball smoke test,
-  the tag must equal package.json's version, and npm must be 11.5.1 or
-  later (trusted publishing).
-- **No dependency cache** in the job that publishes, and `npm publish
-  --ignore-scripts`.
-- **Every action pinned by commit SHA,** now an invariant over all
-  workflows (`pinned-actions`), since this one holds the right to publish.
+every later version (D49). Two jobs (split in the M8 review):
+- **verify**, with no right to an OIDC token: the tag must equal
+  package.json's version; then what CI runs on Node 24 (check, ReDoS,
+  eval, build, `--version`, both wrapper tests, the `--permission` sandbox
+  run of D23) plus the tarball smoke test; then `npm pack`, once, and the
+  tarball goes up as an artifact with its sha512 in the log. CI's Node
+  24.2.0 matrix entry is not repeated.
+- **publish**, the only job with `id-token: write`: no checkout, no package
+  manager, no dev dependency. It checks npm is 11.5.1 or later (trusted
+  publishing), downloads the artifact, checks it is exactly the tagged
+  version's tarball, and runs `npm publish <tarball> --provenance --access
+  public --ignore-scripts`. A compromised dev tool runs only where no token
+  can be requested, and what npm gets is the tarball verify tested.
 
-Who may push a `v*` tag is a repository setting (a tag ruleset), set by the
-maintainer.
+Also: npm trusted publishing (no npm token anywhere; the trusted publisher
+names this repository and this workflow file, so a renamed file stops
+publishing), no dependency cache, no `registry-url` (no token placeholder
+in an `.npmrc`), and every action pinned by commit SHA, an invariant over
+all workflows (`pinned-actions`). Who may push a `v*` tag is a tag ruleset
+(admin only). The maintainer chose no environment approval gate: with the
+split, the remaining risk is a takeover of the maintainer's own account.
 
-**Trade-off:** a release reruns the whole suite (a few minutes) rather
-than trusting the CI run on the same commit.
+**Trade-off:** a release reruns the whole suite rather than trusting the
+CI run on the same commit; the split workflow is first exercised by the
+next tag (0.1.2).
 
 ## D51 — 0.1.0 is out; croak's first look at itself (2026-11-01)
 

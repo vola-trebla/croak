@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { type BuildPolicy, pnpmBuildPolicy } from "../install/pnpm-builds.ts";
 import { REGISTRY } from "../install/registry.ts";
 import { type PlanOutcome, planInstallOnline } from "../install/scan.ts";
 import { signPackument, TEST_REGISTRY_KEY } from "../install/test-registry.ts";
@@ -13,8 +14,12 @@ import { snapshotRepo } from "../repo-snapshot.ts";
 /**
  * Runs `croak plan` on an install fixture with a fake, in-memory registry:
  *
- *   package-lock.json          the planned install (after)
- *   before.package-lock.json   optional: the project's lockfile before
+ *   package-lock.json          the planned install (after), or pnpm-lock.yaml
+ *   before.package-lock.json   optional: the project's lockfile before (for
+ *                              pnpm: before.pnpm-lock.yaml)
+ *   package.json,              optional, pnpm only: the project's build rule
+ *   pnpm-workspace.yaml        (which install scripts pnpm 10+ runs), read as
+ *                              `croak plan --pnpm-builds` reads it
  *   registry/<name>.json       packuments, served at registry.npmjs.org/<name>,
  *                              each version signed by a test key unless it
  *                              states its own dist.signatures; a version's
@@ -24,13 +29,16 @@ import { snapshotRepo } from "../repo-snapshot.ts";
  *
  * Lockfile entries without `resolved` / `integrity` get the registry URL and
  * the hash of the built tarball, so fixtures stay hand-editable; an entry that
- * states its own integrity keeps it (a tampered-tarball case). No network.
+ * states its own integrity keeps it (a tampered-tarball case). In
+ * pnpm-lock.yaml, a package's `resolution: {}` gets the hash. No network.
  */
 
 /** Fixture dates are relative to this clock. */
 export const EVAL_NOW = new Date("2026-10-25T00:00:00Z");
 /** One fixed platform, so os/cpu cases do not depend on the machine running the eval. */
 const EVAL_PLATFORM = { os: "linux", cpu: "x64" } as const;
+/** The pnpm a pnpm case is planned with (its build rule needs 10 or later). */
+const EVAL_PNPM_VERSION = "10.28.2";
 
 export class InstallFixtureError extends Error {
   constructor(message: string) {
@@ -82,6 +90,66 @@ function provenanceFor(
 const sri = (data: Buffer): string =>
   `sha512-${createHash("sha512").update(data).digest("base64")}`;
 
+/** package-lock.json with each entry's missing `resolved` and `integrity` filled in. */
+function fillNpmLock(text: string, tarballs: Map<string, Buffer>): string {
+  const lock: unknown = JSON.parse(text);
+  if (!isRecord(lock) || !isRecord(lock.packages))
+    throw new InstallFixtureError("package-lock.json has no packages map");
+  for (const [path, raw] of Object.entries(lock.packages)) {
+    if (path === "" || !isRecord(raw) || typeof raw.version !== "string")
+      continue;
+    if (raw.link === true) continue;
+    const name =
+      typeof raw.name === "string"
+        ? raw.name
+        : path.slice(
+            path.lastIndexOf("node_modules/") + "node_modules/".length,
+          );
+    raw.resolved ??= tarballUrl(name, raw.version);
+    const tgz = tarballs.get(String(raw.resolved));
+    if (raw.integrity === undefined && tgz !== undefined)
+      raw.integrity = sri(tgz);
+  }
+  return JSON.stringify(lock);
+}
+
+/**
+ * pnpm-lock.yaml with each `resolution: {}` under `packages:` given the built
+ * tarball's integrity. Textual, line by line: the fixture is written by hand
+ * in the shape pnpm writes (two-space package keys, four-space fields), and
+ * croak's own parser then reads the result like any other lockfile.
+ */
+function fillPnpmLock(text: string, tarballs: Map<string, Buffer>): string {
+  let inPackages = false;
+  let key: string | undefined;
+  return text
+    .split("\n")
+    .map((line) => {
+      if (/^\S/.test(line)) {
+        inPackages = /^packages:\s*$/.test(line);
+        key = undefined;
+        return line;
+      }
+      if (!inPackages) return line;
+      const head = /^ {2}(\S.*):\s*$/.exec(line)?.[1];
+      if (head !== undefined) {
+        key = head.replace(/^(['"])(.*)\1$/, "$2");
+        return line;
+      }
+      if (key === undefined || !/^ {4}resolution: \{\}\s*$/.test(line))
+        return line;
+      const at = key.indexOf("@", key.startsWith("@") ? 1 : 0);
+      const tgz =
+        at <= 0
+          ? undefined
+          : tarballs.get(tarballUrl(key.slice(0, at), key.slice(at + 1)));
+      return tgz === undefined
+        ? line
+        : `    resolution: {integrity: ${sri(tgz)}}`;
+    })
+    .join("\n");
+}
+
 export async function checkInstallFixture(
   fixtureDir: string,
 ): Promise<PlanOutcome> {
@@ -110,27 +178,37 @@ export async function checkInstallFixture(
     tarballs.set(tarballUrl(spec.slice(0, at), spec.slice(at + 1)), tar(list));
   }
 
-  const lockText = read("package-lock.json");
-  if (lockText === undefined)
-    throw new InstallFixtureError("missing package-lock.json");
-  const lock: unknown = JSON.parse(lockText);
-  if (!isRecord(lock) || !isRecord(lock.packages))
-    throw new InstallFixtureError("package-lock.json has no packages map");
-  for (const [path, raw] of Object.entries(lock.packages)) {
-    if (path === "" || !isRecord(raw) || typeof raw.version !== "string")
-      continue;
-    if (raw.link === true) continue;
-    const name =
-      typeof raw.name === "string"
-        ? raw.name
-        : path.slice(
-            path.lastIndexOf("node_modules/") + "node_modules/".length,
-          );
-    raw.resolved ??= tarballUrl(name, raw.version);
-    const tgz = tarballs.get(String(raw.resolved));
-    if (raw.integrity === undefined && tgz !== undefined)
-      raw.integrity = sri(tgz);
-  }
+  // One package manager per case: npm's lockfile, or pnpm's with its build rule.
+  const npmLock = read("package-lock.json");
+  const pnpmLock = read("pnpm-lock.yaml");
+  if (npmLock !== undefined && pnpmLock !== undefined)
+    throw new InstallFixtureError(
+      "has both package-lock.json and pnpm-lock.yaml: pick one package manager",
+    );
+  let after: string;
+  let before: string | undefined;
+  let builds: BuildPolicy | undefined;
+  if (pnpmLock !== undefined) {
+    if (read("before.package-lock.json") !== undefined)
+      throw new InstallFixtureError(
+        "a pnpm case's earlier lockfile is before.pnpm-lock.yaml",
+      );
+    after = fillPnpmLock(pnpmLock, tarballs);
+    before = read("before.pnpm-lock.yaml");
+    builds = pnpmBuildPolicy(
+      {
+        packageJson: read("package.json"),
+        workspaceYaml: read("pnpm-workspace.yaml"),
+      },
+      EVAL_PNPM_VERSION,
+    );
+  } else if (npmLock !== undefined) {
+    after = fillNpmLock(npmLock, tarballs);
+    before = read("before.package-lock.json");
+  } else
+    throw new InstallFixtureError(
+      "missing package-lock.json (or pnpm-lock.yaml)",
+    );
 
   // The registry's view of a package: signed like npm signs (each version's
   // tarball hash, or a stand-in hash for versions the fixture has no files
@@ -196,15 +274,12 @@ export async function checkInstallFixture(
     return new Response(JSON.stringify(doc));
   };
 
-  return planInstallOnline(
-    read("before.package-lock.json"),
-    JSON.stringify(lock),
-    {
-      fetch: fakeFetch,
-      now: EVAL_NOW,
-      platform: EVAL_PLATFORM,
-      registryKeys: [TEST_REGISTRY_KEY],
-      sigstore: TEST_SIGSTORE,
-    },
-  );
+  return planInstallOnline(before, after, {
+    fetch: fakeFetch,
+    now: EVAL_NOW,
+    platform: EVAL_PLATFORM,
+    registryKeys: [TEST_REGISTRY_KEY],
+    sigstore: TEST_SIGSTORE,
+    ...(builds === undefined ? {} : { builds }),
+  });
 }

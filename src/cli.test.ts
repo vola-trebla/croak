@@ -1,9 +1,18 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type CliDeps, EXIT, EXIT_USAGE, run, VERSION } from "./cli.ts";
 import type { PlanOutcome } from "./install/scan.ts";
 import { type ScanOutcome, ScanTargetError } from "./scan.ts";
 
 describe("cli", () => {
+  it("prints the version npm publishes (package.json)", () => {
+    const manifest: unknown = JSON.parse(
+      readFileSync(join(import.meta.dirname, "../package.json"), "utf8"),
+    );
+    expect(manifest).toMatchObject({ version: VERSION });
+  });
+
   it.each([["--version"], ["-v"]])(
     "prints the version with %s",
     async (flag) => {

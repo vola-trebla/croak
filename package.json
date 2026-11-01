@@ -1,12 +1,31 @@
 {
-  "name": "croak",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@vola-trebla/croak",
+  "version": "0.1.0",
   "description": "Croak before you install: a pre-execution gate for package installs, built for AI agents",
+  "keywords": [
+    "security",
+    "supply-chain",
+    "npm",
+    "pnpm",
+    "install",
+    "provenance",
+    "sigstore",
+    "ai-agents",
+    "claude-code",
+    "hook"
+  ],
+  "homepage": "https://github.com/vola-trebla/croak#readme",
+  "bugs": {
+    "url": "https://github.com/vola-trebla/croak/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vola-trebla/croak.git"
+  },
   "type": "module",
   "bin": {
-    "croak": "./dist/cli.js",
-    "croak-install": "./scripts/croak-install.sh",
+    "croak": "dist/cli.js",
+    "croak-install": "scripts/croak-install.sh",
     "croak-hook": "scripts/croak-hook.sh"
   },
   "files": [
@@ -38,6 +57,9 @@
     "corpus:packages": "node src/tools/package-corpus.ts"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.6.2",
     "@types/node": "^24.19.2",

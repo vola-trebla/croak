@@ -267,6 +267,22 @@ describe("installIntents", () => {
     },
   );
 
+  it.each([
+    "npm i esbuild --dangerously-allow-all-scripts",
+    "npm ci --dangerously-allow-all-scripts=true",
+    "npx --dangerously-allow-all-scripts create-thing",
+  ])(
+    "refuses an install that overrides npm's script policy: %s (D56)",
+    (command) => {
+      expect(at(command)).toEqual([
+        expect.objectContaining({
+          kind: "unchecked",
+          reason: expect.stringContaining("run their install scripts"),
+        }),
+      ]);
+    },
+  );
+
   it("leaves the read-only approval commands alone (D55)", () => {
     for (const command of [
       "pnpm ignored-builds",

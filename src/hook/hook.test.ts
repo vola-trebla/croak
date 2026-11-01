@@ -342,6 +342,15 @@ describe("hookDecide", () => {
       "does not exist on npm. Check the name: x: did you mean `y`?",
     ],
     [
+      "a missing package with no look-alike",
+      result(
+        2,
+        "",
+        "croak-install: a requested package does not exist on npm. Check the name:\nAI agents often invent plausible package names, and attackers register them.\n  zzzzqq: not on npm",
+      ),
+      "Check the name: zzzzqq: not on npm",
+    ],
+    [
       "an incomplete check",
       result(
         3,

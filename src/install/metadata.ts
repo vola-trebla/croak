@@ -58,6 +58,33 @@ export function suggestNames(spec: string): string[] {
     .map(({ popular }) => popular);
 }
 
+const PACKAGE_NAME = /^(?:@[a-z0-9~-][\w.~-]*\/)?[a-z0-9~-][\w.~-]*$/i;
+
+/**
+ * The packages a failed npm or pnpm plan could not find, from the 404 lines
+ * of its log (npm: `GET https://registry.npmjs.org/<name>`, pnpm:
+ * `for url (https://registry.npmjs.org/<name>)`). Only text shaped like a
+ * package name is kept: the log is the registry's words, not ours.
+ */
+export function missingPackages(log: string): string[] {
+  const names = new Set<string>();
+  // pnpm wraps its errors with an indent; a break after / or - is mid-word.
+  const unwrapped = log
+    .replace(/([/-])\n[ \t]+/g, "$1")
+    .replace(/\n[ \t]+/g, " ");
+  for (const line of unwrapped.split("\n")) {
+    if (!/\b404\b/.test(line)) continue;
+    for (const m of line.matchAll(
+      /https:\/\/registry\.npmjs\.org\/([^\s):]+)/g,
+    )) {
+      const path = (m[1] ?? "").split("/-/")[0] ?? "";
+      const name = path.replace(/%2f/gi, "/").replace(/%40/g, "@");
+      if (PACKAGE_NAME.test(name)) names.add(name);
+    }
+  }
+  return [...names];
+}
+
 /** The popular package this unscoped name is one keystroke (or one separator) away from. */
 export function nearPopularName(name: string): string | undefined {
   if (name.startsWith("@") || POPULAR.has(name) || name.length < 5)

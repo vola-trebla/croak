@@ -224,15 +224,28 @@ describe("croak plan", () => {
 });
 
 describe("croak suggest", () => {
-  it("prints did-you-mean lines only for names it can place", async () => {
-    const result = await run(
-      ["suggest", "lodahs", "zzzzzzzzqq"],
-      deps(outcome("allow")),
-    );
+  it("names each package the plan's log could not find, with a did-you-mean when it can place one", async () => {
+    const log = [
+      "npm error 404 Not Found - GET https://registry.npmjs.org/lodahs - Not found",
+      "error (404 Not Found) for url (https://registry.npmjs.org/zzzzzzzzqq)",
+    ].join("\n");
+    const result = await run(["suggest", "--log", "plan.log"], {
+      ...deps(outcome("allow")),
+      readFile: () => log,
+    });
     expect(result).toMatchObject({
       code: 0,
-      stdout: "  lodahs: did you mean `lodash`?\n",
+      stdout:
+        "  lodahs: not on npm; did you mean `lodash`?\n  zzzzzzzzqq: not on npm\n",
     });
+  });
+
+  it("says nothing when the log names no package", async () => {
+    const result = await run(["suggest", "--log", "plan.log"], {
+      ...deps(outcome("allow")),
+      readFile: () => "npm error 404",
+    });
+    expect(result).toMatchObject({ code: 0, stdout: "" });
   });
 });
 

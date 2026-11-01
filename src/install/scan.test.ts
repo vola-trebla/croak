@@ -439,6 +439,34 @@ describe("planInstallOnline: package contents", () => {
     ]);
   });
 
+  it("names pnpm-lock.yaml for platform packages pnpm will not install here", async () => {
+    const lock = [
+      "lockfileVersion: '9.0'",
+      "importers:",
+      "  .:",
+      "    dependencies:",
+      "      p:",
+      "        specifier: 1.0.0",
+      "        version: 1.0.0",
+      "packages:",
+      "  p@1.0.0:",
+      "    resolution: {integrity: sha512-a==}",
+      "    os: [win32]",
+      "    cpu: [x64]",
+    ].join("\n");
+    const outcome = await planInstallOnline(undefined, lock, {
+      fetch: async () => new Response("{}", { status: 200 }),
+      now,
+      platform: { os: "darwin", cpu: "arm64" },
+    });
+    expect(outcome.status === "complete" && outcome.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "install/other-platform",
+        file: "pnpm-lock.yaml",
+      }),
+    ]);
+  });
+
   it("reuses cached content findings instead of downloading again", async () => {
     const tgz = tarball({
       "package.json": JSON.stringify({

@@ -3,6 +3,7 @@ import type { LockEntry } from "./lockfile.ts";
 import {
   addedDependencyFindings,
   metadataFindings,
+  missingPackages,
   nearPopularName,
   suggestNames,
 } from "./metadata.ts";
@@ -386,5 +387,57 @@ describe("suggestNames", () => {
   it("suggests at most three, nearest first", () => {
     expect(suggestNames("reacts").length).toBeLessThanOrEqual(3);
     expect(suggestNames("reacts")[0]).toBe("react");
+  });
+});
+
+describe("missingPackages", () => {
+  it("reads npm's 404 lines", () => {
+    const log = [
+      "npm error code E404",
+      "npm error 404 Not Found - GET https://registry.npmjs.org/reactt-domm - Not found",
+      "npm error 404",
+      "npm error 404  'reactt-domm@*' is not in this registry.",
+    ].join("\n");
+    expect(missingPackages(log)).toEqual(["reactt-domm"]);
+  });
+
+  it("reads pnpm's 404 lines, scoped names included", () => {
+    const log = [
+      " ERR_PNPM_FETCH_404  GET https://registry.npmjs.org/@acme%2Fmissing: Not Found - 404",
+      "      error (404 Not Found) for url (https://registry.npmjs.org/reactt-domm)",
+    ].join("\n");
+    expect(missingPackages(log)).toEqual(["@acme/missing", "reactt-domm"]);
+  });
+
+  it("reads pnpm's wrapped error lines (it wraps at ~80 columns, after / and -)", () => {
+    const log = [
+      "  × adding a new package",
+      "  ╰─▶ Failed to resolve the latest version of zzzzqq-nope-croak: Failed to",
+      "      fetch metadata from https://registry.npmjs.org/zzzzqq-nope-croak: HTTP",
+      "      status client error (404 Not Found)",
+      "",
+      "      status client error (404 Not Found) for url (https://registry.npmjs.org/",
+      "      some-long-",
+      "      name)",
+    ].join("\n");
+    expect(missingPackages(log)).toEqual([
+      "zzzzqq-nope-croak",
+      "some-long-name",
+    ]);
+  });
+
+  it("names the package of a missing tarball, once", () => {
+    const log =
+      "npm error 404 Not Found - GET https://registry.npmjs.org/lodahs/-/lodahs-1.0.0.tgz\nnpm error 404 GET https://registry.npmjs.org/lodahs";
+    expect(missingPackages(log)).toEqual(["lodahs"]);
+  });
+
+  it("ignores lines without a 404 and text that is not a package name", () => {
+    const log = [
+      "npm http fetch GET 200 https://registry.npmjs.org/zod 120ms",
+      "error 404 for url (https://registry.npmjs.org/\u001b[31mx)",
+      "npm error 404 GET https://registry.npmjs.org/%E0%A4%A",
+    ].join("\n");
+    expect(missingPackages(log)).toEqual([]);
   });
 });

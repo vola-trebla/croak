@@ -20,6 +20,24 @@
 set -eu
 
 usage() { echo "usage: croak-install [--pnpm] [--json] [--ci | --update | --empty] [package...]" >&2; exit 2; }
+help() {
+  cat <<'HELP'
+usage: croak-install [--pnpm] [--json] [--ci | --update | --empty] [package...]
+
+Plans an npm (or pnpm) install without running it, then lets croak judge
+the plan before any package code runs. Your project's files are not changed.
+
+  [package...]  install these in this project; none = what package.json lists
+  --pnpm        plan with pnpm instead of npm
+  --ci          npm ci / pnpm install --frozen-lockfile: the lockfile as written
+  --update      update [package...] to the newest versions in range
+  --empty       an install into an empty project (npx, pnpm dlx, -g)
+  --json        machine-readable report
+
+Exit codes: 0 allow/warn · 1 block · 2 usage error or a package npm does not
+have · 3 the install could not be planned or checked
+HELP
+}
 # Modes, for people and for the agent hook (D32):
 #   (default)  install [package...] in this project; no packages = what
 #              package.json lists
@@ -34,6 +52,7 @@ mode=project
 manager=npm
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -h|--help) help; exit 0 ;;
     --json) json=--json; shift ;;
     --pnpm) manager=pnpm; shift ;;
     --ci) mode=ci; shift ;;
@@ -217,12 +236,12 @@ if ! isolated "$@" >"$work/plan.log" 2>&1; then
     # Most often a mistyped or AI-invented name; an attacker may register it later.
     echo "croak-install: a requested package does not exist on npm. Check the name:" >&2
     echo "AI agents often invent plausible package names, and attackers register them." >&2
-    grep -E "404" "$work/plan.log" | head -n 3 >&2
-    missing=$(sed -n 's#.*GET https://registry.npmjs.org/\([^ :]*\).*#\1#p' "$work/plan.log" | sort -u)
-    set -f
-    # shellcheck disable=SC2086 # one registry path per word, from the package manager's log
-    [ -z "$missing" ] || croak "$work" suggest $missing >&2
-    set +f
+    names=$(croak "$work" suggest --log "$work/plan.log")
+    if [ -n "$names" ]; then
+      echo "$names" >&2
+    else
+      grep -E "404" "$work/plan.log" | head -n 3 >&2
+    fi
     exit 2
   fi
   echo "croak-install: $manager could not plan this install, so it was not checked:" >&2

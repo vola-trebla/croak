@@ -52,6 +52,12 @@ describe("renderScan", () => {
     expect(text).toContain("12 files scanned · 3 ms");
   });
 
+  it("says 1 file, not 1 files", () => {
+    expect(
+      renderScan({ ...complete, filesScanned: 1 }, { emoji: false }),
+    ).toContain("1 file scanned · 3 ms");
+  });
+
   it("plain mode: no emoji, uppercase greppable severities", () => {
     const text = renderScan(complete, { emoji: false });
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);

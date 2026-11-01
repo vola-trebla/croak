@@ -13,7 +13,7 @@ import {
   installedLockfile,
   installedPnpmLockfile,
 } from "./install/installed.ts";
-import { suggestNames } from "./install/metadata.ts";
+import { missingPackages, suggestNames } from "./install/metadata.ts";
 import { pnpmBuildPolicy } from "./install/pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
 import {
@@ -374,15 +374,18 @@ export async function run(
       stderr: "",
     };
   }
-  // Suggestions for package names npm does not have (croak-install on E404).
+  // The packages a failed plan could not find, with suggestions
+  // (croak-install on a 404, npm or pnpm).
   if (argv[0] === "suggest") {
-    const lines = argv.slice(1).flatMap((spec) => {
-      const names = suggestNames(decodeURIComponent(spec));
+    if (argv[1] !== "--log" || argv[2] === undefined)
+      return usageError("usage: croak suggest --log <package manager log>");
+    const read =
+      deps.readFile ?? ((path: string) => readFileSync(path, "utf8"));
+    const lines = missingPackages(read(argv[2])).map((name) => {
+      const names = suggestNames(name);
       return names.length === 0
-        ? []
-        : [
-            `  ${spec}: did you mean ${names.map((n) => `\`${n}\``).join(", ")}?\n`,
-          ];
+        ? `  ${name}: not on npm\n`
+        : `  ${name}: not on npm; did you mean ${names.map((n) => `\`${n}\``).join(", ")}?\n`;
     });
     return { code: EXIT.ok, stdout: lines.join(""), stderr: "" };
   }

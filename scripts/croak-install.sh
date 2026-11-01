@@ -217,12 +217,12 @@ if ! isolated "$@" >"$work/plan.log" 2>&1; then
     # Most often a mistyped or AI-invented name; an attacker may register it later.
     echo "croak-install: a requested package does not exist on npm. Check the name:" >&2
     echo "AI agents often invent plausible package names, and attackers register them." >&2
-    grep -E "404" "$work/plan.log" | head -n 3 >&2
-    missing=$(sed -n 's#.*GET https://registry.npmjs.org/\([^ :]*\).*#\1#p' "$work/plan.log" | sort -u)
-    set -f
-    # shellcheck disable=SC2086 # one registry path per word, from the package manager's log
-    [ -z "$missing" ] || croak "$work" suggest $missing >&2
-    set +f
+    names=$(croak "$work" suggest --log "$work/plan.log")
+    if [ -n "$names" ]; then
+      echo "$names" >&2
+    else
+      grep -E "404" "$work/plan.log" | head -n 3 >&2
+    fi
     exit 2
   fi
   echo "croak-install: $manager could not plan this install, so it was not checked:" >&2

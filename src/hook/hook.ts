@@ -341,7 +341,7 @@ function judge(result: CheckResult): Judged {
   const tail = (text: string): string => {
     const lines = text.trim().split("\n");
     const own = lines.filter((l) =>
-      /^croak-install:|did you mean/.test(l.trim()),
+      /^croak-install:|did you mean|: not on npm$/.test(l.trim()),
     );
     return (own.length > 0 ? own : lines.slice(-4))
       .map((l) => l.trim())

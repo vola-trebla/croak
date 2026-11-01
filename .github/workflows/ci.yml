@@ -43,6 +43,9 @@ jobs:
       - run: sh scripts/test-croak-install.sh
       # The agent hook asks, denies and fails closed without running any script (D32).
       - run: sh scripts/test-croak-hook.sh
+      # The package as npm ships it: only dist/ and the wrappers, and every
+      # binary works from a global install of the tarball (M8, D49).
+      - run: sh scripts/test-tarball.sh
       # croak must keep working sandboxed (D23): no spawning, writing, workers, or eval.
       - run: >-
           node --permission --allow-fs-read="$PWD" --disallow-code-generation-from-strings

@@ -9,6 +9,11 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/croak-install-test.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
 marker="$work/SCRIPT-RAN"
 
+for flag in --help -h; do
+  help=$(sh "$root/scripts/croak-install.sh" $flag) || { echo "FAIL: croak-install $flag did not exit 0"; exit 1; }
+  echo "$help" | grep -q "usage: croak-install" || { echo "FAIL: croak-install $flag printed no usage"; exit 1; }
+done
+
 mkdir -p "$work/bait/package" "$work/project"
 cat >"$work/bait/package/package.json" <<JSON
 { "name": "croak-bait", "version": "1.0.0",

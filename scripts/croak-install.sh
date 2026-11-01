@@ -20,6 +20,24 @@
 set -eu
 
 usage() { echo "usage: croak-install [--pnpm] [--json] [--ci | --update | --empty] [package...]" >&2; exit 2; }
+help() {
+  cat <<'HELP'
+usage: croak-install [--pnpm] [--json] [--ci | --update | --empty] [package...]
+
+Plans an npm (or pnpm) install without running it, then lets croak judge
+the plan before any package code runs. Your project's files are not changed.
+
+  [package...]  install these in this project; none = what package.json lists
+  --pnpm        plan with pnpm instead of npm
+  --ci          npm ci / pnpm install --frozen-lockfile: the lockfile as written
+  --update      update [package...] to the newest versions in range
+  --empty       an install into an empty project (npx, pnpm dlx, -g)
+  --json        machine-readable report
+
+Exit codes: 0 allow/warn · 1 block · 2 usage error or a package npm does not
+have · 3 the install could not be planned or checked
+HELP
+}
 # Modes, for people and for the agent hook (D32):
 #   (default)  install [package...] in this project; no packages = what
 #              package.json lists
@@ -34,6 +52,7 @@ mode=project
 manager=npm
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -h|--help) help; exit 0 ;;
     --json) json=--json; shift ;;
     --pnpm) manager=pnpm; shift ;;
     --ci) mode=ci; shift ;;

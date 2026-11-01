@@ -40,7 +40,7 @@ import { renderScan, scanToJson } from "./repo-report.ts";
 import { type ScanOutcome, ScanTargetError, scanRepoAt } from "./scan.ts";
 import { aggregate, type Finding } from "./verdict.ts";
 
-export const VERSION = "0.1.3";
+export const VERSION = "0.1.4";
 
 /**
  * 0 allow or warn (warnings are printed, the process succeeds),

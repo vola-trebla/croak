@@ -910,10 +910,10 @@ Found while dogfooding 0.1.3. `pnpm add esbuild` is rightly silent: pnpm
 script as info. pnpm then fails with `ERR_PNPM_IGNORED_BUILDS` and tells
 the agent to run `pnpm approve-builds`; the agent does, the hook stayed
 silent (it did not know the command), and pnpm ran the postinstall. The
-same held for `pnpm rebuild`, and for npm 11.19, which holds back
-dependency install scripts by default (`allowScripts` in package.json):
-`npm install-scripts approve` / `npm approve-scripts`, then `npm rebuild`.
-Checked by hand with the real esbuild.
+same held for `pnpm rebuild`, and for npm's approval commands
+(`npm install-scripts approve` / `npm approve-scripts`, then `npm rebuild`),
+which matter once npm holds scripts back (npm 12; this record first said
+npm 11.19, which was wrong, see D56). Checked by hand with the real esbuild.
 
 The hook now reports these as unchecked, so it denies them with the reason
 "it lets installed packages run their install scripts; the user should
@@ -926,5 +926,51 @@ allow builds were already refused (an allowlist of flags, M6 review).
 
 Not covered, as before: an agent editing package.json or
 pnpm-workspace.yaml with a file tool (the hook sees shell commands only),
-and npm's own script policy, which croak does not read yet (it warns on a
-script npm 11.19 will not run; next).
+and npm's own script policy, which croak did not read yet (D56).
+
+## D56 — npm 12 holds install scripts back; croak reads allowScripts (2026-11-01)
+
+Measured with a bait whose postinstall writes a marker, each npm installed
+on its own: npm 11.15 to 11.21 run a dependency's install scripts (11.16+
+warns about `allowScripts`); npm 12.0 and 12.2.1 (`latest` since then) do
+not, unless they are allowed. D55 first said npm 11.19 holds them back:
+that came from esbuild's quiet postinstall, not from a marker, and was
+wrong. croak's warning on a script npm 11 runs is right; on npm 12 it is
+the false alarm pnpm 10 had before D38.
+
+npm 12 runs a dependency's install scripts only when they are allowed by
+`allowScripts` in the project's package.json (`"name"` or
+`"name@version"`, true or false), npm's `allow-scripts` config, or
+`dangerously-allow-all-scripts`. croak reads that like pnpm's rule
+(`npmScriptPolicy`, beside `pnpmBuildPolicy`), conservatively: only on npm
+12+, with nothing allowing every script, a package.json that reads
+cleanly, no pattern croak does not expand, and no pin to another npm;
+a name allowed in any version counts as allowed. Then a warning about a
+script npm will not run is a note ("npm will not run it: allowScripts
+does not allow X"). Blocks stay, as for pnpm: a malicious script is
+evidence about the package, and an approval would run it.
+
+`croak-install` passes the npm that would install (`npm --version`,
+isolated) and the settings the real install reads: `npm config get
+allow-scripts dangerously-allow-all-scripts` in the project, with the
+user's real config and environment (the project's, user's and global
+.npmrc, `npm_config_*`), not the isolated planning config. That runs npm
+on config only, never a lifecycle step. Settings it cannot read count as
+"every script allowed". `--empty` (npx, `-g`) gets no rule: no project
+allowScripts applies there.
+
+The hook denies `--dangerously-allow-all-scripts` on an npm command: croak
+would note the scripts as held back while npm runs them all. A
+`--allow-scripts` flag needs nothing: npm rejects it on a project install,
+and npx/`-g` get no rule. Approving (`npm approve-scripts`, `npm
+install-scripts approve`) and `npm rebuild` stay denied (D55).
+
+The eval plans an npm case as npm 11 unless its package.json pins
+`"packageManager": "npm@12.x.y"`; three twins cover unapproved-benign
+(allow), approved (warn), unapproved-malicious (block).
+
+Not covered: an agent writing `allowScripts` into package.json with a file
+tool (the hook sees shell commands only); that makes croak warn again,
+which is the safe direction. Workspaces: allowScripts is read at the
+workspace root, where npm installs (`npm install-scripts` says it is
+unaware of workspaces).

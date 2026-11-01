@@ -104,6 +104,12 @@ its result (`croak plan --before <lock> --after <lock>`). The wrapper:
 - uses the public registry only, and sets `git` to `/usr/bin/false`, so git
   dependencies fail the plan instead of being cloned (fail closed);
 - runs `npm install --package-lock-only --ignore-scripts`;
+- asks the user's own npm, outside that isolation, one read-only question:
+  `npm config get allow-scripts dangerously-allow-all-scripts` in the
+  project, with the real config and environment, because that is what the
+  real install will read (npm 12's script policy, D56). It runs no
+  lifecycle step and installs nothing; a failure counts as "every script
+  allowed", so croak notes nothing down;
 - compares the plan with what is really installed: entries of
   `node_modules/.package-lock.json` whose folder holds that package and
   version (`croak plan --installed`), not the project's lockfile. On a fresh

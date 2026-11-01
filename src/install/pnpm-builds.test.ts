@@ -122,4 +122,16 @@ describe("applyBuildPolicy", () => {
     ]);
     expect(out[0]?.message).toContain("pnpm will not run it");
   });
+
+  it("names npm and its allowScripts for npm's rule (D56)", () => {
+    const [out] = applyBuildPolicy(
+      [finding("sharp@0.34.0/package.json", "warn")],
+      policyFn,
+      "npm",
+    );
+    expect(out?.severity).toBe("info");
+    expect(out?.message).toContain(
+      "npm will not run it: allowScripts does not allow sharp",
+    );
+  });
 });

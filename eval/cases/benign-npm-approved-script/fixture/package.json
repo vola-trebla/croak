@@ -1,0 +1,12 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@12.2.1",
+  "dependencies": {
+    "nodebridge": "^6.0.0"
+  },
+  "allowScripts": {
+    "nodebridge": true
+  }
+}

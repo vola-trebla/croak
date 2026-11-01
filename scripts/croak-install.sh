@@ -152,11 +152,28 @@ pnpm_version=""
 if [ "$manager" = pnpm ]; then
   pnpm_version=$(isolated pnpm --version 2>/dev/null | tail -n 1) || pnpm_version=""
 fi
-plan() { # plan <extra read path> <croak plan args...>: adds the pnpm policy, one quoted word each
+# npm 12+ holds back dependency install scripts unless they are allowed
+# (D56): the npm that would install, and the settings the real install reads
+# (the project's, user's and global .npmrc and the environment), not the
+# isolated ones. Not for --empty (npx, -g): no project rule applies there.
+npm_version=""
+if [ "$manager" = npm ] && [ "$mode" != empty ]; then
+  npm_version=$(isolated npm --version 2>/dev/null | tail -n 1) || npm_version=""
+fi
+plan() { # plan <extra read path> <croak plan args...>: adds the pnpm or npm policy, one quoted word each
   extra=$1
   shift
   [ -z "$member" ] || set -- "$@" --member "$member"
-  if [ -n "$pnpm_version" ]; then
+  if [ -n "$npm_version" ]; then
+    # Unknown settings count as "every script is allowed": nothing is noted down.
+    if settings=$(cd "$project" && npm config get allow-scripts dangerously-allow-all-scripts 2>/dev/null) &&
+      [ "$(printf '%s\n' "$settings" | sed -n 's/^dangerously-allow-all-scripts=//p')" = false ]; then
+      croak "$extra" plan "$@" --npm-scripts "$project" --npm-version "$npm_version" \
+        --npm-allow-scripts "$(printf '%s\n' "$settings" | sed -n 's/^allow-scripts=//p')"
+    else
+      croak "$extra" plan "$@" --npm-scripts "$project" --npm-version "$npm_version" --npm-allow-all
+    fi
+  elif [ -n "$pnpm_version" ]; then
     croak "$extra" plan "$@" --pnpm-builds "$project" --pnpm-version "$pnpm_version"
   elif [ "$manager" = pnpm ]; then
     # Without a version, no build rule; the pnpmfile is still checked.

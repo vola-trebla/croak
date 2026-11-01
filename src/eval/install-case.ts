@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { npmScriptPolicy } from "../install/npm-scripts.ts";
 import { type BuildPolicy, pnpmBuildPolicy } from "../install/pnpm-builds.ts";
 import {
   type ProjectFs,
@@ -28,6 +29,9 @@ import { aggregate, type Finding } from "../verdict.ts";
  *                              a plain install of it, as `croak plan
  *                              --project` checks one: its own install scripts
  *                              and its workspace members' (D35, D47)
+ *                              (pinning `"packageManager": "npm@12.x.y"`
+ *                              plans it as npm 12+, which reads allowScripts;
+ *                              D56)
  *   pnpm-workspace.yaml,       pnpm only: the project's build rule (which
  *   .pnpmfile.cjs              install scripts pnpm 10+ runs, with
  *                              package.json) and the code pnpm loads on every
@@ -216,7 +220,7 @@ export async function checkInstallFixture(
     );
   let after: string;
   let before: string | undefined;
-  let builds: BuildPolicy | undefined;
+  let builds: { manager: "npm" | "pnpm"; mayRun: BuildPolicy } | undefined;
   if (pnpmLock !== undefined) {
     if (read("before.package-lock.json") !== undefined)
       throw new InstallFixtureError(
@@ -224,16 +228,29 @@ export async function checkInstallFixture(
       );
     after = fillPnpmLock(pnpmLock, tarballs);
     before = read("before.pnpm-lock.yaml");
-    builds = pnpmBuildPolicy(
+    const mayRun = pnpmBuildPolicy(
       {
         packageJson: read("package.json"),
         workspaceYaml: read("pnpm-workspace.yaml"),
       },
       EVAL_PNPM_VERSION,
     );
+    builds = mayRun === undefined ? undefined : { manager: "pnpm", mayRun };
   } else if (npmLock !== undefined) {
     after = fillNpmLock(npmLock, tarballs);
     before = read("before.package-lock.json");
+    // A fixture plans as npm 12+ by pinning it (packageManager), with no
+    // allow-scripts config; otherwise as npm 11, which runs every script.
+    const manifest = read("package.json");
+    const pin =
+      manifest === undefined
+        ? undefined
+        : /"packageManager"\s*:\s*"npm@(\d+\.\d+\.\d+)"/.exec(manifest)?.[1];
+    const mayRun =
+      pin === undefined
+        ? undefined
+        : npmScriptPolicy(manifest, pin, { allowScripts: [], allowAll: false });
+    builds = mayRun === undefined ? undefined : { manager: "npm", mayRun };
   } else
     throw new InstallFixtureError(
       "missing package-lock.json (or pnpm-lock.yaml)",

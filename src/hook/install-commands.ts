@@ -303,6 +303,7 @@ const BOOLEAN_FLAGS = new Set([
   "force",
   "dry-run",
   "ignore-scripts",
+  "dangerously-allow-all-scripts",
   "audit",
   "fund",
   "prefer-offline",
@@ -460,6 +461,10 @@ function npmIntents(
     return unchecked(
       "it points npm at a registry or config croak does not check",
     );
+  // npm 12 holds scripts back and croak notes them as such; this runs them all (D56).
+  const allowAll = flags.get("dangerously-allow-all-scripts")?.at(-1);
+  if (allowAll !== undefined && allowAll !== "false")
+    return unchecked(RUNS_SCRIPTS);
   const prefix = flags.get("prefix")?.at(-1);
   const dir =
     prefix === undefined || state.dir === undefined

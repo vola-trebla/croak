@@ -219,3 +219,42 @@ else
   echo "skip: pnpm is not installed"
 fi
 
+
+# npm 12 holds back dependency install scripts unless they are allowed (D56).
+# A shim reports npm 12 and answers `npm config get` from SHIM_* (CI's npm may
+# predate allow-scripts); everything else goes to the real npm.
+shim="$work/npm12"
+mkdir -p "$shim"
+# Outside $work: earlier cases leave workspace files there.
+p12=$(mktemp -d "${TMPDIR:-/tmp}/croak-npm12.XXXXXX")
+trap 'rm -rf "$work" "$p12"' EXIT INT TERM
+cat >"$shim/npm" <<SHIM
+#!/bin/sh
+if [ "\$1" = --version ]; then echo 12.2.1; exit 0; fi
+if [ "\$1" = config ] && [ "\$2" = get ]; then
+  [ -z "\${SHIM_FAIL-}" ] || exit 1
+  echo "allow-scripts=\${SHIM_ALLOW-}"
+  echo "dangerously-allow-all-scripts=\${SHIM_ALL-false}"
+  exit 0
+fi
+exec "$(command -v npm)" "\$@"
+SHIM
+chmod +x "$shim/npm"
+severity() { # severity <package.json> [env assignment]: install-script severity under npm 12
+  echo "$1" >"$p12/package.json"
+  set +e
+  (cd "$p12" && env PATH="$shim:$PATH" ${2-} sh "$root/scripts/croak-install.sh" --json "$work/bait/croak-bait-1.0.0.tgz" >"$work/p12.out" 2>&1)
+  set -e
+  node -e 'let s="";process.stdin.on("data",(d)=>{s+=d}).on("end",()=>{try{const f=JSON.parse(s).findings.find((x)=>x.ruleId==="install/install-script");console.log(f?f.severity:"none")}catch{console.log("no-report")}})' <"$work/p12.out"
+}
+plain='{ "name": "p12", "version": "1.0.0" }'
+check12() { # check12 <expected> <why> <package.json> [env assignment]
+  [ "$(severity "$3" "${4-}")" = "$1" ] || { echo "FAIL: npm 12, $2:"; cat "$work/p12.out"; exit 1; }
+}
+check12 info "no allowScripts, still warned" "$plain"
+check12 warn "allowScripts allows it, not warned" '{ "name": "p12", "version": "1.0.0", "allowScripts": { "croak-bait": true } }'
+check12 warn "allow-scripts config allows it, not warned" "$plain" SHIM_ALLOW=other,croak-bait
+check12 warn "dangerously-allow-all-scripts ignored" "$plain" SHIM_ALL=true
+check12 warn "unreadable settings were trusted" "$plain" SHIM_FAIL=1
+[ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
+echo "ok: npm 12's allowScripts, allow-scripts and dangerously-allow-all-scripts are read; nothing ran"

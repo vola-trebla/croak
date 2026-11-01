@@ -39,6 +39,21 @@ describe("checkInstallFixture", () => {
     expect(outcome).toMatchObject({ status: "complete", added: 1, changed: 1 });
   });
 
+  it("plans as npm 12 when the fixture pins it, reading allowScripts (D56)", async () => {
+    const severity = async (id: string) => {
+      const outcome = await checkInstallFixture(fixture(id));
+      return (
+        outcome.status === "complete" &&
+        outcome.findings.find((f) => f.ruleId === "repo/lifecycle-script")
+          ?.severity
+      );
+    };
+    expect(await severity("benign-binary-installer")).toBe("warn");
+    expect(await severity("benign-npm-unapproved-script")).toBe("info");
+    expect(await severity("benign-npm-approved-script")).toBe("warn");
+    expect(await severity("a-npm-unapproved-script-exfil")).toBe("block");
+  });
+
   it("rejects a fixture without a lockfile", async () => {
     await expect(checkInstallFixture(fixture("d-postinstall"))).rejects.toThrow(
       InstallFixtureError,

@@ -32,7 +32,10 @@ A root `package.json` makes the fixture the project itself, installed with a
 plain `npm install`: its own install scripts and those of the workspace
 members the lockfile lists are checked, as `croak plan --project` checks
 them (D35, D47). Put members outside `packages/`, which holds tarballs
-(`apps/web/`, say).
+(`apps/web/`, say). An npm case is planned as npm 11, which runs every
+install script, unless its `package.json` pins `"packageManager":
+"npm@12.x.y"`: then it is planned as that npm, whose `allowScripts` decides
+which scripts run, as in `croak-install` (D56).
 
 A pnpm case carries `pnpm-lock.yaml` (and `before.pnpm-lock.yaml`) instead,
 never both managers' lockfiles. Its `package.json` and `pnpm-workspace.yaml`,

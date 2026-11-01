@@ -1,0 +1,10 @@
+{
+  "id": "a-npm-unapproved-script-exfil",
+  "kind": "install",
+  "threat": "A",
+  "description": "npm 12 twin of a-install-script-exfil: the hijacked release's postinstall posts process.env away. allowScripts never approved it, so npm 12+ will not run it today, but it is still evidence about the package and a later approval would run it: the block stays (D56).",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

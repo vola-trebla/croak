@@ -1,6 +1,6 @@
 {
   "name": "@vola-trebla/croak",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Croak before you install: a pre-execution gate for package installs, built for AI agents",
   "keywords": [
     "security",

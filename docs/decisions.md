@@ -792,3 +792,25 @@ maintainer.
 
 **Trade-off:** a release reruns the whole suite (a few minutes) rather
 than trusting the CI run on the same commit.
+
+## D51 — 0.1.0 is out; croak's first look at itself (2026-11-01)
+
+The maintainer published 0.1.0 by hand (D49): 60 files, and the registry's
+sha512 matches a local `npm pack` byte for byte. `croak-install --empty
+@vola-trebla/croak` then warned about croak itself:
+- **New package, released today** (`install/new-package`,
+  `install/recent-release`): true, and they lapse with time.
+- **A changed build workflow in its dependency:** `@anthropic-ai/sdk`
+  0.133.0 was built by `publish-npm.yml`, 0.131.0 by `create-releases.yml`.
+  A real M7 signal on a legitimate change; asking about it is the design.
+- **Obfuscation in croak's own detector:** a false alarm. Comments in the
+  obfuscation detector quote `globalThis[key](…)`, and tsc kept comments
+  in dist/. The build now drops them (`removeComments`), and the tarball
+  smoke test scans croak's own installed files.
+
+0.1.1 carries that fix and is the first version published from CI with
+provenance (D50), so croak can verify its own build.
+
+**Open for the M8 review:** the obfuscation detector also matches inside
+comments of other packages; dropping croak's own comments hides that
+class here, it does not fix it.

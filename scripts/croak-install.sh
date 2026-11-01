@@ -230,9 +230,26 @@ if ! isolated "$@" >"$work/plan.log" 2>&1; then
   exit 3
 fi
 if [ ! -f "$work/plan/$lockname" ] && [ -n "$member" ] && [ -f "$work/plan/$member/$lockname" ]; then
-  # The package manager planned the folder as its own project (M6 review).
-  echo "croak-install: $member is inside a workspace that does not list it as a member, so the install would not run where croak planned it" >&2
-  exit 3
+  # The package manager planned the folder as its own project: the workspace
+  # does not list it, and the real install runs there too. That plan lacked
+  # the folder's own lockfile and sanitized manifest, so plan the folder again
+  # as a project of its own, exactly as outside any workspace (D48). croak
+  # plan still refuses a --member the lockfile does not list (M6 review).
+  cd "$start"
+  if [ "$manager" = npm ] && [ -f npm-shrinkwrap.json ]; then
+    echo "croak-install: npm-shrinkwrap.json is not supported yet, so this install was not checked" >&2
+    exit 2
+  fi
+  project=$(pwd -P)
+  member="" ws="" baseline_value=$project plan_at="$work/plan"
+  rm -rf "$work/plan" && mkdir "$work/plan"
+  croak "$project" sanitize root-manifest package.json >"$work/plan/package.json" || exit 3
+  [ ! -f "$lockname" ] || cp "$lockname" "$work/plan/$lockname"
+  if ! isolated "$@" >"$work/plan.log" 2>&1; then
+    echo "croak-install: $manager could not plan this install, so it was not checked:" >&2
+    tail -n 15 "$work/plan.log" >&2
+    exit 3
+  fi
 fi
 [ -f "$work/plan/$lockname" ] || { echo "croak-install: $manager wrote no $lockname, so this install was not checked" >&2; exit 3; }
 

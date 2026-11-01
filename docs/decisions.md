@@ -718,3 +718,29 @@ lockfile got a registry URL filled in, as if they were downloads.
 **Trade-off:** the project-level part is a copy of the CLI's wiring
 (`runPlan` in src/cli.ts), not shared code; a change to one must be
 mirrored in the other, and the cases are what catches a drift.
+
+## D48 — A folder the workspace does not list is planned on its own (2026-10-31)
+
+D41 refused a project inside a workspace folder that the workspace does not
+list (exit 3): an agent working in `examples/demo` of a monorepo could not
+install anything there. The wrapper already ran the package manager from
+that folder in the copied workspace, and the package manager's own choice
+showed where the real install goes: a lockfile in the folder, not at the
+root, means it installs the folder as a project of its own. That plan is
+not used, because it lacked the folder's own lockfile and its manifest was
+not sanitized. The folder is planned again, from scratch, exactly as a
+project outside any workspace: its sanitized package.json, its lockfile,
+its node_modules as the baseline, its own install scripts, and its own
+`npm-shrinkwrap.json` refused (D34).
+
+Observed: npm 11 installs such a folder on its own; pnpm 12.4.2 adds it to
+the workspace lockfile as an importer and installs from the root, so the
+plan stays at the root. Both follow from what the package manager wrote,
+not from croak's reading of the workspace globs.
+
+Unchanged: `--ci` in such a folder stays incomplete, since no package
+manager runs to tell where it installs, and `croak plan` still refuses a
+`--member` the planned lockfile does not list, as a backstop. This lifts
+D41's trade-off.
+
+**Trade-off:** planning such a folder runs the package manager twice.

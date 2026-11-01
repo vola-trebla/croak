@@ -137,8 +137,8 @@ not warned about; the project's `.pnpmfile.cjs` and config dependencies,
 which pnpm runs on every install, are checked; and planning never lets a
 project pick the pnpm binary (`packageManager`) or load a pnpmfile.
 Workspaces, npm and pnpm, are checked from their root, with every member's
-own install scripts; a folder the workspace does not list as a member is
-refused.
+own install scripts; a folder inside the workspace that it does not list as
+a member is checked as a project of its own, as npm installs it.
 
 **`croak repo`** runs seven detectors: install scripts, VS Code autorun tasks,
 hidden code, obfuscation, dangerous git config, committed `node_modules`, and

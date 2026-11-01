@@ -814,3 +814,33 @@ provenance (D50), so croak can verify its own build.
 **Open for the M8 review:** the obfuscation detector also matches inside
 comments of other packages; dropping croak's own comments hides that
 class here, it does not fix it.
+
+## D52 — A forged root lockfile could hide a non-member's install (2026-11-01)
+
+The M8 toad review found that D48 only re-planned a folder the workspace
+does not list when the workspace root had **no** lockfile. The wrapper
+copies the root lockfile into the plan folder before npm runs, and npm,
+planning the folder on its own, leaves that copy as it was; the old check
+read its presence as "npm planned at the root". So in the usual monorepo,
+with a root lockfile:
+- an honest root lockfile made the folder incomplete (exit 3), so D48 did
+  nothing where it matters;
+- a root lockfile that lists the folder as a member, which any repository
+  can write, passed `croak plan`'s member check: the plan used the root
+  lockfile, and croak said **allow** for an install whose own dependency
+  (with a postinstall) it never saw. The reviewer probed it; a fake test
+  assignment is exactly that repository. The gap dates from M6 (the exit 3
+  check had the same condition); D48 described it as safe.
+
+The wrapper now decides by what the package manager wrote: the copy holds
+only package.json files, so a lockfile inside the member's folder can only
+come from the package manager planning that folder apart from the
+workspace. For npm, the folder is planned again on its own (D48). For pnpm,
+which also writes one for a real member under `sharedWorkspaceLockfile:
+false`, it is refused (exit 3): planning that member alone would leave the
+rest of the workspace out. Tests cover an honest and a forged root lockfile,
+with a bait only the folder depends on.
+
+**Trade-off:** `croak plan --member` still trusts the planned lockfile's
+member list as its backstop; the wrapper is what keeps a forged list from
+standing in for the package manager's own plan.

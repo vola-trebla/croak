@@ -93,7 +93,14 @@ echo "$out" | grep -q "packages/a/package.json" || { echo "FAIL: the member's po
 [ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
 # A project inside the workspace folder that is not a member: npm installs it
 # on its own, so croak plans it on its own, with its own install scripts (D48).
-printf '{ "name": "demo", "version": "1.0.0", "scripts": { "postinstall": "node demo-setup.js" }, "dependencies": { "croak-bait": "file:%s" } }\n' "$work/bait/croak-bait-1.0.0.tgz" >"$ws/examples/demo/package.json"
+# Its bait is a package no member has, so only a plan of the folder itself
+# can find it (M8 review).
+mkdir -p "$work/bait2/package"
+cat >"$work/bait2/package/package.json" <<JSON
+{ "name": "croak-bait2", "version": "1.0.0", "scripts": { "postinstall": "touch $marker" } }
+JSON
+(cd "$work/bait2" && tar -czf croak-bait2-1.0.0.tgz package)
+printf '{ "name": "demo", "version": "1.0.0", "scripts": { "postinstall": "node demo-setup.js" }, "dependencies": { "croak-bait2": "file:%s" } }\n' "$work/bait2/croak-bait2-1.0.0.tgz" >"$ws/examples/demo/package.json"
 echo "require('fs').writeFileSync('$marker', '')" >"$ws/examples/demo/demo-setup.js"
 set +e
 out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
@@ -112,6 +119,30 @@ code=$?
 set -e
 rm "$ws/examples/demo/npm-shrinkwrap.json"
 [ "$code" -eq 2 ] && echo "$out" | grep -q "not supported yet" || { echo "FAIL: a non-member's shrinkwrap was not refused (exit $code):"; echo "$out"; exit 1; }
+# The usual monorepo has a root lockfile: the folder is still planned on its
+# own, from what npm wrote there, not from the root lockfile (M8 review).
+(cd "$ws" && env -i PATH="$PATH" HOME="$work" npm install --package-lock-only --ignore-scripts --no-audit --no-fund >/dev/null 2>&1)
+[ -f "$ws/package-lock.json" ] || { echo "FAIL: could not prepare the workspace's root lockfile"; exit 1; }
+set +e
+out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
+code=$?
+set -e
+[ "$code" -ne 3 ] && echo "$out" | grep -q "croak-bait2" || { echo "FAIL: with a root lockfile, the non-member was not planned on its own (exit $code):"; echo "$out"; exit 1; }
+# A forged root lockfile that lists the folder as a member must not stand in
+# for the plan npm made of the folder: the bait is still found.
+node -e '
+  const fs = require("fs"); const lock = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  lock.packages["examples/demo"] = { name: "demo", version: "1.0.0" };
+  lock.packages["node_modules/demo"] = { resolved: "examples/demo", link: true };
+  fs.writeFileSync(process.argv[1], JSON.stringify(lock, null, 2));
+' "$ws/package-lock.json"
+set +e
+out=$(cd "$ws/examples/demo" && sh "$root/scripts/croak-install.sh" 2>&1)
+code=$?
+set -e
+echo "$out" | grep -q "croak-bait2" || { echo "FAIL: a forged root lockfile hid the non-member's bait (exit $code):"; echo "$out"; exit 1; }
+[ ! -e "$marker" ] || { echo "FAIL: a lifecycle script ran during planning"; exit 1; }
+rm "$ws/package-lock.json"
 # A member behind a linked folder would be left out of the copy: refused.
 mkdir -p "$work/elsewhere/c"
 echo '{ "name": "c", "version": "1.0.0", "scripts": { "postinstall": "node x.js" } }' >"$work/elsewhere/c/package.json"

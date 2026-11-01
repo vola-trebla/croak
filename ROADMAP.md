@@ -101,7 +101,7 @@ browser cookies), CI tokens, and the user's own published packages (worm spread)
 - [x] Actionable feedback for the agent: deny/ask reasons with the findings, and "did you mean `react-dom`?" for names npm does not have or that look like a popular package
 - [x] Verdict cache keyed by tarball sha512 + croak's code, so repeated installs stay fast in the hook (D33) — moved from M3 (D29)
 - [x] Agent-command eval: 43 commands (caught 28/29, untouched 14/14)
-- [ ] Not yet: npm workspaces, `npm-shrinkwrap.json` and private registries (denied for now, D34)
+- [ ] Not yet: `npm-shrinkwrap.json` and private registries (denied for now, D34; workspaces came in M6)
 
 ### M5 — LLM triage (BYOK, Haiku by default)
 
@@ -134,7 +134,7 @@ Three separate mechanisms, never merged into one "verified" badge:
 
 ### M8 — npm release
 
-- [ ] Open the repo — moved earlier: right after M2, marked early-stage (D21)
+- [x] Open the repo — moved earlier: right after M2, marked early-stage (D21)
 - [ ] Publish `@vola-trebla/croak` from CI with provenance (name checked for conflicts first, D22)
 - [ ] Article: "From a 2013 ECC diploma to croak"
 

@@ -91,4 +91,6 @@ jobs:
           sha512sum "$tgz"
       # No token: npm exchanges this job's OIDC token for a one-time publish
       # credential. --ignore-scripts: croak has no publish scripts, and none may run.
-      - run: npm publish "release/vola-trebla-croak-${GITHUB_REF_NAME#v}.tgz" --provenance --access public --ignore-scripts
+      # The path starts with ./ : npm reads `release/x.tgz` as the GitHub
+      # repository release/x.tgz and runs git (v0.1.2 failed on it, D54).
+      - run: npm publish "./release/vola-trebla-croak-${GITHUB_REF_NAME#v}.tgz" --provenance --access public --ignore-scripts

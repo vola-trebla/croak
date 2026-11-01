@@ -889,3 +889,16 @@ for the first time with the next tag.
 Eval: 67 cases, block recall 26/35, false alarms 0/32, rule recall 52/52
 (`eval/history/m8.json`). Package corpus: 62 packages, 40 allow, 22 warn,
 0 block.
+
+## D54 — v0.1.2 did not publish; 0.1.3 does (2026-11-01)
+
+The first run of the split release workflow (D50) passed verify and failed
+at `npm publish release/vola-trebla-croak-0.1.2.tgz`: npm reads a path
+without `./` as GitHub shorthand (`owner/repo`) and ran `git ls-remote`,
+which failed. Nothing reached npm; `latest` stayed 0.1.1. The publish step
+now passes `./release/…`, checked locally with `npm publish --dry-run` both
+ways.
+
+The tag `v0.1.2` is left where it is, on the commit whose workflow failed:
+croak pins actions by commit because tags can move, and it does not move
+its own. The fix ships as 0.1.3, so npm goes from 0.1.1 to 0.1.3.

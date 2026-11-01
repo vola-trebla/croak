@@ -137,7 +137,8 @@ Three separate mechanisms, never merged into one "verified" badge:
 - [x] Open the repo — moved earlier: right after M2, marked early-stage (D21)
 - [x] Before the release: install eval for pnpm lockfiles and the project's own files (D46, D47); a folder the workspace does not list is planned on its own (D48)
 - [x] Package `@vola-trebla/croak` 0.1.0, tarball smoke test in CI, release workflow on npm trusted publishing (D49, D50)
-- [ ] Publish `@vola-trebla/croak` from CI with provenance (name checked for conflicts first, D22): 0.1.0 by hand, 0.1.1 from CI
+- [x] Publish `@vola-trebla/croak` from CI with provenance (name checked for conflicts first, D22): 0.1.0 by hand, 0.1.1 from CI, verified by croak itself (D51)
+- [x] Review fixes (D52, D53): a forged root lockfile could hide a non-member's install; release split into a tokenless verify job and a publish job
 - [ ] Article: "From a 2013 ECC diploma to croak"
 
 ### Later

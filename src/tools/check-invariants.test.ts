@@ -334,6 +334,20 @@ describe("checkWorkflow", () => {
     ]);
   });
 
+  it.each([
+    "  - { uses: actions/checkout@v7, with: { fetch-depth: 1 } }",
+    '  - "uses": actions/checkout@v7',
+    "  - 'uses' : actions/checkout@v7",
+  ])("flags other YAML spellings of uses: %s", (line) => {
+    expect(flagged(`steps:\n${line}`)).toHaveLength(1);
+  });
+
+  it("passes those spellings when pinned", () => {
+    expect(
+      flagged(`steps:\n  - { uses: actions/checkout@${sha}, with: {} }`),
+    ).toEqual([]);
+  });
+
   it("reports the line", () => {
     expect(
       checkWorkflow("w.yml", "on: push\nsteps:\n  - uses: a/b@v1"),

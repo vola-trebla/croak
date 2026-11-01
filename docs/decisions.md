@@ -752,7 +752,8 @@ someone else), first version **0.1.0**: 0.x says early stage, as the README
 does. package.json gains `repository` (provenance requires it to match the
 repository that builds the package), `homepage`, `bugs`, `keywords` and
 `publishConfig.access: public` (a scoped package is private by default),
-and loses `private`. `bin` paths all start with `./`. A test ties the
+and loses `private`. `bin` paths have no leading `./`, the form npm
+normalizes to (it warns about others at publish). A test ties the
 CLI's `--version` to package.json's version.
 
 How releases happen, chosen by the maintainer:
@@ -802,7 +803,9 @@ next tag (0.1.2).
 ## D51 — 0.1.0 is out; croak's first look at itself (2026-11-01)
 
 The maintainer published 0.1.0 by hand (D49): 60 files, and the registry's
-sha512 matches a local `npm pack` byte for byte. `croak-install --empty
+sha512 matches a local `npm pack` byte for byte. npm's staged publishing
+also created `0.0.0-stage` a minute earlier: a two-file placeholder
+(`stub: true`) that no dist-tag points to. `croak-install --empty
 @vola-trebla/croak` then warned about croak itself:
 - **New package, released today** (`install/new-package`,
   `install/recent-release`): true, and they lapse with time.

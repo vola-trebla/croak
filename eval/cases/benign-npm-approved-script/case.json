@@ -1,0 +1,10 @@
+{
+  "id": "benign-npm-approved-script",
+  "kind": "install",
+  "threat": "benign",
+  "description": "npm 12 twin of benign-binary-installer whose allowScripts approves the package: npm will run the postinstall, so it stays worth a look (D56).",
+  "expect": {
+    "verdict": "warn",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

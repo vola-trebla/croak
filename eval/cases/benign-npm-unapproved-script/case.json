@@ -1,0 +1,10 @@
+{
+  "id": "benign-npm-unapproved-script",
+  "kind": "install",
+  "threat": "benign",
+  "description": "npm 12 twin of benign-binary-installer: an esbuild-style postinstall that the project's allowScripts does not allow. npm 12+ will not run it, so the warning becomes a note (D56).",
+  "expect": {
+    "verdict": "allow",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

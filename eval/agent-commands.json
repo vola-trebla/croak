@@ -266,6 +266,31 @@
       "command": "pnpm ci",
       "expect": "check",
       "why": "installs the lockfile as written (M6 review)"
+    },
+    {
+      "command": "pnpm approve-builds esbuild",
+      "expect": "deny",
+      "why": "pnpm suggests it after ERR_PNPM_IGNORED_BUILDS; it runs the build (D55)"
+    },
+    {
+      "command": "npm rebuild",
+      "expect": "deny",
+      "why": "runs installed packages' install scripts (D55)"
+    },
+    {
+      "command": "npm install-scripts approve --all",
+      "expect": "deny",
+      "why": "lets every held-back install script run (D55)"
+    },
+    {
+      "command": "npm i esbuild --dangerously-allow-all-scripts",
+      "expect": "deny",
+      "why": "overrides npm 12's script policy (D56)"
+    },
+    {
+      "command": "pnpm ignored-builds",
+      "expect": "ignore",
+      "why": "only lists the held-back builds (D55)"
     }
   ]
 }

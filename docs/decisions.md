@@ -694,3 +694,27 @@ test-only shortcut that keeps fixtures hand-written, with no YAML writer.
 **Trade-off:** the pnpmfile and config-dependency checks (D39) and the
 project's own scripts still have no eval cases; they come with project
 manifests in install cases (D47).
+
+## D47 — Install cases can carry the project (2026-10-31)
+
+The checks on the project's own files ran only through `croak plan
+--project` and `--pnpm-builds`: no eval case reached them, though the fake
+test assignment (threat D) attacks exactly there. A fixture's root
+package.json is now the project, installed with a plain install, and the
+harness adds what the planning wrapper adds: the project's install scripts
+and its workspace members' (D35, D41), and on pnpm cases the pnpmfile and
+config dependencies (D39). A fixture without package.json is about its
+packages alone, so the 26 earlier install cases are unchanged.
+
+Six cases, each with a twin: a test assignment's own postinstall (block)
+against husky in prepare (allow); the same exfil in a workspace member's
+preinstall (block) against a member's `prisma generate` (warn); a
+`.pnpmfile.cjs` that posts the environment (block) against one that pins
+a dependency (warn).
+
+Writing them found a harness bug: workspace members in an npm fixture
+lockfile got a registry URL filled in, as if they were downloads.
+
+**Trade-off:** the project-level part is a copy of the CLI's wiring
+(`runPlan` in src/cli.ts), not shared code; a change to one must be
+mirrored in the other, and the cases are what catches a drift.

@@ -1,0 +1,10 @@
+{
+  "id": "d-install-project-postinstall",
+  "kind": "install",
+  "threat": "D",
+  "description": "Install twin of d-postinstall-exfil: the agent runs a plain npm install in a cloned test assignment, and npm runs the project's own postinstall, which posts process.env away. The packages are clean; the project is the attack (D35).",
+  "expect": {
+    "verdict": "block",
+    "rules": ["repo/lifecycle-script"]
+  }
+}

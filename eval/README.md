@@ -28,11 +28,17 @@ fixture/
   packages/<name>@<version>/ # files served as that version's tarball
 ```
 
+A root `package.json` makes the fixture the project itself, installed with a
+plain `npm install`: its own install scripts and those of the workspace
+members the lockfile lists are checked, as `croak plan --project` checks
+them (D35, D47). Put members outside `packages/`, which holds tarballs
+(`apps/web/`, say).
+
 A pnpm case carries `pnpm-lock.yaml` (and `before.pnpm-lock.yaml`) instead,
 never both managers' lockfiles. Its `package.json` and `pnpm-workspace.yaml`,
 when present, are the project's build rule: an install script that pnpm 10+
 will not run is a note, not a warning, as in `croak-install --pnpm` (D38,
-D46).
+D46). Its `.pnpmfile.cjs` is checked on every pnpm case (D39).
 
 Lockfile entries without `resolved`/`integrity` get the registry URL and the
 hash of the built tarball (in pnpm-lock.yaml: a package's `resolution: {}`);

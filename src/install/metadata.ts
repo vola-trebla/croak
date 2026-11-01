@@ -141,11 +141,17 @@ export function metadataFindings(
     : "";
 
   if (recentRelease) {
+    // A publish time ahead of the clock: a wrong clock here, or a registry
+    // answer that is not what it seems. Either way, as recent as it gets.
+    const when =
+      facts.ageDays !== undefined && facts.ageDays < 0
+        ? "has a publish time after this machine's clock"
+        : `was published ${facts.ageDays} day(s) ago`;
     findings.push(
       finding(
         "install/recent-release",
         "warn",
-        `was published ${facts.ageDays} day(s) ago; new versions of popular packages are where hijacks land first`,
+        `${when}; new versions of popular packages are where hijacks land first`,
       ),
     );
   }

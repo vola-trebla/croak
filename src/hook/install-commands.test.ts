@@ -242,6 +242,41 @@ describe("installIntents", () => {
     ]);
   });
 
+  it.each([
+    "pnpm approve-builds esbuild",
+    "pnpm approve-builds --all",
+    "pnpm -C web approve-builds",
+    "pnpm rebuild",
+    "pnpm rb esbuild",
+    "pnpm --filter web rebuild",
+    "npm rebuild esbuild",
+    "npm rb",
+    "npm approve-scripts esbuild",
+    "npm approve-scripts --all",
+    "npm install-scripts approve esbuild",
+    "npm install-scripts approve --all",
+  ])(
+    "refuses a command that lets installed packages run install scripts: %s (D55)",
+    (command) => {
+      expect(at(command)).toEqual([
+        expect.objectContaining({
+          kind: "unchecked",
+          reason: expect.stringContaining("run their install scripts"),
+        }),
+      ]);
+    },
+  );
+
+  it("leaves the read-only approval commands alone (D55)", () => {
+    for (const command of [
+      "pnpm ignored-builds",
+      "npm install-scripts ls",
+      "npm install-scripts deny esbuild",
+      "npm help rebuild",
+    ])
+      expect(at(command)).toEqual([]);
+  });
+
   it("checks pnpm ci and install-test (M6 review)", () => {
     expect(at("pnpm ci")[0]).toMatchObject({ kind: "ci", manager: "pnpm" });
     expect(at("pnpm it")[0]).toMatchObject({

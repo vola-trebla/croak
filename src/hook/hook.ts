@@ -49,7 +49,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** The Bash command and directory from a PreToolUse event, or undefined for other tools. */
-export function hookCommand(
+function hookCommand(
   input: string,
 ): { command: string; cwd: string } | undefined {
   let data: unknown;
@@ -85,10 +85,7 @@ const isSafeSpec = (spec: string): boolean =>
  * package.json or a node_modules folder (as @npmcli/config does); `dir` itself
  * when there is none. That is where npm installs, not where the agent is.
  */
-export function npmPrefix(
-  dir: string,
-  exists: (path: string) => boolean,
-): string {
+function npmPrefix(dir: string, exists: (path: string) => boolean): string {
   for (let at = dir; ; at = posix.dirname(at)) {
     if (
       exists(posix.join(at, "package.json")) ||

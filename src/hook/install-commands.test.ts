@@ -81,8 +81,8 @@ describe("installIntents", () => {
       "through the environment",
     ],
     [`eval "npm i x"`, "eval hides"],
-    ["yarn", "yarn support is planned (M6)"],
-    ["bunx cowsay", "bunx support is planned (M6)"],
+    ["yarn", "yarn is not supported yet"],
+    ["bunx cowsay", "bunx is not supported yet"],
     [`npm i "unbalanced`, "could not parse"],
   ])("fails closed on %s", (command, reason) => {
     expect(at(command)).toEqual([
@@ -213,7 +213,7 @@ describe("installIntents", () => {
       "registry settings",
     ],
     ["pnpm add $PKG", "only known when the shell runs"],
-    ["yarn add react", "yarn support is planned (M6)"],
+    ["yarn add react", "yarn is not supported yet"],
   ])("fails closed on %s (M6)", (command, reason) => {
     expect(at(command)).toEqual(
       expect.arrayContaining([

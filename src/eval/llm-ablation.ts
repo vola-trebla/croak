@@ -176,7 +176,7 @@ export async function runAblation(
   };
 }
 
-export function renderAblation(report: AblationReport): string {
+function renderAblation(report: AblationReport): string {
   const ratio = ({ hit, total }: { hit: number; total: number }) =>
     `${hit}/${total}`;
   const lines = [

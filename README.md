@@ -156,6 +156,10 @@ that pnpm 10+ will not run (the project does not allow its builds) is noted,
 not warned about; the project's `.pnpmfile.cjs` and config dependencies,
 which pnpm runs on every install, are checked; and planning never lets a
 project pick the pnpm binary (`packageManager`) or load a pnpmfile.
+**npm 12** holds back dependency install scripts that the project's
+`allowScripts` (or npm's `allow-scripts` config) does not allow; croak reads
+that the same way, so a script npm 12 will not run is noted, not warned
+about (npm 11 runs every script, so there it stays a warning).
 Workspaces, npm and pnpm, are checked from their root, with every member's
 own install scripts; a folder inside the workspace that it does not list as
 a member is checked as a project of its own, as npm installs it.

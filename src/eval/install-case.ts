@@ -216,7 +216,7 @@ export async function checkInstallFixture(
     );
   let after: string;
   let before: string | undefined;
-  let builds: BuildPolicy | undefined;
+  let builds: { manager: "npm" | "pnpm"; mayRun: BuildPolicy } | undefined;
   if (pnpmLock !== undefined) {
     if (read("before.package-lock.json") !== undefined)
       throw new InstallFixtureError(
@@ -224,13 +224,14 @@ export async function checkInstallFixture(
       );
     after = fillPnpmLock(pnpmLock, tarballs);
     before = read("before.pnpm-lock.yaml");
-    builds = pnpmBuildPolicy(
+    const mayRun = pnpmBuildPolicy(
       {
         packageJson: read("package.json"),
         workspaceYaml: read("pnpm-workspace.yaml"),
       },
       EVAL_PNPM_VERSION,
     );
+    builds = mayRun === undefined ? undefined : { manager: "pnpm", mayRun };
   } else if (npmLock !== undefined) {
     after = fillNpmLock(npmLock, tarballs);
     before = read("before.package-lock.json");

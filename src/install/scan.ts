@@ -124,8 +124,11 @@ export interface OnlineOptions {
   readonly cache?: ContentCache;
   /** Ask a model about packages the rules only warned about (opt-in, D36). */
   readonly llm?: LlmOptions;
-  /** pnpm's rule for whose install scripts run (D38); absent: every script counts. */
-  readonly builds?: BuildPolicy;
+  /** The package manager's rule for whose install scripts run (pnpm D38, npm D56); absent: every script counts. */
+  readonly builds?: {
+    readonly manager: "npm" | "pnpm";
+    readonly mayRun: BuildPolicy;
+  };
   /** Keys registry signatures are checked against (default: npm's, pinned; D42). */
   readonly registryKeys?: readonly RegistryKey[];
   /** Roots provenance is checked against (default: Sigstore's public good, pinned; D43). */
@@ -327,11 +330,11 @@ export async function planInstallOnline(
       ...provenance,
       ...content,
     ];
-    // Before the LLM step: a script pnpm will not run needs no second opinion.
+    // Before the LLM step: a script that will not run needs no second opinion.
     const ruled =
       options.builds === undefined
         ? all
-        : applyBuildPolicy(all, options.builds);
+        : applyBuildPolicy(all, options.builds.mayRun, options.builds.manager);
     const step =
       options.llm === undefined || options.content === false
         ? undefined

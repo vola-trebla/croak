@@ -249,6 +249,85 @@ describe("croak suggest", () => {
   });
 });
 
+describe("croak plan --npm-scripts (D56)", () => {
+  const lock = JSON.stringify({
+    lockfileVersion: 3,
+    packages: {
+      "": {},
+      "node_modules/esbuild": {
+        version: "0.28.2",
+        resolved: "https://registry.npmjs.org/esbuild/-/esbuild-0.28.2.tgz",
+        integrity: "sha512-x",
+        hasInstallScript: true,
+      },
+    },
+  });
+  const plan = (manifest: string, flags: string[]) =>
+    run(
+      [
+        ...["plan", "--before", "none", "--after", "after.json"],
+        ...["--metadata-only", "--no-cache", "--json", ...flags],
+      ],
+      {
+        emoji: false,
+        scan: () => {
+          throw new Error("not used");
+        },
+        fetch: async () => new Response("{}"),
+        readFile: (path) => {
+          if (path === "after.json") return lock;
+          if (path === "proj/package.json") return manifest;
+          throw new Error(`ENOENT ${path}`);
+        },
+      },
+    );
+  const scriptSeverity = async (result: Promise<{ stdout: string }>) =>
+    (
+      JSON.parse((await result).stdout).findings as {
+        ruleId: string;
+        severity: string;
+      }[]
+    ).find((f) => f.ruleId === "install/install-script")?.severity;
+
+  it("notes, not warns, a script npm 12 will not run", async () => {
+    const npm12 = ["--npm-scripts", "proj", "--npm-version", "12.2.1"];
+    expect(await scriptSeverity(plan('{"name":"app"}', npm12))).toBe("info");
+    expect(
+      await scriptSeverity(
+        plan('{"name":"app","allowScripts":{"esbuild":true}}', npm12),
+      ),
+    ).toBe("warn");
+    expect(
+      await scriptSeverity(
+        plan('{"name":"app"}', [...npm12, "--npm-allow-scripts", "x,esbuild"]),
+      ),
+    ).toBe("warn");
+    expect(
+      await scriptSeverity(
+        plan('{"name":"app"}', [...npm12, "--npm-allow-all"]),
+      ),
+    ).toBe("warn");
+  });
+
+  it("keeps the warning under npm 11, and refuses both managers' rules at once", async () => {
+    expect(
+      await scriptSeverity(
+        plan('{"name":"app"}', [
+          "--npm-scripts",
+          "proj",
+          "--npm-version",
+          "11.19.1",
+        ]),
+      ),
+    ).toBe("warn");
+    const both = await plan("{}", [
+      ...["--npm-scripts", "proj", "--npm-version", "12.2.1"],
+      ...["--pnpm-builds", "proj", "--pnpm-version", "10.28.2"],
+    ]);
+    expect(both.code).toBe(EXIT_USAGE);
+  });
+});
+
 describe("croak plan --llm without a key", () => {
   it("runs the rules and says the model did not run", async () => {
     const lock = JSON.stringify({ lockfileVersion: 3, packages: { "": {} } });

@@ -21,7 +21,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** "nx@21.6.4 || 21.6.5" → "nx"; "@s/x@1" → "@s/x". */
-const matcherName = (key: string): string => {
+export const matcherName = (key: string): string => {
   const at = key.indexOf("@", key.startsWith("@") ? 1 : 0);
   return (at === -1 ? key : key.slice(0, at)).trim();
 };
@@ -116,14 +116,19 @@ const SCRIPT_RULES = new Set([
 ]);
 
 /**
- * Warnings about install scripts pnpm will not run become info. Blocks stay:
- * a malicious script is evidence about the package, and a later
- * `pnpm approve-builds` would run it.
+ * Warnings about install scripts the package manager will not run become
+ * info (pnpm 10+, D38; npm 12+, D56). Blocks stay: a malicious script is
+ * evidence about the package, and a later approval would run it.
  */
 export function applyBuildPolicy(
   findings: readonly Finding[],
   policy: BuildPolicy,
+  manager: "npm" | "pnpm" = "pnpm",
 ): Finding[] {
+  const why = (name: string): string =>
+    manager === "pnpm"
+      ? `pnpm will not run it: the project does not allow builds for ${name}`
+      : `npm will not run it: allowScripts does not allow ${name}`;
   return findings.map((f) => {
     const label = labelOf(f.file);
     if (
@@ -138,7 +143,7 @@ export function applyBuildPolicy(
       : {
           ...f,
           severity: "info",
-          message: `${f.message} (pnpm will not run it: the project does not allow builds for ${name})`,
+          message: `${f.message} (${why(name)})`,
         };
   });
 }

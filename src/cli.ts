@@ -14,6 +14,7 @@ import {
   installedPnpmLockfile,
 } from "./install/installed.ts";
 import { missingPackages, suggestNames } from "./install/metadata.ts";
+import { npmScriptPolicy } from "./install/npm-scripts.ts";
 import { pnpmBuildPolicy } from "./install/pnpm-builds.ts";
 import { isPnpmLockfile, parsePnpmLockfile } from "./install/pnpm-lockfile.ts";
 import {
@@ -82,6 +83,7 @@ const HELP = `croak 🐸 — croak before you install
 Usage:
   croak plan --after <lock> [--before <lock|none> | --installed <project>] [--project <dir>] [--member <dir>] [--llm]
              [--pnpm-builds <dir> [--pnpm-version <v>]]
+             [--npm-scripts <dir> --npm-version <v> [--npm-allow-scripts <list>] [--npm-allow-all]]
              [--offline | --metadata-only] [--no-cache]
                          judge an install from the lockfile npm planned
   croak repo [path]      scan a repo before you install or open it (default: .)
@@ -126,6 +128,10 @@ function parse(argv: readonly string[]) {
       llm: { type: "boolean" },
       "pnpm-builds": { type: "string" },
       "pnpm-version": { type: "string" },
+      "npm-scripts": { type: "string" },
+      "npm-version": { type: "string" },
+      "npm-allow-scripts": { type: "string" },
+      "npm-allow-all": { type: "boolean" },
     },
     allowPositionals: true,
     strict: true,
@@ -158,6 +164,10 @@ async function runPlan(
     readonly llm?: boolean | undefined;
     readonly "pnpm-builds"?: string | undefined;
     readonly "pnpm-version"?: string | undefined;
+    readonly "npm-scripts"?: string | undefined;
+    readonly "npm-version"?: string | undefined;
+    readonly "npm-allow-scripts"?: string | undefined;
+    readonly "npm-allow-all"?: boolean | undefined;
   },
   rest: readonly string[],
   deps: CliDeps,
@@ -210,30 +220,50 @@ async function runPlan(
     if (typeof text !== "string") return text;
     before = text;
   }
-  // pnpm's own rule for whose install scripts run, from the project's settings (D38).
+  // The package manager's own rule for whose install scripts run, from the
+  // project's settings: pnpm 10+ (D38), npm 12+ (D56).
   const buildsDir = values["pnpm-builds"];
-  const builds =
+  const scriptsDir = values["npm-scripts"];
+  if (buildsDir !== undefined && scriptsDir !== undefined)
+    return usageError(
+      "--pnpm-builds and --npm-scripts: pick one package manager",
+    );
+  const readIn = (dir: string, file: string): string | undefined => {
+    try {
+      return read(`${dir}/${file}`);
+    } catch {
+      return undefined;
+    }
+  };
+  const pnpmRule =
     buildsDir === undefined || values["pnpm-version"] === undefined
       ? undefined
       : pnpmBuildPolicy(
           {
-            packageJson: (() => {
-              try {
-                return read(`${buildsDir}/package.json`);
-              } catch {
-                return undefined;
-              }
-            })(),
-            workspaceYaml: (() => {
-              try {
-                return read(`${buildsDir}/pnpm-workspace.yaml`);
-              } catch {
-                return undefined;
-              }
-            })(),
+            packageJson: readIn(buildsDir, "package.json"),
+            workspaceYaml: readIn(buildsDir, "pnpm-workspace.yaml"),
           },
           values["pnpm-version"],
         );
+  const npmRule =
+    scriptsDir === undefined || values["npm-version"] === undefined
+      ? undefined
+      : npmScriptPolicy(
+          readIn(scriptsDir, "package.json"),
+          values["npm-version"],
+          {
+            allowScripts: (values["npm-allow-scripts"] ?? "")
+              .split(/[\s,]+/)
+              .filter((name) => name !== ""),
+            allowAll: values["npm-allow-all"] === true,
+          },
+        );
+  const builds =
+    pnpmRule !== undefined
+      ? { manager: "pnpm" as const, mayRun: pnpmRule }
+      : npmRule !== undefined
+        ? { manager: "npm" as const, mayRun: npmRule }
+        : undefined;
   // --offline: lockfile signals only, no registry requests (tests, air-gapped CI).
   const outcome =
     values.offline === true

@@ -187,7 +187,7 @@ malicious never: 0 new blocks, 0 failures, $0.02 for the whole corpus.
 
 ## Package corpus (false-alarm check for installs)
 
-`eval/packages.json` pins 61 popular npm packages by version: frameworks,
+`eval/packages.json` pins 61 popular npm packages and croak itself by version: frameworks,
 minified bundles, parsers, native modules, binary installers. Each is checked
 on its own with `croak plan` (a one-entry lockfile built from the registry) at
 the clock the list was pinned on, so release ages stay the same.

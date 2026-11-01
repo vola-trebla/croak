@@ -307,13 +307,16 @@ export function checkPackageJson(manifest: unknown): Violation[] {
   return violations;
 }
 
-const USES = /^\s*(?:-\s+)?uses:\s*(\S+)/;
+/** `uses:` as a step key, plain or quoted, in block style or a flow mapping. */
+const USES = /(?:^\s*(?:-\s+)?|[{,]\s*)["']?uses["']?\s*:\s*([^\s,}]+)/;
 const PINNED = /^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/;
 
 /**
  * Every action a workflow runs is pinned by commit SHA (M0): a tag can be
  * moved to other code, and the release workflow holds the right to publish
- * croak (D49). Local actions (`./…`) are part of the repository.
+ * croak (D50). Local actions (`./…`) are part of the repository. A line
+ * check, not a YAML parser: a quoted value is flagged even when pinned
+ * (the safe direction), and a `uses:` split across lines is not seen.
  */
 export function checkWorkflow(file: string, text: string): Violation[] {
   const violations: Violation[] = [];

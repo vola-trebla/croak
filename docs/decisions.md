@@ -752,7 +752,8 @@ someone else), first version **0.1.0**: 0.x says early stage, as the README
 does. package.json gains `repository` (provenance requires it to match the
 repository that builds the package), `homepage`, `bugs`, `keywords` and
 `publishConfig.access: public` (a scoped package is private by default),
-and loses `private`. `bin` paths all start with `./`. A test ties the
+and loses `private`. `bin` paths have no leading `./`, the form npm
+normalizes to (it warns about others at publish). A test ties the
 CLI's `--version` to package.json's version.
 
 How releases happen, chosen by the maintainer:
@@ -773,30 +774,38 @@ check the provenance of; the self-check demo waits for 0.1.1.
 ## D50 — The release workflow (2026-11-01)
 
 `.github/workflows/release.yml` publishes from a `v*` tag, the second and
-every later version (D49). Choices:
-- **npm trusted publishing (OIDC).** Only the publish job may mint an
-  `id-token`; no npm token exists in the repository or its secrets, and
-  npm adds provenance. The trusted publisher on npm names this repository
-  and this workflow file, so a renamed file stops publishing.
-- **The commit is checked again before it ships:** everything CI runs
-  (check, ReDoS, eval, both wrapper tests) plus the tarball smoke test,
-  the tag must equal package.json's version, and npm must be 11.5.1 or
-  later (trusted publishing).
-- **No dependency cache** in the job that publishes, and `npm publish
-  --ignore-scripts`.
-- **Every action pinned by commit SHA,** now an invariant over all
-  workflows (`pinned-actions`), since this one holds the right to publish.
+every later version (D49). Two jobs (split in the M8 review):
+- **verify**, with no right to an OIDC token: the tag must equal
+  package.json's version; then what CI runs on Node 24 (check, ReDoS,
+  eval, build, `--version`, both wrapper tests, the `--permission` sandbox
+  run of D23) plus the tarball smoke test; then `npm pack`, once, and the
+  tarball goes up as an artifact with its sha512 in the log. CI's Node
+  24.2.0 matrix entry is not repeated.
+- **publish**, the only job with `id-token: write`: no checkout, no package
+  manager, no dev dependency. It checks npm is 11.5.1 or later (trusted
+  publishing), downloads the artifact, checks it is exactly the tagged
+  version's tarball, and runs `npm publish <tarball> --provenance --access
+  public --ignore-scripts`. A compromised dev tool runs only where no token
+  can be requested, and what npm gets is the tarball verify tested.
 
-Who may push a `v*` tag is a repository setting (a tag ruleset), set by the
-maintainer.
+Also: npm trusted publishing (no npm token anywhere; the trusted publisher
+names this repository and this workflow file, so a renamed file stops
+publishing), no dependency cache, no `registry-url` (no token placeholder
+in an `.npmrc`), and every action pinned by commit SHA, an invariant over
+all workflows (`pinned-actions`). Who may push a `v*` tag is a tag ruleset
+(admin only). The maintainer chose no environment approval gate: with the
+split, the remaining risk is a takeover of the maintainer's own account.
 
-**Trade-off:** a release reruns the whole suite (a few minutes) rather
-than trusting the CI run on the same commit.
+**Trade-off:** a release reruns the whole suite rather than trusting the
+CI run on the same commit; the split workflow is first exercised by the
+next tag (0.1.2).
 
 ## D51 — 0.1.0 is out; croak's first look at itself (2026-11-01)
 
 The maintainer published 0.1.0 by hand (D49): 60 files, and the registry's
-sha512 matches a local `npm pack` byte for byte. `croak-install --empty
+sha512 matches a local `npm pack` byte for byte. npm's staged publishing
+also created `0.0.0-stage` a minute earlier: a two-file placeholder
+(`stub: true`) that no dist-tag points to. `croak-install --empty
 @vola-trebla/croak` then warned about croak itself:
 - **New package, released today** (`install/new-package`,
   `install/recent-release`): true, and they lapse with time.
@@ -814,3 +823,69 @@ provenance (D50), so croak can verify its own build.
 **Open for the M8 review:** the obfuscation detector also matches inside
 comments of other packages; dropping croak's own comments hides that
 class here, it does not fix it.
+
+## D52 — A forged root lockfile could hide a non-member's install (2026-11-01)
+
+The M8 toad review found that D48 only re-planned a folder the workspace
+does not list when the workspace root had **no** lockfile. The wrapper
+copies the root lockfile into the plan folder before npm runs, and npm,
+planning the folder on its own, leaves that copy as it was; the old check
+read its presence as "npm planned at the root". So in the usual monorepo,
+with a root lockfile:
+- an honest root lockfile made the folder incomplete (exit 3), so D48 did
+  nothing where it matters;
+- a root lockfile that lists the folder as a member, which any repository
+  can write, passed `croak plan`'s member check: the plan used the root
+  lockfile, and croak said **allow** for an install whose own dependency
+  (with a postinstall) it never saw. The reviewer probed it; a fake test
+  assignment is exactly that repository. The gap dates from M6 (the exit 3
+  check had the same condition); D48 described it as safe.
+
+The wrapper now decides by what the package manager wrote: the copy holds
+only package.json files, so a lockfile inside the member's folder can only
+come from the package manager planning that folder apart from the
+workspace. For npm, the folder is planned again on its own (D48). For pnpm,
+which also writes one for a real member under `sharedWorkspaceLockfile:
+false`, it is refused (exit 3): planning that member alone would leave the
+rest of the workspace out. Tests cover an honest and a forged root lockfile,
+with a bait only the folder depends on.
+
+**Trade-off:** `croak plan --member` still trusts the planned lockfile's
+member list as its backstop; the wrapper is what keeps a forged list from
+standing in for the package manager's own plan.
+
+## D53 — M8 review: a forged lockfile, a token too close to dev tools (2026-11-01)
+
+The M8 toad review (`review/m7..fix/m8-review`) said do not ship until
+its first finding was fixed. Findings and fixes:
+- **Blocking: a forged root lockfile hid a non-member folder's install**
+  (D52). The wrapper now decides by the lockfile the package manager wrote
+  in the folder; tests cover an honest and a forged root lockfile.
+- **Major: the release job that could mint the npm OIDC token also ran
+  every dev dependency**, and npm repacked the tree instead of publishing
+  the tested tarball. Split into a tokenless verify job and a publish job
+  that only hands the verified tarball to npm (D50). No approval gate,
+  by the maintainer's choice.
+- **Minor:** a release newer than the clock printed a negative age; it
+  now says the publish time is after the clock. D49's `bin` claim and D50's
+  "everything CI runs" were untrue; both fixed.
+- **Nits:** `pinned-actions` also reads flow-style and quoted `uses` keys;
+  its comment cites D50; D51 mentions npm's `0.0.0-stage` placeholder;
+  ROADMAP ticks the CI release.
+- Mine, from the self-check: a workspace member was noted twice (once as
+  `name@?`); the hook's comment about Node below 24.2 was outdated (since
+  Node 22.18, `import.meta.main` exists and the CLI runs; the check stays).
+
+Found sound: every new eval case passes for the intended finding, the
+fixtures are harmless, no analyzed code runs, `removeComments` and the
+tarball smoke test hold.
+
+Left for later: the obfuscation detector also matches inside comments of
+other packages (a detector change, with its own eval twin); whether croak
+should skip npm `stub: true` versions as baselines (today they never
+settle before the first real release). The split release workflow runs
+for the first time with the next tag.
+
+Eval: 67 cases, block recall 26/35, false alarms 0/32, rule recall 52/52
+(`eval/history/m8.json`). Package corpus: 62 packages, 40 allow, 22 warn,
+0 block.

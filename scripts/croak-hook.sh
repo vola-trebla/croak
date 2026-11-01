@@ -15,8 +15,10 @@ here=$(dirname "$self")
 cli="$here/../dist/cli.js"
 install="$here/croak-install.sh"
 [ -f "$cli" ] || deny "$cli not found (run pnpm build in the croak repo)"
-# Below Node 24.2 the CLI's entry point does not run and exits 0 with no
-# output: every step would "succeed" silently, and every install would pass.
+# croak needs Node 24.2 or later (package.json engines). On a Node whose
+# entry point check does not run, the CLI exits 0 with no output, and every
+# step would "succeed" silently; on others, behaviour croak was never tested
+# with would decide. Either way: deny instead.
 node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 24 || (a === 24 && b >= 2) ? 0 : 1)' ||
   deny "croak needs Node 24.2 or later (found $(node --version 2>/dev/null || echo none))"
 

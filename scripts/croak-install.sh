@@ -229,12 +229,20 @@ if ! isolated "$@" >"$work/plan.log" 2>&1; then
   tail -n 15 "$work/plan.log" >&2
   exit 3
 fi
-if [ ! -f "$work/plan/$lockname" ] && [ -n "$member" ] && [ -f "$work/plan/$member/$lockname" ]; then
-  # The package manager planned the folder as its own project: the workspace
-  # does not list it, and the real install runs there too. That plan lacked
-  # the folder's own lockfile and sanitized manifest, so plan the folder again
-  # as a project of its own, exactly as outside any workspace (D48). croak
-  # plan still refuses a --member the lockfile does not list (M6 review).
+# The copy holds package.json files only, so a lockfile in the member's folder
+# means the package manager planned that folder apart from the workspace, as
+# the real install will. Decide by that, never by the root lockfile, which the
+# package manager then left as it was and the repository may have forged (D52).
+if [ -n "$member" ] && [ -f "$work/plan/$member/$lockname" ]; then
+  if [ "$manager" != npm ]; then
+    # pnpm writes one for a real member too (sharedWorkspaceLockfile: false);
+    # planning it alone would leave the rest of the workspace out.
+    echo "croak-install: $manager planned $member apart from its workspace, so this install was not checked" >&2
+    exit 3
+  fi
+  # npm installs a folder the workspace does not list as a project of its own.
+  # That plan lacked the folder's own lockfile and sanitized manifest, so plan
+  # the folder again, exactly as outside any workspace (D48).
   cd "$start"
   if [ "$manager" = npm ] && [ -f npm-shrinkwrap.json ]; then
     echo "croak-install: npm-shrinkwrap.json is not supported yet, so this install was not checked" >&2

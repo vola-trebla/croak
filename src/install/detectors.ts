@@ -54,8 +54,17 @@ function sourceProblem(
 }
 
 /** Packages that do not come from the public npm registry over https. */
-export const source: InstallDetector = (changes) =>
-  changes.flatMap((c): Finding[] => {
+export const source: InstallDetector = (changes) => {
+  // npm lists a workspace member twice: its folder, and the node_modules link
+  // to it. One note per member, on the folder's entry, which has a version.
+  const folders = new Set(changes.map((c) => c.entry.path));
+  return changes.flatMap((c): Finding[] => {
+    if (
+      c.entry.link &&
+      c.entry.resolved !== undefined &&
+      folders.has(c.entry.resolved)
+    )
+      return [];
     if (c.entry.link) {
       return [
         {
@@ -82,6 +91,7 @@ export const source: InstallDetector = (changes) =>
           },
         ];
   });
+};
 
 /** A downloaded package without an integrity hash is not verified by npm. */
 export const integrity: InstallDetector = (changes) =>

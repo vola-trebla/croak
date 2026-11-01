@@ -95,6 +95,20 @@ describe("planInstall", () => {
     );
   });
 
+  it("notes a workspace member once, not again for its node_modules link", () => {
+    const outcome = planInstall(
+      undefined,
+      lock({
+        "packages/w": { name: "w", version: "1.0.0" },
+        "node_modules/w": { resolved: "packages/w", link: true },
+      }),
+    );
+    expect(
+      outcome.status === "complete" &&
+        outcome.findings.map((f) => `${f.ruleId} ${f.file}`),
+    ).toEqual(["install/source w@1.0.0"]);
+  });
+
   it("reports the version change of an existing package", () => {
     const outcome = planInstall(
       before,

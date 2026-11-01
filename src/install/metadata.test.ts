@@ -99,6 +99,16 @@ describe("metadataFindings", () => {
     ).toEqual(["warn:install/recent-release"]);
   });
 
+  it("says so when a release is newer than this machine's clock, instead of a negative age", () => {
+    const [f] = metadataFindings(change("left-pad"), facts({ ageDays: -7 }));
+    expect(f).toMatchObject({
+      ruleId: "install/recent-release",
+      severity: "warn",
+    });
+    expect(f?.message).toContain("a publish time after this machine's clock");
+    expect(f?.message).not.toContain("-7");
+  });
+
   it("warns on dropped provenance, but not on provenance that never existed", () => {
     const dropped = facts({
       earlier: [
